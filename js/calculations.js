@@ -85,13 +85,14 @@ function calculateCentroid(impacts) {
 
 /**
  * Calculate group size (maximum center-to-center spread).
- * Finds the two impacts that are farthest apart, then converts to C-T-C.
- * @param {{x: number, y: number}[]} impacts - Array of impact pixel coordinates
+ * Finds the two impacts that are farthest apart.
+ * Impact coordinates are hole centers (user taps the center of each hole),
+ * so pixel distance between impacts is already center-to-center.
+ * @param {{x: number, y: number}[]} impacts - Array of impact pixel coordinates (hole centers)
  * @param {number} pixelsPerInch - Calibration ratio
- * @param {number} bulletDiameter - Bullet diameter in inches
  * @returns {{inches: number, pair: [number, number]}} Group size and which shots form the max pair
  */
-function calculateGroupSize(impacts, pixelsPerInch, bulletDiameter) {
+function calculateGroupSize(impacts, pixelsPerInch) {
     if (impacts.length < 2) return { inches: 0, pair: [0, 0] };
 
     let maxDist = 0;
@@ -107,8 +108,7 @@ function calculateGroupSize(impacts, pixelsPerInch, bulletDiameter) {
         }
     }
 
-    const edgeToEdgeInches = pixelsToInches(maxDist, pixelsPerInch);
-    const ctcInches = centerToCenter(edgeToEdgeInches, bulletDiameter);
+    const ctcInches = pixelsToInches(maxDist, pixelsPerInch);
 
     return {
         inches: ctcInches,
@@ -131,32 +131,30 @@ function calculateMeanRadius(impacts, pixelsPerInch) {
 
 /**
  * Calculate extreme vertical spread (height of group).
- * @param {{x: number, y: number}[]} impacts - Array of impact pixel coordinates
+ * Impact coordinates are hole centers, so spread is already center-to-center.
+ * @param {{x: number, y: number}[]} impacts - Array of impact pixel coordinates (hole centers)
  * @param {number} pixelsPerInch - Calibration ratio
- * @param {number} bulletDiameter - Bullet diameter in inches
  * @returns {number} Vertical spread in inches (center-to-center)
  */
-function calculateVerticalSpread(impacts, pixelsPerInch, bulletDiameter) {
+function calculateVerticalSpread(impacts, pixelsPerInch) {
     if (impacts.length < 2) return 0;
     const ys = impacts.map(p => p.y);
-    const edgeToEdgePx = Math.max(...ys) - Math.min(...ys);
-    const edgeToEdgeInches = pixelsToInches(edgeToEdgePx, pixelsPerInch);
-    return centerToCenter(edgeToEdgeInches, bulletDiameter);
+    const spreadPx = Math.max(...ys) - Math.min(...ys);
+    return pixelsToInches(spreadPx, pixelsPerInch);
 }
 
 /**
  * Calculate extreme horizontal spread (width of group).
- * @param {{x: number, y: number}[]} impacts - Array of impact pixel coordinates
+ * Impact coordinates are hole centers, so spread is already center-to-center.
+ * @param {{x: number, y: number}[]} impacts - Array of impact pixel coordinates (hole centers)
  * @param {number} pixelsPerInch - Calibration ratio
- * @param {number} bulletDiameter - Bullet diameter in inches
  * @returns {number} Horizontal spread in inches (center-to-center)
  */
-function calculateHorizontalSpread(impacts, pixelsPerInch, bulletDiameter) {
+function calculateHorizontalSpread(impacts, pixelsPerInch) {
     if (impacts.length < 2) return 0;
     const xs = impacts.map(p => p.x);
-    const edgeToEdgePx = Math.max(...xs) - Math.min(...xs);
-    const edgeToEdgeInches = pixelsToInches(edgeToEdgePx, pixelsPerInch);
-    return centerToCenter(edgeToEdgeInches, bulletDiameter);
+    const spreadPx = Math.max(...xs) - Math.min(...xs);
+    return pixelsToInches(spreadPx, pixelsPerInch);
 }
 
 /**
@@ -217,10 +215,10 @@ function calculateSession(params) {
         throw new Error('No impacts to calculate');
     }
 
-    const groupSize = calculateGroupSize(impacts, pixelsPerInch, bulletDiameter);
+    const groupSize = calculateGroupSize(impacts, pixelsPerInch);
     const meanRadius = calculateMeanRadius(impacts, pixelsPerInch);
-    const verticalSpread = calculateVerticalSpread(impacts, pixelsPerInch, bulletDiameter);
-    const horizontalSpread = calculateHorizontalSpread(impacts, pixelsPerInch, bulletDiameter);
+    const verticalSpread = calculateVerticalSpread(impacts, pixelsPerInch);
+    const horizontalSpread = calculateHorizontalSpread(impacts, pixelsPerInch);
     const poaOffset = calculatePOAOffset(poa, impacts, pixelsPerInch);
     const atz = calculateATZ(poaOffset, distanceYards);
     const centroid = calculateCentroid(impacts);

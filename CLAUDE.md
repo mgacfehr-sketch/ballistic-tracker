@@ -31,7 +31,8 @@ Building Phase 1: Core Session Workflow
 ## Key Formulas
 ```
 pixelsPerInch = pixelDistanceBetweenCalibrationPoints / 1.0
-centerToCenter_inches = (pixelDistance / pixelsPerInch) - bulletDiameter
+groupSize_inches = pixelDistance / pixelsPerInch
+  (impacts are tapped at hole centers, so pixel distance IS center-to-center)
 MOA = (inches / distanceYards) * (100 / 1.047)
 ATZ = negate the offset from POA to group centroid, in MOA
 ```

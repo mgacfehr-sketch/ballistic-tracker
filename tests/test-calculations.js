@@ -95,14 +95,13 @@ assertApprox(centroid1.y, 3.333, 0.01, 'Triangle centroid Y = 3.33');
 
 console.log('\nGroup Size:');
 
-// Scenario: 100 pixels per inch, .308 bullet, two shots 200px apart
-// Edge-to-edge = 200/100 = 2.0 inches. C-T-C = 2.0 - 0.308 = 1.692 inches
+// Scenario: 100 pixels per inch, two shots 200px apart
+// Impacts are tapped at hole centers, so 200/100 = 2.0" center-to-center
 const gs1 = calc.calculateGroupSize(
     [{x: 0, y: 0}, {x: 200, y: 0}],
-    100, // pixelsPerInch
-    0.308 // bulletDiameter
+    100 // pixelsPerInch
 );
-assertApprox(gs1.inches, 1.692, 0.001, 'Two shots 200px apart at 100ppi with .308 = 1.692" C-T-C');
+assertApprox(gs1.inches, 2.0, 0.001, 'Two shots 200px apart at 100ppi = 2.000" C-T-C');
 
 // ─── Full Session Calculation ───────────────────────────────────
 
@@ -132,10 +131,8 @@ const sessionResult = calc.calculateSession({
 assert(sessionResult.shotCount === 5, 'Shot count = 5');
 
 // Max spread should be between shot 1 (540,470) and shot 2 (560,490)
-// Distance = sqrt(20^2 + 20^2) = 28.28px = 0.2828" edge-to-edge
-// C-T-C = 0.2828 - 0.308 = 0 (clamped, group is smaller than bullet)
-// Actually let's check — these are close shots. That's a very tight group.
-assert(sessionResult.groupSizeInches >= 0, 'Group size is non-negative');
+// Distance = sqrt(20^2 + 20^2) = 28.28px = 0.2828" center-to-center
+assertApprox(sessionResult.groupSizeInches, 0.2828, 0.01, 'Group size ≈ 0.283"');
 assert(sessionResult.groupSizeMOA >= 0, 'Group size MOA is non-negative');
 
 // Centroid should be around (550, 480)
@@ -180,7 +177,7 @@ const wideResult = calc.calculateSession({
 console.log(`  Group: ${wideResult.groupSizeInches}" (${wideResult.groupSizeMOA} MOA)`);
 console.log(`  ATZ: ${wideResult.atzElevationDir} ${wideResult.atzElevationMOA} MOA, ${wideResult.atzWindageDir} ${wideResult.atzWindageMOA} MOA`);
 
-// At 20ppi, shot 1 (200,200) to shot 3 (280,350) = sqrt(80^2+150^2) = 170px = 8.5" edge-to-edge
+// At 20ppi, shot 1 (200,200) to shot 3 (280,350) = sqrt(80^2+150^2) = 170px = 8.5" C-T-C
 // That seems reasonable for a 1000yd group test
 assert(wideResult.groupSizeInches > 5, 'Wide group > 5 inches');
 assert(wideResult.groupSizeMOA > 0, 'Wide group MOA > 0');
