@@ -35,11 +35,14 @@
         // ── Profiles & History ─────────────────────────────
         var profileManager = null;
         var historyManager = null;
+        var aiAssistant = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
             historyManager = new HistoryManager(db, profileManager);
             profileManager.historyManager = historyManager;
+            aiAssistant = new AIAssistantManager(db);
+            aiAssistant.init();
         } else {
             var profilesContainer = document.getElementById('view-profiles');
             if (profilesContainer) {
@@ -55,7 +58,9 @@
         var navTabs = document.querySelectorAll('.nav-tab');
         var views = {
             session: document.getElementById('view-session'),
-            profiles: document.getElementById('view-profiles')
+            profiles: document.getElementById('view-profiles'),
+            ai: document.getElementById('view-ai'),
+            settings: document.getElementById('view-settings')
         };
         var btnNewSession = document.getElementById('btn-new-session');
 
@@ -88,6 +93,16 @@
                 profileManager.showRifleList();
             }
 
+            // Show AI assistant when switching to AI tab
+            if (viewName === 'ai' && aiAssistant) {
+                aiAssistant.show();
+            }
+
+            // Render settings when switching to settings tab
+            if (viewName === 'settings') {
+                renderSettings();
+            }
+
             // Resize canvas when switching back to session
             if (viewName === 'session') {
                 window.dispatchEvent(new Event('resize'));
@@ -100,10 +115,77 @@
             });
         }
 
+        // ── Settings Rendering ────────────────────────────
+        function renderSettings() {
+            var container = views.settings;
+            if (!container) return;
+
+            // Only render if empty (avoid re-render on every tab switch)
+            if (container.querySelector('.profile-screen')) return;
+
+            var html = '<div class="profile-screen">';
+            html += '<div class="profile-toolbar"><div class="toolbar-spacer"></div>';
+            html += '<span class="profile-title">Settings</span>';
+            html += '<div class="toolbar-spacer"></div></div>';
+
+            html += '<div class="profile-form">';
+            html += '<div class="form-group">';
+            html += '<label for="settings-api-key">Anthropic API Key</label>';
+            html += '<input type="password" id="settings-api-key" placeholder="sk-ant-..." autocomplete="off">';
+            html += '<span class="form-hint">Your key is stored locally and only sent to api.anthropic.com</span>';
+            html += '</div>';
+
+            html += '<div class="btn-row">';
+            html += '<button class="btn btn-primary" id="settings-save-key">Save Key</button>';
+            html += '</div>';
+            html += '<div id="settings-status"></div>';
+            html += '</div></div>';
+
+            container.innerHTML = html;
+
+            // Load existing key
+            if (db) {
+                db.getSetting('anthropic-api-key').then(function (key) {
+                    var input = document.getElementById('settings-api-key');
+                    if (input && key) {
+                        input.value = key;
+                    }
+                });
+            }
+
+            // Save handler
+            var saveBtn = document.getElementById('settings-save-key');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function () {
+                    var input = document.getElementById('settings-api-key');
+                    var statusEl = document.getElementById('settings-status');
+                    if (!input || !db) return;
+
+                    var value = input.value.trim();
+                    if (!value) {
+                        db.deleteSetting('anthropic-api-key').then(function () {
+                            statusEl.className = 'settings-status settings-status-success';
+                            statusEl.textContent = 'API key removed.';
+                        });
+                        return;
+                    }
+
+                    db.setSetting('anthropic-api-key', value).then(function () {
+                        statusEl.className = 'settings-status settings-status-success';
+                        statusEl.textContent = 'API key saved.';
+                    }).catch(function (err) {
+                        statusEl.className = 'settings-status settings-status-error';
+                        statusEl.textContent = 'Error saving key: ' + err.message;
+                    });
+                });
+            }
+        }
+
         // ── Touch Prevention ───────────────────────────────
         document.getElementById('app').addEventListener('touchmove', function (e) {
-            // Allow scrolling inside the step panel and profiles view
-            if (e.target.closest('#step-panel') || e.target.closest('#view-profiles')) return;
+            // Allow scrolling inside the step panel, profiles, AI, and settings views
+            if (e.target.closest('#step-panel') || e.target.closest('#view-profiles') ||
+                e.target.closest('#view-ai') || e.target.closest('#view-settings')) return;
             e.preventDefault();
         }, { passive: false });
 

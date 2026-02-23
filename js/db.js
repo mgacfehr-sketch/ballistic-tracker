@@ -10,7 +10,7 @@
  */
 
 var DB_NAME = 'ballistic-tracker';
-var DB_VERSION = 2;
+var DB_VERSION = 3;
 var MAX_RIFLES = 50;
 
 function BallisticDB() {
@@ -80,6 +80,11 @@ BallisticDB.prototype.open = function () {
                 // Session Images (annotated export images)
                 if (!db.objectStoreNames.contains('sessionImages')) {
                     db.createObjectStore('sessionImages', { keyPath: 'sessionId' });
+                }
+
+                // Settings (API keys, preferences)
+                if (!db.objectStoreNames.contains('settings')) {
+                    db.createObjectStore('settings', { keyPath: 'key' });
                 }
             } catch (err) {
                 console.error('DB upgrade failed:', err);
@@ -476,4 +481,24 @@ BallisticDB.prototype.getCleaningLogsByBarrel = function (barrelId) {
 
 BallisticDB.prototype.deleteCleaningLog = function (id) {
     return this._delete('cleaningLogs', id);
+};
+
+// ── Settings CRUD ─────────────────────────────────────────────
+
+BallisticDB.prototype.setSetting = function (key, value) {
+    return this._put('settings', {
+        key: key,
+        value: value,
+        updatedAt: new Date().toISOString()
+    });
+};
+
+BallisticDB.prototype.getSetting = function (key) {
+    return this._get('settings', key).then(function (record) {
+        return record ? record.value : null;
+    });
+};
+
+BallisticDB.prototype.deleteSetting = function (key) {
+    return this._delete('settings', key);
 };
