@@ -820,6 +820,166 @@ html, body {
     flex: 0;
 }
 
+/* ── Profile Picker (Session Step 1) ───────────────────────── */
+
+.picker-rifle-group {
+    margin-bottom: 12px;
+}
+
+.picker-rifle-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.picker-load-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    margin-bottom: 4px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.picker-load-btn:active {
+    background: var(--primary-dark);
+    border-color: var(--primary);
+}
+
+.picker-load-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+/* ── Collapsible Session Details ───────────────────────────── */
+
+.session-details {
+    margin: 4px 0;
+}
+
+.session-details-summary {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 8px 0;
+    list-style: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.session-details-summary::-webkit-details-marker {
+    display: none;
+}
+
+.session-details-summary::before {
+    content: '\25B6  ';
+    font-size: 10px;
+    transition: transform 0.15s;
+    display: inline-block;
+}
+
+.session-details[open] > .session-details-summary::before {
+    transform: rotate(90deg);
+}
+
+.session-details-body {
+    padding: 4px 0 8px;
+    animation: fadeIn 0.15s ease;
+}
+
+.session-details-body .form-row {
+    margin-bottom: 10px;
+}
+
+.session-details-body .detail-card {
+    margin: 0;
+}
+
+/* ── Log Entries ───────────────────────────────────────────── */
+
+.log-entry {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    gap: 10px;
+}
+
+.log-entry-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.log-entry-date {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.log-entry-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Dashboard Stats ───────────────────────────────────────── */
+
+.dashboard-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.dashboard-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: monospace;
+    color: var(--primary);
+}
+
+.dashboard-stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+}
+
+/* ── Form Hint ─────────────────────────────────────────────── */
+
+.form-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
 /* ── Landscape tweaks ───────────────────────────────────────── */
 
 @media (orientation: landscape) and (max-height: 500px) {

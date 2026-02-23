@@ -11,6 +11,7 @@ function ProfileManager(db) {
     this.db = db;
     this.container = null;
     this.currentRifleId = null; // set when viewing a rifle detail
+    this.historyManager = null; // set by app.js after HistoryManager is created
 }
 
 /**
@@ -289,6 +290,11 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     }
     html += '</div>';
 
+    // Barrel stats (round counts)
+    if (activeBarrel) {
+        html += '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
+    }
+
     // Loads section
     html += '<div class="detail-section">';
     html += '<div class="detail-section-header">';
@@ -310,6 +316,29 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
             html += '</div>';
         }
     }
+    html += '</div>';
+
+    // Session History link
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section-header">';
+    html += '<h3 class="detail-section-title">History &amp; Logs</h3>';
+    html += '</div>';
+    html += '<div class="profile-list" style="padding:0 16px;">';
+    html += '<div class="profile-card" id="btn-session-history">';
+    html += '<div class="profile-card-main"><span class="profile-card-name">Session History</span></div>';
+    html += '<span class="profile-card-arrow">&rsaquo;</span>';
+    html += '</div>';
+    if (activeBarrel) {
+        html += '<div class="profile-card" id="btn-cleaning-log" data-barrel-id="' + activeBarrel.id + '">';
+        html += '<div class="profile-card-main"><span class="profile-card-name">Cleaning Log</span></div>';
+        html += '<span class="profile-card-arrow">&rsaquo;</span>';
+        html += '</div>';
+    }
+    html += '<div class="profile-card" id="btn-scope-adjustments">';
+    html += '<div class="profile-card-main"><span class="profile-card-name">Scope Adjustments</span></div>';
+    html += '<span class="profile-card-arrow">&rsaquo;</span>';
+    html += '</div>';
+    html += '</div>';
     html += '</div>';
 
     html += '</div>';
@@ -363,6 +392,47 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
         loadCards[i].addEventListener('click', function () {
             var loadId = this.getAttribute('data-load-id');
             self.showLoadDetail(rifle.id, loadId);
+        });
+    }
+
+    // History & log links
+    var historyBtn = document.getElementById('btn-session-history');
+    if (historyBtn && this.historyManager) {
+        historyBtn.addEventListener('click', function () {
+            self.historyManager.showSessionList(rifle.id);
+        });
+    }
+
+    var cleaningBtn = document.getElementById('btn-cleaning-log');
+    if (cleaningBtn && this.historyManager && activeBarrel) {
+        cleaningBtn.addEventListener('click', function () {
+            self.historyManager.showCleaningLog(rifle.id, activeBarrel.id);
+        });
+    }
+
+    var scopeBtn = document.getElementById('btn-scope-adjustments');
+    if (scopeBtn && this.historyManager) {
+        scopeBtn.addEventListener('click', function () {
+            self.historyManager.showScopeAdjustments(rifle.id);
+        });
+    }
+
+    // Async load barrel round counts
+    if (activeBarrel && this.historyManager) {
+        Promise.all([
+            this.db.getSessionsByRifle(rifle.id),
+            this.db.getCleaningLogsByBarrel(activeBarrel.id)
+        ]).then(function (results) {
+            var sessions = results[0];
+            var cleaningLogs = results[1];
+            var totalRounds = self.historyManager._computeTotalRounds(sessions, activeBarrel.id);
+            var sinceCleaning = self.historyManager._computeRoundsSinceCleaning(sessions, cleaningLogs, activeBarrel.id);
+
+            var statsEl = document.getElementById('barrel-stats');
+            if (statsEl) {
+                statsEl.innerHTML = '<div class="dashboard-stat"><span class="dashboard-stat-value">' + totalRounds + '</span><span class="dashboard-stat-label">Total Rounds</span></div>'
+                    + '<div class="dashboard-stat"><span class="dashboard-stat-value">' + sinceCleaning + '</span><span class="dashboard-stat-label">Since Cleaning</span></div>';
+            }
         });
     }
 };

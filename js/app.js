@@ -28,14 +28,17 @@
         var zoomEl = document.getElementById('zoom-indicator');
 
         var canvasManager = new CanvasManager(canvasEl, hintEl, zoomEl);
-        var sessionFlow = new SessionFlow(canvasManager);
+        var sessionFlow = new SessionFlow(canvasManager, db);
         sessionFlow.init();
 
-        // ── Profiles ───────────────────────────────────────
+        // ── Profiles & History ─────────────────────────────
         var profileManager = null;
+        var historyManager = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
+            historyManager = new HistoryManager(db, profileManager);
+            profileManager.historyManager = historyManager;
         }
 
         // ── Navigation ─────────────────────────────────────

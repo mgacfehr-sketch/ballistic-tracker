@@ -2,16 +2,17 @@
  * session-flow.js — Step-by-step session workflow controller.
  *
  * Manages the state machine for the core session flow:
- *   LOAD → CALIBRATE → DATA → POA → IMPACTS → RESULTS
+ *   PROFILE → LOAD → CALIBRATE → DATA → POA → IMPACTS → RESULTS
  *
  * Coordinates between CanvasManager, CalibrationManager, and calculations.js.
  */
 
-var STEPS = ['load', 'calibrate', 'data', 'poa', 'impacts', 'results'];
+var STEPS = ['profile', 'load', 'calibrate', 'data', 'poa', 'impacts', 'results'];
 var MAX_IMPACTS = 10;
 
-function SessionFlow(canvasManager) {
+function SessionFlow(canvasManager, db) {
     this.canvas = canvasManager;
+    this.db = db;
     this.calibration = new CalibrationManager();
 
     this.currentStep = 0; // index into STEPS
@@ -23,6 +24,19 @@ function SessionFlow(canvasManager) {
     this.poa = null;           // {x, y} image coords
     this.impacts = [];         // [{x, y}] image coords, ordered
     this.results = null;       // output from calculateSession
+
+    // Profile references (null in Quick/Misc mode)
+    this.rifleId = null;
+    this.loadId = null;
+    this.barrelId = null;
+    this.selectedRifle = null;
+    this.selectedLoad = null;
+
+    // Optional session data
+    this.roundsFired = 0;
+    this.measuredVelocity = null;
+    this.weather = null;
+    this.savedSessionId = null;
 
     // DOM references (set in init)
     this.els = {};
@@ -40,29 +54,42 @@ SessionFlow.prototype.init = function () {
         // Step sections
         steps: {},
         progressBar: document.getElementById('progress-bar'),
-        // Step 1: Load
+        // Step 1: Profile
+        profilePicker: document.getElementById('profile-picker'),
+        btnQuickMode: document.getElementById('btn-quick-mode'),
+        // Step 2: Load
         btnCamera: document.getElementById('btn-camera'),
         btnGallery: document.getElementById('btn-gallery'),
         inputCamera: document.getElementById('input-camera'),
         inputGallery: document.getElementById('input-gallery'),
-        // Step 2: Calibrate
+        // Step 3: Calibrate
         calibrationStatus: document.getElementById('calibration-status'),
         btnRedoCalibration: document.getElementById('btn-redo-calibration'),
         btnNextCalibration: document.getElementById('btn-next-calibration'),
-        // Step 3: Data
+        // Step 4: Data
         inputDistance: document.getElementById('input-distance'),
         inputBulletDia: document.getElementById('input-bullet-dia'),
         btnNextData: document.getElementById('btn-next-data'),
-        // Step 4: POA
+        inputRoundsFired: document.getElementById('input-rounds-fired'),
+        inputVelocity: document.getElementById('input-velocity'),
+        inputTemp: document.getElementById('input-temp'),
+        inputHumidity: document.getElementById('input-humidity'),
+        inputWindMph: document.getElementById('input-wind-mph'),
+        inputWindDir: document.getElementById('input-wind-dir'),
+        inputAltitude: document.getElementById('input-altitude'),
+        inputPressure: document.getElementById('input-pressure'),
+        dataOptionalDetails: document.getElementById('data-optional-details'),
+        // Step 5: POA
         poaStatus: document.getElementById('poa-status'),
         btnRedoPoa: document.getElementById('btn-redo-poa'),
         btnNextPoa: document.getElementById('btn-next-poa'),
-        // Step 5: Impacts
+        // Step 6: Impacts
         impactStatus: document.getElementById('impact-status'),
         btnUndoImpact: document.getElementById('btn-undo-impact'),
         btnCalculate: document.getElementById('btn-calculate'),
-        // Step 6: Results
+        // Step 7: Results
         resultsCard: document.getElementById('results-card'),
+        btnSaveSession: document.getElementById('btn-save-session'),
         btnSaveImage: document.getElementById('btn-save-image'),
         btnShare: document.getElementById('btn-share'),
         btnNewFromResults: document.getElementById('btn-new-from-results'),
@@ -92,12 +119,36 @@ SessionFlow.prototype.reset = function () {
     this.impacts = [];
     this.results = null;
 
+    // Clear profile references
+    this.rifleId = null;
+    this.loadId = null;
+    this.barrelId = null;
+    this.selectedRifle = null;
+    this.selectedLoad = null;
+
+    // Clear optional fields
+    this.roundsFired = 0;
+    this.measuredVelocity = null;
+    this.weather = null;
+    this.savedSessionId = null;
+
     this.canvas.clearImage();
     this.canvas.setHint('');
 
     // Reset inputs
     if (this.els.inputDistance) this.els.inputDistance.value = '';
     if (this.els.inputBulletDia) this.els.inputBulletDia.value = '';
+    if (this.els.inputRoundsFired) this.els.inputRoundsFired.value = '';
+    if (this.els.inputVelocity) this.els.inputVelocity.value = '';
+    if (this.els.inputTemp) this.els.inputTemp.value = '';
+    if (this.els.inputHumidity) this.els.inputHumidity.value = '';
+    if (this.els.inputWindMph) this.els.inputWindMph.value = '';
+    if (this.els.inputWindDir) this.els.inputWindDir.value = '';
+    if (this.els.inputAltitude) this.els.inputAltitude.value = '';
+    if (this.els.inputPressure) this.els.inputPressure.value = '';
+
+    // Close optional details
+    if (this.els.dataOptionalDetails) this.els.dataOptionalDetails.removeAttribute('open');
 
     // Reset button states
     this._hideEl(this.els.btnRedoCalibration);
@@ -107,6 +158,10 @@ SessionFlow.prototype.reset = function () {
     if (this.els.btnNextData) this.els.btnNextData.disabled = true;
     if (this.els.btnUndoImpact) this.els.btnUndoImpact.disabled = true;
     if (this.els.btnCalculate) this.els.btnCalculate.disabled = true;
+    if (this.els.btnSaveSession) {
+        this.els.btnSaveSession.disabled = false;
+        this.els.btnSaveSession.textContent = 'Save Session';
+    }
 
     // Clear preset selection
     var presetBtns = document.querySelectorAll('.preset-btn');
@@ -137,6 +192,11 @@ SessionFlow.prototype._showStep = function (index) {
     var pct = ((index + 1) / STEPS.length) * 100;
     if (this.els.progressBar) {
         this.els.progressBar.style.width = pct + '%';
+    }
+
+    // Load profile picker when showing profile step
+    if (stepName === 'profile') {
+        this._loadProfilePicker();
     }
 
     // Set canvas hints per step
@@ -176,12 +236,147 @@ SessionFlow.prototype._updateHint = function () {
     }
 };
 
+// ── Step 1: Profile Picker ────────────────────────────────────
+
+SessionFlow.prototype._loadProfilePicker = function () {
+    var picker = this.els.profilePicker;
+    if (!picker) return;
+
+    if (!this.db) {
+        picker.innerHTML = '<p class="empty-state-sub">Database not available</p>';
+        return;
+    }
+
+    var self = this;
+    this.db.getAllRifles().then(function (rifles) {
+        if (rifles.length === 0) {
+            picker.innerHTML = '<p class="empty-state-sub">No rifles configured. Create one in Profiles tab, or use Quick Mode.</p>';
+            return;
+        }
+
+        // For each rifle, get its loads
+        var promises = rifles.map(function (r) {
+            return self.db.getLoadsByRifle(r.id).then(function (loads) {
+                return { rifle: r, loads: loads };
+            });
+        });
+
+        Promise.all(promises).then(function (groups) {
+            self._renderProfilePicker(groups);
+        });
+    });
+};
+
+SessionFlow.prototype._renderProfilePicker = function (groups) {
+    var picker = this.els.profilePicker;
+    var html = '';
+
+    for (var g = 0; g < groups.length; g++) {
+        var rifle = groups[g].rifle;
+        var loads = groups[g].loads;
+
+        loads.sort(function (a, b) {
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        html += '<div class="picker-rifle-group">';
+        html += '<div class="picker-rifle-name">' + escapeHtml(rifle.name) + ' <span style="color:var(--text-muted);font-weight:400;">' + escapeHtml(rifle.caliber) + '</span></div>';
+
+        if (loads.length === 0) {
+            html += '<p class="empty-state-sub" style="padding:4px 0;">No loads — add one in Profiles</p>';
+        } else {
+            for (var l = 0; l < loads.length; l++) {
+                var ld = loads[l];
+                html += '<button class="picker-load-btn" data-rifle-id="' + escapeAttr(rifle.id) + '" data-load-id="' + escapeAttr(ld.id) + '">';
+                html += escapeHtml(ld.name);
+                html += '<span class="picker-load-sub">' + ld.bulletWeight + 'gr &middot; ' + ld.bulletDiameter + '&quot;</span>';
+                html += '</button>';
+            }
+        }
+        html += '</div>';
+    }
+
+    picker.innerHTML = html;
+
+    // Bind load buttons
+    var self = this;
+    var btns = picker.querySelectorAll('.picker-load-btn');
+    for (var i = 0; i < btns.length; i++) {
+        btns[i].addEventListener('click', function () {
+            var rId = this.getAttribute('data-rifle-id');
+            var lId = this.getAttribute('data-load-id');
+            self._selectProfile(rId, lId);
+        });
+    }
+};
+
+SessionFlow.prototype._selectProfile = function (rifleId, loadId) {
+    var self = this;
+
+    Promise.all([
+        this.db.getRifle(rifleId),
+        this.db.getLoad(loadId),
+        this.db.getBarrelsByRifle(rifleId)
+    ]).then(function (results) {
+        var rifle = results[0];
+        var load = results[1];
+        var barrels = results[2];
+
+        self.rifleId = rifleId;
+        self.loadId = loadId;
+        self.selectedRifle = rifle;
+        self.selectedLoad = load;
+
+        // Find active barrel
+        self.barrelId = null;
+        for (var i = 0; i < barrels.length; i++) {
+            if (barrels[i].isActive) {
+                self.barrelId = barrels[i].id;
+                break;
+            }
+        }
+
+        // Auto-fill data inputs
+        if (load) {
+            if (load.bulletDiameter) {
+                self.els.inputBulletDia.value = load.bulletDiameter;
+                self._updatePresetHighlight();
+            }
+            if (load.muzzleVelocity && self.els.inputVelocity) {
+                self.els.inputVelocity.value = load.muzzleVelocity;
+            }
+        }
+        if (rifle && rifle.zeroRange) {
+            self.els.inputDistance.value = rifle.zeroRange;
+        }
+
+        self._validateDataInputs();
+        self._nextStep();
+    });
+};
+
+SessionFlow.prototype._selectQuickMode = function () {
+    this.rifleId = null;
+    this.loadId = null;
+    this.barrelId = null;
+    this.selectedRifle = null;
+    this.selectedLoad = null;
+    this._nextStep();
+};
+
 // ── UI Binding ─────────────────────────────────────────────────
 
 SessionFlow.prototype._bindUI = function () {
     var self = this;
 
-    // Step 1: Load image
+    // Step 1: Profile
+    if (this.els.btnQuickMode) {
+        this.els.btnQuickMode.addEventListener('click', function () {
+            self._selectQuickMode();
+        });
+    }
+
+    // Step 2: Load image
     this.els.btnCamera.addEventListener('click', function () {
         self.els.inputCamera.click();
     });
@@ -195,7 +390,7 @@ SessionFlow.prototype._bindUI = function () {
         self._onImageSelected(e);
     });
 
-    // Step 2: Calibrate
+    // Step 3: Calibrate
     this.els.btnRedoCalibration.addEventListener('click', function () {
         self._startCalibration();
     });
@@ -203,7 +398,7 @@ SessionFlow.prototype._bindUI = function () {
         self._nextStep();
     });
 
-    // Step 3: Data inputs
+    // Step 4: Data inputs
     this.els.inputDistance.addEventListener('input', function () {
         self._validateDataInputs();
     });
@@ -225,7 +420,7 @@ SessionFlow.prototype._bindUI = function () {
         });
     }
 
-    // Step 4: POA
+    // Step 5: POA
     this.els.btnRedoPoa.addEventListener('click', function () {
         self.poa = null;
         self._removeMarkersOfType('poa');
@@ -240,7 +435,7 @@ SessionFlow.prototype._bindUI = function () {
         self._updateHint();
     });
 
-    // Step 5: Impacts
+    // Step 6: Impacts
     this.els.btnUndoImpact.addEventListener('click', function () {
         self._undoLastImpact();
     });
@@ -248,7 +443,12 @@ SessionFlow.prototype._bindUI = function () {
         self._calculate();
     });
 
-    // Step 6: Results
+    // Step 7: Results
+    if (this.els.btnSaveSession) {
+        this.els.btnSaveSession.addEventListener('click', function () {
+            self._saveSession();
+        });
+    }
     this.els.btnSaveImage.addEventListener('click', function () {
         self._saveImage();
     });
@@ -265,7 +465,7 @@ SessionFlow.prototype._bindUI = function () {
     });
 };
 
-// ── Step 1: Image Loading ──────────────────────────────────────
+// ── Step 2: Image Loading ──────────────────────────────────────
 
 SessionFlow.prototype._onImageSelected = function (e) {
     var file = e.target.files && e.target.files[0];
@@ -285,7 +485,7 @@ SessionFlow.prototype._onImageSelected = function (e) {
     e.target.value = '';
 };
 
-// ── Step 2: Calibration ────────────────────────────────────────
+// ── Step 3: Calibration ────────────────────────────────────────
 
 SessionFlow.prototype._startCalibration = function () {
     this.calibration.start();
@@ -299,7 +499,7 @@ SessionFlow.prototype._startCalibration = function () {
     this._updateHint();
 };
 
-// ── Step 3: Data ───────────────────────────────────────────────
+// ── Step 4: Data ───────────────────────────────────────────────
 
 SessionFlow.prototype._validateDataInputs = function () {
     var d = parseFloat(this.els.inputDistance.value);
@@ -330,11 +530,37 @@ SessionFlow.prototype._confirmData = function () {
         this.canvas.bulletDiameterPx = this.bulletDiameter * this.calibration.pixelsPerInch;
     }
 
+    // Collect optional fields
+    this.roundsFired = parseInt(this.els.inputRoundsFired.value, 10) || 0;
+    this.measuredVelocity = parseFloat(this.els.inputVelocity.value) || null;
+
+    // Collect weather snapshot
+    var tempF = parseFloat(this.els.inputTemp.value);
+    var humidity = parseFloat(this.els.inputHumidity.value);
+    var windMph = parseFloat(this.els.inputWindMph.value);
+    var windDir = this.els.inputWindDir.value.trim();
+    var altitudeFt = parseFloat(this.els.inputAltitude.value);
+    var pressureInHg = parseFloat(this.els.inputPressure.value);
+
+    var hasWeather = !isNaN(tempF) || !isNaN(humidity) || !isNaN(windMph) || windDir || !isNaN(altitudeFt) || !isNaN(pressureInHg);
+    if (hasWeather) {
+        this.weather = {
+            tempF: !isNaN(tempF) ? tempF : null,
+            humidity: !isNaN(humidity) ? humidity : null,
+            windMph: !isNaN(windMph) ? windMph : null,
+            windDir: windDir || null,
+            altitudeFt: !isNaN(altitudeFt) ? altitudeFt : null,
+            pressureInHg: !isNaN(pressureInHg) ? pressureInHg : null
+        };
+    } else {
+        this.weather = null;
+    }
+
     this._nextStep();
     this._updateHint();
 };
 
-// ── Step 4: POA ────────────────────────────────────────────────
+// ── Step 5: POA ────────────────────────────────────────────────
 
 SessionFlow.prototype._placePOA = function (point) {
     this.poa = { x: point.x, y: point.y };
@@ -348,7 +574,7 @@ SessionFlow.prototype._placePOA = function (point) {
     this.canvas.setHint('');
 };
 
-// ── Step 5: Impacts ────────────────────────────────────────────
+// ── Step 6: Impacts ────────────────────────────────────────────
 
 SessionFlow.prototype._placeImpact = function (point) {
     if (this.impacts.length >= MAX_IMPACTS) return;
@@ -394,7 +620,7 @@ SessionFlow.prototype._updateImpactUI = function () {
     }
 };
 
-// ── Step 6: Calculate & Display ────────────────────────────────
+// ── Step 7: Calculate & Display ────────────────────────────────
 
 SessionFlow.prototype._calculate = function () {
     if (this.impacts.length < 2) return;
@@ -495,6 +721,60 @@ SessionFlow.prototype._renderResults = function () {
     html += '</div>';
 
     card.innerHTML = html;
+};
+
+// ── Save Session ───────────────────────────────────────────────
+
+SessionFlow.prototype._saveSession = function () {
+    if (!this.results || !this.db) return;
+    if (this.savedSessionId) return; // already saved
+
+    var roundsFired = this.roundsFired || this.impacts.length;
+
+    var sessionData = {
+        rifleId: this.rifleId,
+        loadId: this.loadId,
+        barrelId: this.barrelId,
+        date: new Date().toISOString(),
+        distanceYards: this.distanceYards,
+        roundsFired: roundsFired,
+        measuredVelocity: this.measuredVelocity,
+        weather: this.weather,
+        calibrationData: {
+            pixelsPerInch: this.calibration.pixelsPerInch,
+            pointA: this.calibration.pointA,
+            pointB: this.calibration.pointB
+        },
+        bulletDiameter: this.bulletDiameter,
+        poaPoint: this.poa,
+        impacts: this.impacts.slice(),
+        results: this.results
+    };
+
+    // Store snapshot of rifle/load names for historical reference
+    if (this.selectedRifle) {
+        sessionData.rifleName = this.selectedRifle.name;
+        sessionData.rifleCaliber = this.selectedRifle.caliber;
+    }
+    if (this.selectedLoad) {
+        sessionData.loadName = this.selectedLoad.name;
+        sessionData.loadBulletName = this.selectedLoad.bulletName;
+        sessionData.loadBulletWeight = this.selectedLoad.bulletWeight;
+    }
+
+    var self = this;
+    var btn = this.els.btnSaveSession;
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    this.db.addSession(sessionData).then(function (saved) {
+        self.savedSessionId = saved.id;
+        btn.textContent = 'Saved';
+    }).catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Save Session';
+        alert('Failed to save: ' + err.message);
+    });
 };
 
 // ── Canvas Tap Routing ─────────────────────────────────────────
