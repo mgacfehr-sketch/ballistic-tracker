@@ -232,21 +232,17 @@ AIAssistantManager.prototype._gatherContext = function (selectedRifleId) {
         }
         return ctx;
     }).then(function (ctx) {
-        // Extract weather from most recent session (if available)
-        var weather = {};
-        if (ctx.sessions && ctx.sessions.length > 0) {
-            var recentSession = ctx.sessions[0];
-            if (recentSession.weather) {
-                var w = recentSession.weather;
-                if (w.tempF !== undefined && w.tempF !== null) weather.tempF = w.tempF;
-                if (w.humidity !== undefined && w.humidity !== null) weather.humidity = w.humidity;
-                if (w.windMph !== undefined && w.windMph !== null) weather.windSpeedMph = w.windMph;
-            }
-        }
-        ctx.weather = weather;
+        // Always compute standard atmosphere trajectories first
+        ctx.trajectories = self._computeTrajectories(ctx.allRifles, ctx.allLoadsMap, {});
 
-        // Compute trajectories for all rifle+load pairs
-        ctx.trajectories = self._computeTrajectories(ctx.allRifles, ctx.allLoadsMap, weather);
+        // If the user has provided weather conditions in the conversation,
+        // re-run the solver with those conditions for an adjusted table
+        var chatWeather = self._extractWeatherFromChat();
+        if (chatWeather.tempF !== undefined || chatWeather.windSpeedMph !== undefined ||
+            chatWeather.humidity !== undefined || chatWeather.pressureInHg !== undefined) {
+            ctx.adjustedTrajectories = self._computeTrajectories(ctx.allRifles, ctx.allLoadsMap, chatWeather);
+            ctx.adjustedConditions = chatWeather;
+        }
 
         return ctx;
     });
@@ -281,11 +277,15 @@ AIAssistantManager.prototype._computeTrajectories = function (allRifles, allLoad
                 tempF: weather.tempF || 59,
                 pressureInHg: weather.pressureInHg || 29.92,
                 humidity: weather.humidity || 0,
-                windSpeedMph: weather.windSpeedMph || 0
+                windSpeedMph: weather.windSpeedMph || 0,
+                windClockPos: weather.windClockPos || 3
             };
 
             try {
-                var table = computeTrajectory(params);
+                var result = computeTrajectory(params);
+                // computeTrajectory returns { zeroAngleDeg, table }
+                var table = result && result.table ? result.table : [];
+                if (table.length === 0) continue;
                 results.push({
                     rifleName: rifle.name || 'Unnamed',
                     rifleId: rifle.id,
@@ -295,7 +295,8 @@ AIAssistantManager.prototype._computeTrajectories = function (allRifles, allLoad
                         tempF: params.tempF,
                         pressureInHg: params.pressureInHg,
                         humidity: params.humidity,
-                        windSpeedMph: params.windSpeedMph
+                        windSpeedMph: params.windSpeedMph,
+                        windClockPos: params.windClockPos
                     },
                     table: table
                 });
@@ -309,6 +310,43 @@ AIAssistantManager.prototype._computeTrajectories = function (allRifles, allLoad
 };
 
 /**
+ * Scan user messages for weather conditions (temp, wind, humidity, pressure).
+ * Returns an object with any found values.
+ */
+AIAssistantManager.prototype._extractWeatherFromChat = function () {
+    var weather = {};
+    for (var i = 0; i < this.messages.length; i++) {
+        if (this.messages[i].role !== 'user') continue;
+        var text = this.messages[i].content;
+
+        // Temperature: "85 degrees", "85°F", "temp is 85"
+        var tempMatch = text.match(/(\-?\d+)\s*(?:degrees?\s*F?|°\s*F?)/i) ||
+                        text.match(/temp(?:erature)?\s*(?:is|:|\s)\s*(\-?\d+)/i);
+        if (tempMatch) weather.tempF = parseInt(tempMatch[1], 10);
+
+        // Wind speed: "10 mph", "wind 10", "wind speed 10"
+        var windMatch = text.match(/(\d+)\s*mph/i) ||
+                        text.match(/wind\s*(?:speed)?\s*(?:is|:|\s)\s*(\d+)/i);
+        if (windMatch) weather.windSpeedMph = parseInt(windMatch[1] || windMatch[2], 10);
+
+        // Wind direction as clock: "3 o'clock", "9 oclock"
+        var clockMatch = text.match(/(\d{1,2})\s*o['\u2019]?\s*clock/i);
+        if (clockMatch) weather.windClockPos = parseInt(clockMatch[1], 10);
+
+        // Humidity: "50% humidity", "humidity 50%", "50% RH"
+        var humMatch = text.match(/(\d+)\s*%\s*(?:humidity|RH)/i) ||
+                       text.match(/humidity\s*(?:is|:|\s)\s*(\d+)/i);
+        if (humMatch) weather.humidity = parseInt(humMatch[1], 10);
+
+        // Pressure: "29.92 inHg", "pressure 30.1"
+        var presMatch = text.match(/([\d.]+)\s*(?:inHg|in\s*Hg)/i) ||
+                        text.match(/pressure\s*(?:is|:|\s)\s*([\d.]+)/i);
+        if (presMatch) weather.pressureInHg = parseFloat(presMatch[1]);
+    }
+    return weather;
+};
+
+/**
  * Build a structured system prompt from the gathered context.
  */
 AIAssistantManager.prototype._buildSystemPrompt = function (context) {
@@ -318,11 +356,14 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
     lines.push('Be concise and practical. Use MOA or MIL as appropriate. Reference specific data when available.');
     lines.push('When introducing yourself or asked who you are, say you are Yort.');
     lines.push('');
-    lines.push('You have access to pre-computed ballistic trajectory tables below. Use them to answer questions about drop, dial-up, come-up, holdover, wind drift, velocity, and energy at any range.');
+    lines.push('You have access to pre-computed ballistic trajectory tables below.');
+    lines.push('STANDARD tables use standard atmosphere (59\u00B0F, 29.92 inHg, 0% humidity, zero wind).');
+    lines.push('When a user asks for a dial-up or come-up, immediately give the answer from the STANDARD table. Then say: "This is based on standard conditions (59\u00B0F, 29.92 inHg, no wind). For a more precise dial-up, what\'s the current temperature, wind speed, and wind direction?"');
+    lines.push('If ADJUSTED tables are also present below (re-computed with user-provided conditions), use those instead and state the exact conditions used. Do NOT ask for conditions again.');
     lines.push('For ranges between table rows, interpolate linearly.');
     lines.push('If a user asks a ballistics question and the rifle has MULTIPLE loads, ask which load they want to use. List the load names. If the rifle has only ONE load, use it automatically without asking.');
     lines.push('If no rifle is selected and there are multiple rifles, ask which rifle. If only one rifle exists, use it automatically.');
-    lines.push('When giving dial-up/come-up values, reference the ComeUp(MOA) column. State the conditions used.');
+    lines.push('When giving dial-up/come-up values, reference the ComeUp(MOA) column.');
     lines.push('');
 
     if (!context) {
@@ -481,17 +522,13 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
         lines.push('');
     }
 
-    // Trajectory tables for all rifle+load pairs
+    // Standard atmosphere trajectory tables
     if (context.trajectories && context.trajectories.length > 0) {
-        lines.push('=== BALLISTIC TRAJECTORY TABLES ===');
+        lines.push('=== STANDARD TRAJECTORY TABLES (59\u00B0F, 29.92 inHg, 0% RH, no wind) ===');
         lines.push('');
         for (var t = 0; t < context.trajectories.length; t++) {
             var traj = context.trajectories[t];
-            lines.push('=== TRAJECTORY: ' + traj.rifleName + ' / ' + traj.loadName + ' ===');
-            lines.push('Conditions: ' + traj.conditions.tempF + '\u00B0F, ' +
-                traj.conditions.pressureInHg + ' inHg, ' +
-                traj.conditions.humidity + '% RH, wind ' +
-                traj.conditions.windSpeedMph + ' mph');
+            lines.push('--- ' + traj.rifleName + ' / ' + traj.loadName + ' ---');
             lines.push('Range(yd) | Drop(in) | Drop(MOA) | ComeUp(MOA) | Wind(in) | Wind(MOA) | Vel(fps) | Energy(ft-lb)');
             for (var row = 0; row < traj.table.length; row++) {
                 var d = traj.table[row];
@@ -504,6 +541,42 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
                     d.windDriftMOA.toFixed(2) + ' | ' +
                     d.velocityFps + ' | ' +
                     d.energyFtLbs
+                );
+            }
+            lines.push('');
+        }
+    }
+
+    // Adjusted trajectory tables (re-computed with user-provided conditions)
+    if (context.adjustedTrajectories && context.adjustedTrajectories.length > 0) {
+        var ac = context.adjustedConditions || {};
+        var condParts = [];
+        if (ac.tempF !== undefined) condParts.push(ac.tempF + '\u00B0F');
+        if (ac.pressureInHg !== undefined) condParts.push(ac.pressureInHg + ' inHg');
+        if (ac.humidity !== undefined) condParts.push(ac.humidity + '% RH');
+        if (ac.windSpeedMph !== undefined) {
+            var windDesc = ac.windSpeedMph + ' mph';
+            if (ac.windClockPos !== undefined) windDesc += ' from ' + ac.windClockPos + " o'clock";
+            condParts.push('wind ' + windDesc);
+        }
+        lines.push('=== ADJUSTED TRAJECTORY TABLES (' + condParts.join(', ') + ') ===');
+        lines.push('Use these tables instead of the STANDARD tables above.');
+        lines.push('');
+        for (var at = 0; at < context.adjustedTrajectories.length; at++) {
+            var atraj = context.adjustedTrajectories[at];
+            lines.push('--- ' + atraj.rifleName + ' / ' + atraj.loadName + ' ---');
+            lines.push('Range(yd) | Drop(in) | Drop(MOA) | ComeUp(MOA) | Wind(in) | Wind(MOA) | Vel(fps) | Energy(ft-lb)');
+            for (var arow = 0; arow < atraj.table.length; arow++) {
+                var ad = atraj.table[arow];
+                lines.push(
+                    ad.rangeYards + ' | ' +
+                    ad.dropInches.toFixed(1) + ' | ' +
+                    ad.dropMOA.toFixed(2) + ' | ' +
+                    ad.comeUpMOA.toFixed(2) + ' | ' +
+                    ad.windDriftInches.toFixed(1) + ' | ' +
+                    ad.windDriftMOA.toFixed(2) + ' | ' +
+                    ad.velocityFps + ' | ' +
+                    ad.energyFtLbs
                 );
             }
             lines.push('');
