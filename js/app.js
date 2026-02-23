@@ -16,6 +16,7 @@
             initApp(db);
         }).catch(function (err) {
             console.error('Failed to open database:', err);
+            alert('Database error: ' + err.message);
             // Fall back to running without DB
             initApp(null);
         });
@@ -39,6 +40,15 @@
             profileManager.init();
             historyManager = new HistoryManager(db, profileManager);
             profileManager.historyManager = historyManager;
+        } else {
+            var profilesContainer = document.getElementById('view-profiles');
+            if (profilesContainer) {
+                profilesContainer.innerHTML =
+                    '<div style="padding:2rem;text-align:center;color:#ff6b6b;">' +
+                    '<h3>Database Unavailable</h3>' +
+                    '<p>Close other tabs using this app and reload.</p>' +
+                    '</div>';
+            }
         }
 
         // ── Navigation ─────────────────────────────────────

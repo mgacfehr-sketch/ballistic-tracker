@@ -31,59 +31,74 @@ BallisticDB.prototype.open = function () {
         request.onupgradeneeded = function (e) {
             var db = e.target.result;
 
-            // Rifles
-            if (!db.objectStoreNames.contains('rifles')) {
-                db.createObjectStore('rifles', { keyPath: 'id' });
-            }
+            try {
+                // Rifles
+                if (!db.objectStoreNames.contains('rifles')) {
+                    db.createObjectStore('rifles', { keyPath: 'id' });
+                }
 
-            // Barrels
-            if (!db.objectStoreNames.contains('barrels')) {
-                var barrelStore = db.createObjectStore('barrels', { keyPath: 'id' });
-                barrelStore.createIndex('rifleId', 'rifleId', { unique: false });
-            }
+                // Barrels
+                if (!db.objectStoreNames.contains('barrels')) {
+                    var barrelStore = db.createObjectStore('barrels', { keyPath: 'id' });
+                    barrelStore.createIndex('rifleId', 'rifleId', { unique: false });
+                }
 
-            // Loads
-            if (!db.objectStoreNames.contains('loads')) {
-                var loadStore = db.createObjectStore('loads', { keyPath: 'id' });
-                loadStore.createIndex('rifleId', 'rifleId', { unique: false });
-            }
+                // Loads
+                if (!db.objectStoreNames.contains('loads')) {
+                    var loadStore = db.createObjectStore('loads', { keyPath: 'id' });
+                    loadStore.createIndex('rifleId', 'rifleId', { unique: false });
+                }
 
-            // Sessions
-            if (!db.objectStoreNames.contains('sessions')) {
-                var sessionStore = db.createObjectStore('sessions', { keyPath: 'id' });
-                sessionStore.createIndex('rifleId', 'rifleId', { unique: false });
-                sessionStore.createIndex('loadId', 'loadId', { unique: false });
-                sessionStore.createIndex('barrelId', 'barrelId', { unique: false });
-            }
+                // Sessions
+                if (!db.objectStoreNames.contains('sessions')) {
+                    var sessionStore = db.createObjectStore('sessions', { keyPath: 'id' });
+                    sessionStore.createIndex('rifleId', 'rifleId', { unique: false });
+                    sessionStore.createIndex('loadId', 'loadId', { unique: false });
+                    sessionStore.createIndex('barrelId', 'barrelId', { unique: false });
+                }
 
-            // Zero Records
-            if (!db.objectStoreNames.contains('zeroRecords')) {
-                var zeroStore = db.createObjectStore('zeroRecords', { keyPath: 'id' });
-                zeroStore.createIndex('rifleId', 'rifleId', { unique: false });
-                zeroStore.createIndex('loadId', 'loadId', { unique: false });
-            }
+                // Zero Records
+                if (!db.objectStoreNames.contains('zeroRecords')) {
+                    var zeroStore = db.createObjectStore('zeroRecords', { keyPath: 'id' });
+                    zeroStore.createIndex('rifleId', 'rifleId', { unique: false });
+                    zeroStore.createIndex('loadId', 'loadId', { unique: false });
+                }
 
-            // Scope Adjustments
-            if (!db.objectStoreNames.contains('scopeAdjustments')) {
-                var scopeStore = db.createObjectStore('scopeAdjustments', { keyPath: 'id' });
-                scopeStore.createIndex('rifleId', 'rifleId', { unique: false });
-            }
+                // Scope Adjustments
+                if (!db.objectStoreNames.contains('scopeAdjustments')) {
+                    var scopeStore = db.createObjectStore('scopeAdjustments', { keyPath: 'id' });
+                    scopeStore.createIndex('rifleId', 'rifleId', { unique: false });
+                }
 
-            // Cleaning Logs
-            if (!db.objectStoreNames.contains('cleaningLogs')) {
-                var cleanStore = db.createObjectStore('cleaningLogs', { keyPath: 'id' });
-                cleanStore.createIndex('rifleId', 'rifleId', { unique: false });
-                cleanStore.createIndex('barrelId', 'barrelId', { unique: false });
-            }
+                // Cleaning Logs
+                if (!db.objectStoreNames.contains('cleaningLogs')) {
+                    var cleanStore = db.createObjectStore('cleaningLogs', { keyPath: 'id' });
+                    cleanStore.createIndex('rifleId', 'rifleId', { unique: false });
+                    cleanStore.createIndex('barrelId', 'barrelId', { unique: false });
+                }
 
-            // Session Images (annotated export images)
-            if (!db.objectStoreNames.contains('sessionImages')) {
-                db.createObjectStore('sessionImages', { keyPath: 'sessionId' });
+                // Session Images (annotated export images)
+                if (!db.objectStoreNames.contains('sessionImages')) {
+                    db.createObjectStore('sessionImages', { keyPath: 'sessionId' });
+                }
+            } catch (err) {
+                console.error('DB upgrade failed:', err);
+                if (e.target.transaction) {
+                    e.target.transaction.abort();
+                }
             }
+        };
+
+        request.onblocked = function () {
+            reject(new Error('Database upgrade blocked — close other tabs and reload'));
         };
 
         request.onsuccess = function (e) {
             self.db = e.target.result;
+            self.db.onversionchange = function () {
+                self.db.close();
+                self.db = null;
+            };
             resolve();
         };
 
