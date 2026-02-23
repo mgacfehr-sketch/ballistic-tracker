@@ -5,7 +5,7 @@
  * falling back to network. Cleans up old caches on activate.
  */
 
-var CACHE_NAME = 'ballistic-v1';
+var CACHE_NAME = 'ballistic-v2';
 
 var APP_SHELL = [
     './',

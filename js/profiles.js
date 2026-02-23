@@ -445,20 +445,49 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
 
             var statsEl = document.getElementById('barrel-stats');
             if (statsEl) {
-                statsEl.innerHTML = '<div class="dashboard-stat" id="stat-total-rounds" style="cursor:pointer;"><span class="dashboard-stat-value">' + totalRounds + '</span><span class="dashboard-stat-label">Total Rounds &#9998;</span></div>'
-                    + '<div class="dashboard-stat"><span class="dashboard-stat-value">' + sinceCleaning + '</span><span class="dashboard-stat-label">Since Cleaning</span></div>';
+                statsEl.innerHTML =
+                    '<div class="dashboard-stat" id="stat-total-rounds">' +
+                        '<span class="dashboard-stat-value" id="rounds-display">' + totalRounds + '</span>' +
+                        '<span class="dashboard-stat-label">Total Rounds</span>' +
+                        '<button class="btn btn-sm btn-secondary" id="btn-edit-rounds" style="margin-top:4px;padding:2px 10px;font-size:0.75rem;">Edit</button>' +
+                    '</div>' +
+                    '<div class="dashboard-stat">' +
+                        '<span class="dashboard-stat-value">' + sinceCleaning + '</span>' +
+                        '<span class="dashboard-stat-label">Since Cleaning</span>' +
+                    '</div>';
 
-                document.getElementById('stat-total-rounds').addEventListener('click', function () {
-                    var newVal = prompt('Update total round count:', totalRounds);
-                    if (newVal !== null) {
-                        var parsed = parseInt(newVal, 10);
+                document.getElementById('btn-edit-rounds').addEventListener('click', function () {
+                    var statEl = document.getElementById('stat-total-rounds');
+                    if (!statEl) return;
+                    statEl.innerHTML =
+                        '<input type="number" id="rounds-input" min="0" step="1" inputmode="numeric" value="' + totalRounds + '" style="width:80px;text-align:center;font-size:1.1rem;padding:4px;border-radius:6px;border:1px solid #555;background:#2a2a2a;color:#fff;">' +
+                        '<div style="display:flex;gap:6px;margin-top:6px;">' +
+                            '<button class="btn btn-sm btn-primary" id="btn-save-rounds" style="padding:2px 10px;font-size:0.75rem;">Save</button>' +
+                            '<button class="btn btn-sm btn-secondary" id="btn-cancel-rounds" style="padding:2px 10px;font-size:0.75rem;">Cancel</button>' +
+                        '</div>';
+                    var inp = document.getElementById('rounds-input');
+                    inp.focus();
+                    inp.select();
+
+                    document.getElementById('btn-save-rounds').addEventListener('click', function () {
+                        var parsed = parseInt(inp.value, 10);
                         if (!isNaN(parsed) && parsed >= 0) {
                             activeBarrel.totalRounds = parsed;
                             self.db.updateBarrel(activeBarrel).then(function () {
                                 self.showRifleDetail(rifle.id);
                             });
                         }
-                    }
+                    });
+
+                    document.getElementById('btn-cancel-rounds').addEventListener('click', function () {
+                        self.showRifleDetail(rifle.id);
+                    });
+
+                    inp.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            document.getElementById('btn-save-rounds').click();
+                        }
+                    });
                 });
             }
         });

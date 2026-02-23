@@ -10,7 +10,7 @@
  */
 
 var DB_NAME = 'ballistic-tracker';
-var DB_VERSION = 3;
+var DB_VERSION = 4;
 var MAX_RIFLES = 50;
 
 function BallisticDB() {
