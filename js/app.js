@@ -9,8 +9,8 @@
     'use strict';
 
     // ── Supabase credentials (replace with your project values) ──
-    var SUPABASE_URL = 'YOUR_SUPABASE_URL';
-    var SUPABASE_KEY = 'YOUR_ANON_KEY';
+    var SUPABASE_URL = 'https://lfqegsspgojhmfiqexlk.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmcWVnc3NwZ29qaG1maXFleGxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODU1NTAsImV4cCI6MjA4NzQ2MTU1MH0.dMdU6eP5SLXs1ecpvjiTkAAg4Dt6OYgapv0KE8e7qEo';
 
     document.addEventListener('DOMContentLoaded', function () {
         var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
