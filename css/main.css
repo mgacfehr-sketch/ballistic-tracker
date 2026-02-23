@@ -100,7 +100,7 @@ html, body {
 }
 
 .nav-tab {
-    padding: 5px 10px;
+    padding: 5px 8px;
     border: none;
     border-radius: 5px;
     background: transparent;
@@ -1244,6 +1244,73 @@ html, body {
 .settings-status-error {
     background: rgba(244, 67, 54, 0.15);
     color: var(--danger);
+}
+
+/* ── Solver View ──────────────────────────────────────────────── */
+
+#view-solver {
+    background: var(--bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+.solver-form {
+    padding: 0 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.solver-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 0 24px;
+}
+
+.solver-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.solver-table th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    text-align: right;
+    padding: 8px 10px 4px;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border);
+    z-index: 2;
+}
+
+.solver-table th .th-unit {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-dim);
+    line-height: 1.2;
+}
+
+.solver-table td {
+    text-align: right;
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+}
+
+.solver-row-zero td {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.solver-comeup {
+    color: var(--primary);
 }
 
 /* ── Landscape tweaks ───────────────────────────────────────── */

@@ -36,6 +36,7 @@
         var profileManager = null;
         var historyManager = null;
         var aiAssistant = null;
+        var solverManager = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
@@ -43,6 +44,8 @@
             profileManager.historyManager = historyManager;
             aiAssistant = new AIAssistantManager(db);
             aiAssistant.init();
+            solverManager = new BallisticSolverManager(db);
+            solverManager.init();
         } else {
             var profilesContainer = document.getElementById('view-profiles');
             if (profilesContainer) {
@@ -60,6 +63,7 @@
             session: document.getElementById('view-session'),
             profiles: document.getElementById('view-profiles'),
             ai: document.getElementById('view-ai'),
+            solver: document.getElementById('view-solver'),
             settings: document.getElementById('view-settings')
         };
         var btnNewSession = document.getElementById('btn-new-session');
@@ -96,6 +100,11 @@
             // Show AI assistant when switching to AI tab
             if (viewName === 'ai' && aiAssistant) {
                 aiAssistant.show();
+            }
+
+            // Show solver when switching to solver tab
+            if (viewName === 'solver' && solverManager) {
+                solverManager.show();
             }
 
             // Render settings when switching to settings tab
@@ -185,7 +194,8 @@
         document.getElementById('app').addEventListener('touchmove', function (e) {
             // Allow scrolling inside the step panel, profiles, AI, and settings views
             if (e.target.closest('#step-panel') || e.target.closest('#view-profiles') ||
-                e.target.closest('#view-ai') || e.target.closest('#view-settings')) return;
+                e.target.closest('#view-ai') || e.target.closest('#view-solver') ||
+                e.target.closest('#view-settings')) return;
             e.preventDefault();
         }, { passive: false });
 
