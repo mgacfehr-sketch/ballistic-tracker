@@ -127,6 +127,23 @@ HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
             var windSign = r.windageOffsetInches >= 0 ? 'Right' : 'Left';
             html += '<div class="detail-row"><span class="detail-label">Windage Offset</span><span class="detail-value">' + formatFixed(Math.abs(r.windageOffsetInches), 3) + '&quot; ' + windSign + '</span></div>';
         }
+
+        // Advanced Stats (collapsible)
+        if (r.cepInches != null) {
+            html += '<details class="session-details" style="margin-top:8px;">';
+            html += '<summary class="session-details-summary">Advanced Stats</summary>';
+            html += '<div class="session-details-body">';
+            html += '<div class="detail-row"><span class="detail-label">CEP (50%)</span><span class="detail-value">' + formatFixed(r.cepInches, 3) + '&quot; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span></div>';
+            html += '<div class="detail-row"><span class="detail-label">Radial SD</span><span class="detail-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span></div>';
+            html += '<div class="detail-row"><span class="detail-label">Vertical SD</span><span class="detail-value">' + formatFixed(r.verticalSDInches, 3) + '&quot; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA</span></div>';
+            html += '<div class="detail-row"><span class="detail-label">Horizontal SD</span><span class="detail-value">' + formatFixed(r.horizontalSDInches, 3) + '&quot; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA</span></div>';
+            var mElevSign = r.meanElevationInches >= 0 ? 'High' : 'Low';
+            html += '<div class="detail-row"><span class="detail-label">Mean Elevation</span><span class="detail-value">' + formatFixed(Math.abs(r.meanElevationInches), 3) + '&quot; ' + mElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA</span></div>';
+            var mWindSign = r.meanWindageInches >= 0 ? 'Right' : 'Left';
+            html += '<div class="detail-row"><span class="detail-label">Mean Windage</span><span class="detail-value">' + formatFixed(Math.abs(r.meanWindageInches), 3) + '&quot; ' + mWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA</span></div>';
+            html += '</div></details>';
+        }
+
         html += '</div>';
     }
 
@@ -529,6 +546,196 @@ HistoryManager.prototype._renderScopeAdjustmentForm = function (rifle) {
         self.db.addScopeAdjustment(data).then(function () {
             self.showScopeAdjustments(rifle.id);
         });
+    });
+};
+
+// ── Misc (Quick Mode) Sessions ──────────────────────────────────
+
+/**
+ * Show all sessions without a rifle association (Quick/Misc mode).
+ */
+HistoryManager.prototype.showMiscSessionList = function () {
+    var self = this;
+    this.db.getMiscSessions().then(function (sessions) {
+        sessions.sort(function (a, b) {
+            return (b.date || '').localeCompare(a.date || '');
+        });
+        self._renderMiscSessionList(sessions);
+    });
+};
+
+HistoryManager.prototype._renderMiscSessionList = function (sessions) {
+    var container = this.profileManager.container;
+    var html = '<div class="profile-screen">';
+
+    html += '<div class="profile-toolbar">';
+    html += '<button class="btn-back" id="btn-misc-back">&lsaquo; Profiles</button>';
+    html += '<h2 class="profile-title">Misc Sessions</h2>';
+    html += '<div class="toolbar-spacer"></div>';
+    html += '</div>';
+
+    if (sessions.length === 0) {
+        html += '<div class="empty-state">';
+        html += '<p class="empty-state-text">No misc sessions</p>';
+        html += '<p class="empty-state-sub">Sessions saved without a rifle profile appear here</p>';
+        html += '</div>';
+    } else {
+        html += '<div class="profile-list">';
+        for (var i = 0; i < sessions.length; i++) {
+            var s = sessions[i];
+            var dateStr = s.date ? new Date(s.date).toLocaleDateString() : 'Unknown date';
+            var groupStr = s.results && s.results.groupSizeMOA != null
+                ? formatFixed(s.results.groupSizeMOA, 2) + ' MOA'
+                : '—';
+            var shotCount = s.impacts ? s.impacts.length : 0;
+
+            html += '<div class="profile-card session-card" data-session-id="' + escapeAttr(s.id) + '">';
+            html += '<div class="profile-card-main">';
+            html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + s.distanceYards + ' yds</span>';
+            html += '<span class="profile-card-sub">' + shotCount + ' shots &middot; ES: ' + groupStr + '</span>';
+            html += '</div>';
+            html += '<span class="profile-card-arrow">&rsaquo;</span>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+
+    var self = this;
+
+    document.getElementById('btn-misc-back').addEventListener('click', function () {
+        self.profileManager.showRifleList();
+    });
+
+    var cards = container.querySelectorAll('.session-card');
+    for (var i = 0; i < cards.length; i++) {
+        cards[i].addEventListener('click', function () {
+            var sid = this.getAttribute('data-session-id');
+            self.showMiscSessionDetail(sid);
+        });
+    }
+};
+
+/**
+ * Show detail for a misc session. Back navigates to misc list.
+ */
+HistoryManager.prototype.showMiscSessionDetail = function (sessionId) {
+    var self = this;
+    this.db.getSession(sessionId).then(function (session) {
+        if (!session) { self.showMiscSessionList(); return; }
+        self._renderMiscSessionDetail(session);
+    });
+};
+
+HistoryManager.prototype._renderMiscSessionDetail = function (session) {
+    var container = this.profileManager.container;
+    var r = session.results;
+    var dateStr = session.date ? new Date(session.date).toLocaleDateString() : 'Unknown date';
+
+    var html = '<div class="profile-screen">';
+
+    html += '<div class="profile-toolbar">';
+    html += '<button class="btn-back" id="btn-misc-detail-back">&lsaquo; Misc Sessions</button>';
+    html += '<h2 class="profile-title">' + escapeHtml(dateStr) + '</h2>';
+    html += '<div class="toolbar-spacer"></div>';
+    html += '</div>';
+
+    // Results card
+    if (r) {
+        html += '<div class="detail-card">';
+        html += '<div class="detail-row"><span class="detail-label">Distance</span><span class="detail-value">' + session.distanceYards + ' yds</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Shots</span><span class="detail-value">' + (session.impacts ? session.impacts.length : 0) + '</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Extreme Spread</span><span class="detail-value">' + formatFixed(r.groupSizeInches, 3) + '&quot; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Mean Radius</span><span class="detail-value">' + formatFixed(r.meanRadiusInches, 3) + '&quot; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Vertical Spread</span><span class="detail-value">' + formatFixed(r.verticalSpreadInches, 3) + '&quot;</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Horizontal Spread</span><span class="detail-value">' + formatFixed(r.horizontalSpreadInches, 3) + '&quot;</span></div>';
+        if (r.elevationOffsetMOA != null) {
+            var elevSign = r.elevationOffsetInches >= 0 ? 'High' : 'Low';
+            html += '<div class="detail-row"><span class="detail-label">Elevation Offset</span><span class="detail-value">' + formatFixed(Math.abs(r.elevationOffsetInches), 3) + '&quot; ' + elevSign + '</span></div>';
+        }
+        if (r.windageOffsetMOA != null) {
+            var windSign = r.windageOffsetInches >= 0 ? 'Right' : 'Left';
+            html += '<div class="detail-row"><span class="detail-label">Windage Offset</span><span class="detail-value">' + formatFixed(Math.abs(r.windageOffsetInches), 3) + '&quot; ' + windSign + '</span></div>';
+        }
+
+        // Advanced Stats (collapsible)
+        if (r.cepInches != null) {
+            html += '<details class="session-details" style="margin-top:8px;">';
+            html += '<summary class="session-details-summary">Advanced Stats</summary>';
+            html += '<div class="session-details-body">';
+            html += '<div class="detail-row"><span class="detail-label">CEP (50%)</span><span class="detail-value">' + formatFixed(r.cepInches, 3) + '&quot; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span></div>';
+            html += '<div class="detail-row"><span class="detail-label">Radial SD</span><span class="detail-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span></div>';
+            html += '<div class="detail-row"><span class="detail-label">Vertical SD</span><span class="detail-value">' + formatFixed(r.verticalSDInches, 3) + '&quot; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA</span></div>';
+            html += '<div class="detail-row"><span class="detail-label">Horizontal SD</span><span class="detail-value">' + formatFixed(r.horizontalSDInches, 3) + '&quot; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA</span></div>';
+            var mElevSign = r.meanElevationInches >= 0 ? 'High' : 'Low';
+            html += '<div class="detail-row"><span class="detail-label">Mean Elevation</span><span class="detail-value">' + formatFixed(Math.abs(r.meanElevationInches), 3) + '&quot; ' + mElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA</span></div>';
+            var mWindSign = r.meanWindageInches >= 0 ? 'Right' : 'Left';
+            html += '<div class="detail-row"><span class="detail-label">Mean Windage</span><span class="detail-value">' + formatFixed(Math.abs(r.meanWindageInches), 3) + '&quot; ' + mWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA</span></div>';
+            html += '</div></details>';
+        }
+
+        html += '</div>';
+    }
+
+    // Session details (collapsible)
+    html += '<details class="session-details">';
+    html += '<summary class="session-details-summary">Session Details</summary>';
+    html += '<div class="session-details-body">';
+    html += '<div class="detail-card">';
+
+    if (session.bulletDiameter) {
+        html += '<div class="detail-row"><span class="detail-label">Bullet Diameter</span><span class="detail-value">' + session.bulletDiameter + '&quot;</span></div>';
+    }
+    if (session.roundsFired) {
+        html += '<div class="detail-row"><span class="detail-label">Rounds Fired</span><span class="detail-value">' + session.roundsFired + '</span></div>';
+    }
+    if (session.measuredVelocity) {
+        html += '<div class="detail-row"><span class="detail-label">Measured Velocity</span><span class="detail-value">' + session.measuredVelocity + ' fps</span></div>';
+    }
+
+    var w = session.weather;
+    if (w) {
+        if (w.tempF != null) {
+            html += '<div class="detail-row"><span class="detail-label">Temperature</span><span class="detail-value">' + w.tempF + '&deg;F</span></div>';
+        }
+        if (w.humidity != null) {
+            html += '<div class="detail-row"><span class="detail-label">Humidity</span><span class="detail-value">' + w.humidity + '%</span></div>';
+        }
+        if (w.windMph != null) {
+            html += '<div class="detail-row"><span class="detail-label">Wind</span><span class="detail-value">' + w.windMph + ' mph' + (w.windDir ? ' ' + escapeHtml(w.windDir) : '') + '</span></div>';
+        }
+        if (w.altitudeFt != null) {
+            html += '<div class="detail-row"><span class="detail-label">Altitude</span><span class="detail-value">' + w.altitudeFt + ' ft</span></div>';
+        }
+        if (w.pressureInHg != null) {
+            html += '<div class="detail-row"><span class="detail-label">Pressure</span><span class="detail-value">' + w.pressureInHg + '&quot; Hg</span></div>';
+        }
+    }
+
+    html += '</div></div></details>';
+
+    // Delete button
+    html += '<div class="btn-row" style="padding: 16px;">';
+    html += '<button class="btn btn-danger" id="btn-delete-session">Delete Session</button>';
+    html += '</div>';
+
+    html += '</div>';
+    container.innerHTML = html;
+
+    var self = this;
+
+    document.getElementById('btn-misc-detail-back').addEventListener('click', function () {
+        self.showMiscSessionList();
+    });
+
+    document.getElementById('btn-delete-session').addEventListener('click', function () {
+        if (confirm('Delete this session?')) {
+            self.db.deleteSession(session.id).then(function () {
+                self.showMiscSessionList();
+            });
+        }
     });
 };
 

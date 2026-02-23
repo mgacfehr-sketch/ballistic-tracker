@@ -720,6 +720,51 @@ SessionFlow.prototype._renderResults = function () {
     html += '<span class="result-value">' + r.shotCount + ' shots @ ' + r.distanceYards + ' yds</span>';
     html += '</div>';
 
+    // Advanced Stats (collapsible)
+    if (r.cepInches != null) {
+        html += '<details class="session-details">';
+        html += '<summary class="session-details-summary">Advanced Stats</summary>';
+        html += '<div class="session-details-body">';
+
+        html += '<div class="result-row">';
+        html += '<span class="result-label">CEP (50%)</span>';
+        html += '<span class="result-value">' + formatFixed(r.cepInches, 3) + '&quot; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span>';
+        html += '</div>';
+
+        html += '<div class="result-row">';
+        html += '<span class="result-label">Radial SD</span>';
+        html += '<span class="result-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span>';
+        html += '</div>';
+
+        html += '<div class="result-divider"></div>';
+
+        html += '<div class="result-row">';
+        html += '<span class="result-label">Vertical SD</span>';
+        html += '<span class="result-value">' + formatFixed(r.verticalSDInches, 3) + '&quot; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA</span>';
+        html += '</div>';
+
+        html += '<div class="result-row">';
+        html += '<span class="result-label">Horizontal SD</span>';
+        html += '<span class="result-value">' + formatFixed(r.horizontalSDInches, 3) + '&quot; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA</span>';
+        html += '</div>';
+
+        html += '<div class="result-divider"></div>';
+
+        var meanElevSign = r.meanElevationInches >= 0 ? 'High' : 'Low';
+        html += '<div class="result-row">';
+        html += '<span class="result-label">Mean Elevation</span>';
+        html += '<span class="result-value">' + formatFixed(Math.abs(r.meanElevationInches), 3) + '&quot; ' + meanElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA</span>';
+        html += '</div>';
+
+        var meanWindSign = r.meanWindageInches >= 0 ? 'Right' : 'Left';
+        html += '<div class="result-row">';
+        html += '<span class="result-label">Mean Windage</span>';
+        html += '<span class="result-value">' + formatFixed(Math.abs(r.meanWindageInches), 3) + '&quot; ' + meanWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA</span>';
+        html += '</div>';
+
+        html += '</div></details>';
+    }
+
     card.innerHTML = html;
 };
 

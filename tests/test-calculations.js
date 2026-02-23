@@ -153,6 +153,55 @@ console.log('\nSession result sample:');
 console.log(`  Group: ${sessionResult.groupSizeInches}" (${sessionResult.groupSizeMOA} MOA)`);
 console.log(`  ATZ: ${sessionResult.atzElevationDir} ${sessionResult.atzElevationMOA} MOA, ${sessionResult.atzWindageDir} ${sessionResult.atzWindageMOA} MOA`);
 
+// ─── Advanced Statistics ────────────────────────────────────────
+
+console.log('\nAdvanced Statistics (5 shots at 100 yards):');
+
+// CEP: sorted radial dists from centroid (550,480), 3rd smallest (index 2 for 5 shots)
+// Radial distances (px): each impact to (550,480)
+// (540,470): sqrt(100+100)=14.14px → 0.1414"
+// (560,490): sqrt(100+100)=14.14px → 0.1414"
+// (545,475): sqrt(25+25)=7.07px → 0.0707"
+// (555,485): sqrt(25+25)=7.07px → 0.0707"
+// (550,480): 0px → 0.0"
+// sorted: [0, 0.0707, 0.0707, 0.1414, 0.1414]
+// CEP = index ceil(5*0.5)-1 = index 2 = 0.0707"
+assertApprox(sessionResult.cepInches, 0.0707, 0.005, 'CEP ≈ 0.071"');
+assertApprox(sessionResult.cepMOA, calc.inchesToMOA(sessionResult.cepInches, 100), 0.001, 'CEP MOA consistent');
+
+// Radial SD: SD of [0, 0.0707, 0.0707, 0.1414, 0.1414]
+// mean = 0.08484, variance = mean(d²) - mean²
+assert(sessionResult.radialSDInches > 0, 'Radial SD > 0');
+assert(sessionResult.radialSDMOA >= 0, 'Radial SD MOA ≥ 0');
+
+// Vertical SD: Y values {470,490,475,485,480} → in inches {4.70,4.90,4.75,4.85,4.80}
+// mean=4.80, deviations: {-0.10, 0.10, -0.05, 0.05, 0.00}, variance=0.005, SD≈0.0707
+assertApprox(sessionResult.verticalSDInches, 0.0707, 0.005, 'Vertical SD ≈ 0.071"');
+
+// Horizontal SD: X values {540,560,545,555,550} → in inches {5.40,5.60,5.45,5.55,5.50}
+// mean=5.50, deviations: {-0.10, 0.10, -0.05, 0.05, 0.00}, variance=0.005, SD≈0.0707
+assertApprox(sessionResult.horizontalSDInches, 0.0707, 0.005, 'Horizontal SD ≈ 0.071"');
+
+// Mean Elevation: avg of (500-470),(500-490),(500-475),(500-485),(500-480) = avg(30,10,25,15,20) = 20px → 0.2"
+assertApprox(sessionResult.meanElevationInches, 0.2, 0.01, 'Mean Elevation ≈ 0.2" (high)');
+
+// Mean Windage: avg of (540-500),(560-500),(545-500),(555-500),(550-500) = avg(40,60,45,55,50) = 50px → 0.5"
+assertApprox(sessionResult.meanWindageInches, 0.5, 0.01, 'Mean Windage ≈ 0.5" (right)');
+
+// All new fields present in session result
+assert(sessionResult.cepInches != null, 'cepInches present');
+assert(sessionResult.cepMOA != null, 'cepMOA present');
+assert(sessionResult.radialSDInches != null, 'radialSDInches present');
+assert(sessionResult.radialSDMOA != null, 'radialSDMOA present');
+assert(sessionResult.verticalSDInches != null, 'verticalSDInches present');
+assert(sessionResult.verticalSDMOA != null, 'verticalSDMOA present');
+assert(sessionResult.horizontalSDInches != null, 'horizontalSDInches present');
+assert(sessionResult.horizontalSDMOA != null, 'horizontalSDMOA present');
+assert(sessionResult.meanElevationInches != null, 'meanElevationInches present');
+assert(sessionResult.meanElevationMOA != null, 'meanElevationMOA present');
+assert(sessionResult.meanWindageInches != null, 'meanWindageInches present');
+assert(sessionResult.meanWindageMOA != null, 'meanWindageMOA present');
+
 // ─── Wider Group Test ───────────────────────────────────────────
 
 console.log('\nWider Group (1000 yard target, ~15" spread):');
@@ -181,6 +230,12 @@ console.log(`  ATZ: ${wideResult.atzElevationDir} ${wideResult.atzElevationMOA} 
 // That seems reasonable for a 1000yd group test
 assert(wideResult.groupSizeInches > 5, 'Wide group > 5 inches');
 assert(wideResult.groupSizeMOA > 0, 'Wide group MOA > 0');
+assert(wideResult.cepInches != null, 'Wide group has cepInches');
+assert(wideResult.radialSDInches != null, 'Wide group has radialSDInches');
+assert(wideResult.verticalSDInches != null, 'Wide group has verticalSDInches');
+assert(wideResult.horizontalSDInches != null, 'Wide group has horizontalSDInches');
+assert(wideResult.meanElevationInches != null, 'Wide group has meanElevationInches');
+assert(wideResult.meanWindageInches != null, 'Wide group has meanWindageInches');
 
 // ─── Summary ────────────────────────────────────────────────────
 

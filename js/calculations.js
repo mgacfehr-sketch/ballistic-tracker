@@ -198,6 +198,101 @@ function calculateATZ(offset, distanceYards) {
 }
 
 /**
+ * Population standard deviation of an array of numbers.
+ * @param {number[]} values
+ * @returns {number}
+ */
+function _populationSD(values) {
+    if (values.length === 0) return 0;
+    var mean = values.reduce(function (s, v) { return s + v; }, 0) / values.length;
+    var variance = values.reduce(function (s, v) { return s + (v - mean) * (v - mean); }, 0) / values.length;
+    return Math.sqrt(variance);
+}
+
+/**
+ * Circular Error Probable — radius of circle centered on centroid containing 50% of shots.
+ * @param {{x: number, y: number}[]} impacts
+ * @param {number} pixelsPerInch
+ * @returns {number} CEP in inches
+ */
+function calculateCEP(impacts, pixelsPerInch) {
+    if (impacts.length < 2) return 0;
+    var centroid = calculateCentroid(impacts);
+    var dists = impacts.map(function (p) {
+        return pixelsToInches(pixelDistance(p, centroid), pixelsPerInch);
+    });
+    dists.sort(function (a, b) { return a - b; });
+    return dists[Math.ceil(impacts.length * 0.5) - 1];
+}
+
+/**
+ * Standard deviation of each shot's radial distance from centroid.
+ * @param {{x: number, y: number}[]} impacts
+ * @param {number} pixelsPerInch
+ * @returns {number} Radial SD in inches
+ */
+function calculateRadialSD(impacts, pixelsPerInch) {
+    if (impacts.length < 2) return 0;
+    var centroid = calculateCentroid(impacts);
+    var dists = impacts.map(function (p) {
+        return pixelsToInches(pixelDistance(p, centroid), pixelsPerInch);
+    });
+    return _populationSD(dists);
+}
+
+/**
+ * Standard deviation of Y-coordinates (converted to inches).
+ * @param {{x: number, y: number}[]} impacts
+ * @param {number} pixelsPerInch
+ * @returns {number} Vertical SD in inches
+ */
+function calculateVerticalSD(impacts, pixelsPerInch) {
+    if (impacts.length < 2) return 0;
+    var ys = impacts.map(function (p) { return p.y / pixelsPerInch; });
+    return _populationSD(ys);
+}
+
+/**
+ * Standard deviation of X-coordinates (converted to inches).
+ * @param {{x: number, y: number}[]} impacts
+ * @param {number} pixelsPerInch
+ * @returns {number} Horizontal SD in inches
+ */
+function calculateHorizontalSD(impacts, pixelsPerInch) {
+    if (impacts.length < 2) return 0;
+    var xs = impacts.map(function (p) { return p.x / pixelsPerInch; });
+    return _populationSD(xs);
+}
+
+/**
+ * Average vertical offset of each shot from POA.
+ * Positive = high (matching existing convention: poa.y - impact.y).
+ * @param {{x: number, y: number}[]} impacts
+ * @param {{x: number, y: number}} poa
+ * @param {number} pixelsPerInch
+ * @returns {number} Mean elevation in inches
+ */
+function calculateMeanElevation(impacts, poa, pixelsPerInch) {
+    if (impacts.length === 0) return 0;
+    var sum = impacts.reduce(function (s, p) { return s + (poa.y - p.y); }, 0);
+    return pixelsToInches(sum / impacts.length, pixelsPerInch);
+}
+
+/**
+ * Average horizontal offset of each shot from POA.
+ * Positive = right (matching existing convention: impact.x - poa.x).
+ * @param {{x: number, y: number}[]} impacts
+ * @param {{x: number, y: number}} poa
+ * @param {number} pixelsPerInch
+ * @returns {number} Mean windage in inches
+ */
+function calculateMeanWindage(impacts, poa, pixelsPerInch) {
+    if (impacts.length === 0) return 0;
+    var sum = impacts.reduce(function (s, p) { return s + (p.x - poa.x); }, 0);
+    return pixelsToInches(sum / impacts.length, pixelsPerInch);
+}
+
+/**
  * Run all calculations for a session and return a complete results object.
  * This is the main entry point for the calculation engine.
  * @param {object} params
@@ -222,6 +317,13 @@ function calculateSession(params) {
     const poaOffset = calculatePOAOffset(poa, impacts, pixelsPerInch);
     const atz = calculateATZ(poaOffset, distanceYards);
     const centroid = calculateCentroid(impacts);
+
+    const cep = calculateCEP(impacts, pixelsPerInch);
+    const radialSD = calculateRadialSD(impacts, pixelsPerInch);
+    const verticalSD = calculateVerticalSD(impacts, pixelsPerInch);
+    const horizontalSD = calculateHorizontalSD(impacts, pixelsPerInch);
+    const meanElev = calculateMeanElevation(impacts, poa, pixelsPerInch);
+    const meanWind = calculateMeanWindage(impacts, poa, pixelsPerInch);
 
     return {
         shotCount: impacts.length,
@@ -249,6 +351,24 @@ function calculateSession(params) {
         atzElevationDir: atz.elevationDir,
         atzWindageMOA: round4(atz.windageMOA),
         atzWindageDir: atz.windageDir,
+
+        cepInches: round4(cep),
+        cepMOA: round4(inchesToMOA(cep, distanceYards)),
+
+        radialSDInches: round4(radialSD),
+        radialSDMOA: round4(inchesToMOA(radialSD, distanceYards)),
+
+        verticalSDInches: round4(verticalSD),
+        verticalSDMOA: round4(inchesToMOA(verticalSD, distanceYards)),
+
+        horizontalSDInches: round4(horizontalSD),
+        horizontalSDMOA: round4(inchesToMOA(horizontalSD, distanceYards)),
+
+        meanElevationInches: round4(meanElev),
+        meanElevationMOA: round4(inchesToMOA(Math.abs(meanElev), distanceYards)),
+
+        meanWindageInches: round4(meanWind),
+        meanWindageMOA: round4(inchesToMOA(Math.abs(meanWind), distanceYards)),
 
         centroid: {
             x: centroid.x,
@@ -280,6 +400,12 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateHorizontalSpread,
         calculatePOAOffset,
         calculateATZ,
+        calculateCEP,
+        calculateRadialSD,
+        calculateVerticalSD,
+        calculateHorizontalSD,
+        calculateMeanElevation,
+        calculateMeanWindage,
         calculateSession,
         round4
     };
