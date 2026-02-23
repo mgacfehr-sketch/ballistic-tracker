@@ -1,27 +1,130 @@
 /**
- * app.js — Application initialization and navigation.
+ * app.js — Application initialization, authentication, and navigation.
  *
- * Creates the CanvasManager, SessionFlow, BallisticDB, and ProfileManager.
- * Handles view switching between Session and Profiles tabs.
+ * Creates the Supabase client, handles login/signup/logout,
+ * then initializes CanvasManager, SessionFlow, BallisticDB, and ProfileManager.
  */
 
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
-        // ── Initialize DB ──────────────────────────────────
-        var db = new BallisticDB();
+    // ── Supabase credentials (replace with your project values) ──
+    var SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    var SUPABASE_KEY = 'YOUR_ANON_KEY';
 
-        db.open().then(function () {
-            initApp(db);
-        }).catch(function (err) {
-            console.error('Failed to open database:', err);
-            alert('Database error: ' + err.message);
-            // Fall back to running without DB
-            initApp(null);
+    document.addEventListener('DOMContentLoaded', function () {
+        var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // ── Auth DOM elements ─────────────────────────────────
+        var authScreen = document.getElementById('view-auth');
+        var appEl = document.getElementById('app');
+        var authError = document.getElementById('auth-error');
+        var emailInput = document.getElementById('auth-email');
+        var passInput = document.getElementById('auth-password');
+        var btnLogin = document.getElementById('btn-login');
+        var btnSignup = document.getElementById('btn-signup');
+        var btnLogout = document.getElementById('btn-logout');
+
+        function showAuth() {
+            authScreen.classList.remove('hidden');
+            appEl.classList.add('hidden');
+            authError.textContent = '';
+        }
+
+        function showAuthError(msg) {
+            authError.textContent = msg;
+        }
+
+        function startApp(user) {
+            authScreen.classList.add('hidden');
+            appEl.classList.remove('hidden');
+
+            var db = new BallisticDB(client, user.id);
+            db.open().then(function () {
+                initApp(db);
+            }).catch(function (err) {
+                console.error('Failed to initialize:', err);
+                initApp(null);
+            });
+        }
+
+        // ── Check existing session ────────────────────────────
+        client.auth.getSession().then(function (result) {
+            if (result.data.session) {
+                startApp(result.data.session.user);
+            } else {
+                showAuth();
+            }
+        });
+
+        // ── Login ─────────────────────────────────────────────
+        btnLogin.addEventListener('click', function () {
+            var email = emailInput.value.trim();
+            var pass = passInput.value;
+            if (!email || !pass) {
+                showAuthError('Enter email and password.');
+                return;
+            }
+            btnLogin.disabled = true;
+            btnSignup.disabled = true;
+            authError.textContent = '';
+            client.auth.signInWithPassword({ email: email, password: pass })
+                .then(function (result) {
+                    btnLogin.disabled = false;
+                    btnSignup.disabled = false;
+                    if (result.error) {
+                        showAuthError(result.error.message);
+                    } else {
+                        startApp(result.data.user);
+                    }
+                });
+        });
+
+        // ── Signup ────────────────────────────────────────────
+        btnSignup.addEventListener('click', function () {
+            var email = emailInput.value.trim();
+            var pass = passInput.value;
+            if (!email || !pass) {
+                showAuthError('Enter email and password.');
+                return;
+            }
+            if (pass.length < 6) {
+                showAuthError('Password must be at least 6 characters.');
+                return;
+            }
+            btnLogin.disabled = true;
+            btnSignup.disabled = true;
+            authError.textContent = '';
+            client.auth.signUp({ email: email, password: pass })
+                .then(function (result) {
+                    btnLogin.disabled = false;
+                    btnSignup.disabled = false;
+                    if (result.error) {
+                        showAuthError(result.error.message);
+                    } else if (result.data.session) {
+                        startApp(result.data.user);
+                    } else {
+                        showAuthError('Check your email to confirm your account.');
+                    }
+                });
+        });
+
+        // ── Allow Enter key to submit ─────────────────────────
+        passInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                btnLogin.click();
+            }
+        });
+
+        // ── Logout ────────────────────────────────────────────
+        btnLogout.addEventListener('click', function () {
+            client.auth.signOut().then(function () {
+                window.location.reload();
+            });
         });
     });
 
+    // ── App initialization (unchanged from original) ──────────
     function initApp(db) {
         // ── Canvas & Session ───────────────────────────────
         var canvasEl = document.getElementById('main-canvas');

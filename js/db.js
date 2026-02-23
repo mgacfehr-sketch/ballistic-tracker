@@ -1,259 +1,170 @@
 /**
- * db.js — IndexedDB wrapper for all Ballistic Tracker entities.
+ * db.js — Supabase wrapper for all Ballistic Tracker entities.
  *
  * Promise-based CRUD operations for: Rifle, Barrel, Load, Session,
  * ZeroRecord, ScopeAdjustment, CleaningLog.
  *
+ * Same public API as the original IndexedDB version — all callers
+ * (session-flow.js, profiles.js, history.js, ai-assistant.js,
+ * ballistic-solver.js) remain unchanged.
+ *
  * Usage:
- *   var db = new BallisticDB();
+ *   var db = new BallisticDB(supabaseClient, userId);
  *   db.open().then(function() { ... });
  */
 
-var DB_NAME = 'ballistic-tracker';
-var DB_VERSION = 4;
 var MAX_RIFLES = 50;
 
-function BallisticDB() {
-    this.db = null;
+// ── Case-conversion helpers ────────────────────────────────────
+
+function _toSnake(str) {
+    return str.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function _toCamel(str) {
+    return str.replace(/_([a-z])/g, function (_, c) { return c.toUpperCase(); });
+}
+
+// Known abbreviations that lose casing in the round-trip
+var _CAMEL_FIXES = { bulletBc: 'bulletBC' };
+
+function _rowToJs(row) {
+    if (!row) return null;
+    var obj = {};
+    for (var key in row) {
+        if (!row.hasOwnProperty(key)) continue;
+        if (key === 'user_id') continue;
+        var camelKey = _toCamel(key);
+        camelKey = _CAMEL_FIXES[camelKey] || camelKey;
+        obj[camelKey] = row[key];
+    }
+    return obj;
+}
+
+function _jsToRow(obj, userId) {
+    var row = {};
+    for (var key in obj) {
+        if (!obj.hasOwnProperty(key)) continue;
+        row[_toSnake(key)] = obj[key];
+    }
+    row.user_id = userId;
+    return row;
+}
+
+// ── Constructor ────────────────────────────────────────────────
+
+function BallisticDB(supabaseClient, userId) {
+    this.supabase = supabaseClient;
+    this.userId = userId;
 }
 
 /**
- * Open (or create) the database. Must be called before any other method.
+ * Open — no-op for Supabase (kept for API compatibility).
  * @returns {Promise<void>}
  */
 BallisticDB.prototype.open = function () {
-    var self = this;
-    return new Promise(function (resolve, reject) {
-        if (self.db) { resolve(); return; }
-
-        var request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onupgradeneeded = function (e) {
-            var db = e.target.result;
-
-            try {
-                // Rifles
-                if (!db.objectStoreNames.contains('rifles')) {
-                    db.createObjectStore('rifles', { keyPath: 'id' });
-                }
-
-                // Barrels
-                if (!db.objectStoreNames.contains('barrels')) {
-                    var barrelStore = db.createObjectStore('barrels', { keyPath: 'id' });
-                    barrelStore.createIndex('rifleId', 'rifleId', { unique: false });
-                }
-
-                // Loads
-                if (!db.objectStoreNames.contains('loads')) {
-                    var loadStore = db.createObjectStore('loads', { keyPath: 'id' });
-                    loadStore.createIndex('rifleId', 'rifleId', { unique: false });
-                }
-
-                // Sessions
-                if (!db.objectStoreNames.contains('sessions')) {
-                    var sessionStore = db.createObjectStore('sessions', { keyPath: 'id' });
-                    sessionStore.createIndex('rifleId', 'rifleId', { unique: false });
-                    sessionStore.createIndex('loadId', 'loadId', { unique: false });
-                    sessionStore.createIndex('barrelId', 'barrelId', { unique: false });
-                }
-
-                // Zero Records
-                if (!db.objectStoreNames.contains('zeroRecords')) {
-                    var zeroStore = db.createObjectStore('zeroRecords', { keyPath: 'id' });
-                    zeroStore.createIndex('rifleId', 'rifleId', { unique: false });
-                    zeroStore.createIndex('loadId', 'loadId', { unique: false });
-                }
-
-                // Scope Adjustments
-                if (!db.objectStoreNames.contains('scopeAdjustments')) {
-                    var scopeStore = db.createObjectStore('scopeAdjustments', { keyPath: 'id' });
-                    scopeStore.createIndex('rifleId', 'rifleId', { unique: false });
-                }
-
-                // Cleaning Logs
-                if (!db.objectStoreNames.contains('cleaningLogs')) {
-                    var cleanStore = db.createObjectStore('cleaningLogs', { keyPath: 'id' });
-                    cleanStore.createIndex('rifleId', 'rifleId', { unique: false });
-                    cleanStore.createIndex('barrelId', 'barrelId', { unique: false });
-                }
-
-                // Session Images (annotated export images)
-                if (!db.objectStoreNames.contains('sessionImages')) {
-                    db.createObjectStore('sessionImages', { keyPath: 'sessionId' });
-                }
-
-                // Settings (API keys, preferences)
-                if (!db.objectStoreNames.contains('settings')) {
-                    db.createObjectStore('settings', { keyPath: 'key' });
-                }
-            } catch (err) {
-                console.error('DB upgrade failed:', err);
-                if (e.target.transaction) {
-                    e.target.transaction.abort();
-                }
-            }
-        };
-
-        request.onblocked = function () {
-            reject(new Error('Database upgrade blocked — close other tabs and reload'));
-        };
-
-        request.onsuccess = function (e) {
-            self.db = e.target.result;
-            console.log('[DB] Opened successfully — version:', self.db.version, 'stores:', Array.from(self.db.objectStoreNames));
-            if (!self.db.objectStoreNames.contains('settings')) {
-                console.error('[DB] WARNING: settings store missing after open! Version:', self.db.version);
-            }
-            self.db.onversionchange = function () {
-                console.warn('[DB] Version change detected — closing database');
-                self.db.close();
-                self.db = null;
-            };
-            resolve();
-        };
-
-        request.onerror = function (e) {
-            reject(new Error('IndexedDB open failed: ' + e.target.error));
-        };
-    });
-};
-
-// ── Generic helpers ────────────────────────────────────────────
-
-BallisticDB.prototype._tx = function (storeName, mode) {
-    var tx = this.db.transaction(storeName, mode);
-    return tx.objectStore(storeName);
-};
-
-BallisticDB.prototype._put = function (storeName, record) {
-    var self = this;
-    return new Promise(function (resolve, reject) {
-        var store = self._tx(storeName, 'readwrite');
-        var req = store.put(record);
-        req.onsuccess = function () { resolve(record); };
-        req.onerror = function (e) { reject(e.target.error); };
-    });
-};
-
-BallisticDB.prototype._get = function (storeName, id) {
-    var self = this;
-    return new Promise(function (resolve, reject) {
-        var store = self._tx(storeName, 'readonly');
-        var req = store.get(id);
-        req.onsuccess = function () { resolve(req.result || null); };
-        req.onerror = function (e) { reject(e.target.error); };
-    });
-};
-
-BallisticDB.prototype._getAll = function (storeName) {
-    var self = this;
-    return new Promise(function (resolve, reject) {
-        var store = self._tx(storeName, 'readonly');
-        var req = store.getAll();
-        req.onsuccess = function () { resolve(req.result || []); };
-        req.onerror = function (e) { reject(e.target.error); };
-    });
-};
-
-BallisticDB.prototype._getAllByIndex = function (storeName, indexName, value) {
-    var self = this;
-    return new Promise(function (resolve, reject) {
-        var store = self._tx(storeName, 'readonly');
-        var index = store.index(indexName);
-        var req = index.getAll(value);
-        req.onsuccess = function () { resolve(req.result || []); };
-        req.onerror = function (e) { reject(e.target.error); };
-    });
-};
-
-BallisticDB.prototype._delete = function (storeName, id) {
-    var self = this;
-    return new Promise(function (resolve, reject) {
-        var store = self._tx(storeName, 'readwrite');
-        var req = store.delete(id);
-        req.onsuccess = function () { resolve(); };
-        req.onerror = function (e) { reject(e.target.error); };
-    });
-};
-
-BallisticDB.prototype._count = function (storeName) {
-    var self = this;
-    return new Promise(function (resolve, reject) {
-        var store = self._tx(storeName, 'readonly');
-        var req = store.count();
-        req.onsuccess = function () { resolve(req.result); };
-        req.onerror = function (e) { reject(e.target.error); };
-    });
+    return Promise.resolve();
 };
 
 // ── Rifle CRUD ─────────────────────────────────────────────────
 
 BallisticDB.prototype.addRifle = function (data) {
     var self = this;
-    return this._count('rifles').then(function (count) {
-        if (count >= MAX_RIFLES) {
-            throw new Error('Maximum of ' + MAX_RIFLES + ' rifle profiles reached');
-        }
-        var now = new Date().toISOString();
-        var rifle = {
-            id: generateUUID(),
-            name: data.name || '',
-            caliber: data.caliber || '',
-            scopeHeight: data.scopeHeight || 0,
-            zeroRange: data.zeroRange || 0,
-            angleUnit: data.angleUnit || 'MOA',
-            notes: data.notes || '',
-            createdAt: now,
-            updatedAt: now
-        };
-        return self._put('rifles', rifle);
-    });
+    return self.supabase.from('rifles').select('*', { count: 'exact', head: true })
+        .eq('user_id', self.userId)
+        .then(function (countRes) {
+            if (countRes.error) throw countRes.error;
+            if (countRes.count >= MAX_RIFLES) {
+                throw new Error('Maximum of ' + MAX_RIFLES + ' rifle profiles reached');
+            }
+            var now = new Date().toISOString();
+            var rifle = {
+                id: generateUUID(),
+                name: data.name || '',
+                caliber: data.caliber || '',
+                scopeHeight: data.scopeHeight || 0,
+                zeroRange: data.zeroRange || 0,
+                angleUnit: data.angleUnit || 'MOA',
+                notes: data.notes || '',
+                createdAt: now,
+                updatedAt: now
+            };
+            var row = _jsToRow(rifle, self.userId);
+            return self.supabase.from('rifles').insert(row).select().single();
+        })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.updateRifle = function (rifle) {
+    var self = this;
     rifle.updatedAt = new Date().toISOString();
-    return this._put('rifles', rifle);
+    var row = _jsToRow(rifle, self.userId);
+    return self.supabase.from('rifles').update(row)
+        .eq('id', rifle.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getRifle = function (id) {
-    return this._get('rifles', id);
+    var self = this;
+    return self.supabase.from('rifles').select()
+        .eq('id', id).eq('user_id', self.userId)
+        .maybeSingle()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getAllRifles = function () {
-    return this._getAll('rifles');
+    var self = this;
+    return self.supabase.from('rifles').select()
+        .eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.deleteRifle = function (id) {
     var self = this;
-    // Cascade: delete all barrels, loads, sessions, zeroRecords,
-    // scopeAdjustments, cleaningLogs linked to this rifle
-    return Promise.all([
-        self._getAllByIndex('barrels', 'rifleId', id),
-        self._getAllByIndex('loads', 'rifleId', id),
-        self._getAllByIndex('sessions', 'rifleId', id),
-        self._getAllByIndex('zeroRecords', 'rifleId', id),
-        self._getAllByIndex('scopeAdjustments', 'rifleId', id),
-        self._getAllByIndex('cleaningLogs', 'rifleId', id)
-    ]).then(function (results) {
-        var deletes = [];
-        var storeNames = ['barrels', 'loads', 'sessions', 'zeroRecords', 'scopeAdjustments', 'cleaningLogs'];
-        for (var s = 0; s < results.length; s++) {
-            for (var i = 0; i < results[s].length; i++) {
-                deletes.push(self._delete(storeNames[s], results[s][i].id));
-                if (storeNames[s] === 'sessions') {
-                    deletes.push(self._delete('sessionImages', results[s][i].id).catch(function () {}));
-                }
-            }
+    // Get sessions first so we can delete their Storage images
+    return self.getSessionsByRifle(id).then(function (sessions) {
+        var imageDeletes = [];
+        for (var i = 0; i < sessions.length; i++) {
+            imageDeletes.push(self.deleteSessionImage(sessions[i].id).catch(function () {}));
         }
-        return Promise.all(deletes);
+        return Promise.all(imageDeletes);
     }).then(function () {
-        return self._delete('rifles', id);
+        // Cascade-delete all children
+        return Promise.all([
+            self.supabase.from('barrels').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('loads').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('sessions').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('zero_records').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('scope_adjustments').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('cleaning_logs').delete().eq('rifle_id', id).eq('user_id', self.userId)
+        ]);
+    }).then(function (results) {
+        for (var i = 0; i < results.length; i++) {
+            if (results[i].error) throw results[i].error;
+        }
+        return self.supabase.from('rifles').delete().eq('id', id).eq('user_id', self.userId);
+    }).then(function (res) {
+        if (res.error) throw res.error;
     });
 };
 
 // ── Barrel CRUD ────────────────────────────────────────────────
 
 BallisticDB.prototype.addBarrel = function (data) {
+    var self = this;
     var barrel = {
         id: generateUUID(),
         rifleId: data.rifleId,
@@ -264,28 +175,56 @@ BallisticDB.prototype.addBarrel = function (data) {
         totalRounds: data.totalRounds || 0,
         notes: data.notes || ''
     };
-    return this._put('barrels', barrel);
+    var row = _jsToRow(barrel, self.userId);
+    return self.supabase.from('barrels').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.updateBarrel = function (barrel) {
-    return this._put('barrels', barrel);
+    var self = this;
+    var row = _jsToRow(barrel, self.userId);
+    return self.supabase.from('barrels').update(row)
+        .eq('id', barrel.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getBarrel = function (id) {
-    return this._get('barrels', id);
+    var self = this;
+    return self.supabase.from('barrels').select()
+        .eq('id', id).eq('user_id', self.userId)
+        .maybeSingle()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getBarrelsByRifle = function (rifleId) {
-    return this._getAllByIndex('barrels', 'rifleId', rifleId);
+    var self = this;
+    return self.supabase.from('barrels').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.deleteBarrel = function (id) {
-    return this._delete('barrels', id);
+    var self = this;
+    return self.supabase.from('barrels').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
 };
 
-/**
- * Set a barrel as the active barrel for its rifle, deactivating others.
- */
 BallisticDB.prototype.setActiveBarrel = function (barrelId, rifleId) {
     var self = this;
     return this.getBarrelsByRifle(rifleId).then(function (barrels) {
@@ -294,7 +233,7 @@ BallisticDB.prototype.setActiveBarrel = function (barrelId, rifleId) {
             var wasActive = barrels[i].isActive;
             barrels[i].isActive = (barrels[i].id === barrelId);
             if (barrels[i].isActive !== wasActive) {
-                updates.push(self._put('barrels', barrels[i]));
+                updates.push(self.updateBarrel(barrels[i]));
             }
         }
         return Promise.all(updates);
@@ -304,6 +243,7 @@ BallisticDB.prototype.setActiveBarrel = function (barrelId, rifleId) {
 // ── Load CRUD ──────────────────────────────────────────────────
 
 BallisticDB.prototype.addLoad = function (data) {
+    var self = this;
     var load = {
         id: generateUUID(),
         rifleId: data.rifleId,
@@ -318,28 +258,60 @@ BallisticDB.prototype.addLoad = function (data) {
         notes: data.notes || '',
         createdAt: new Date().toISOString()
     };
-    return this._put('loads', load);
+    var row = _jsToRow(load, self.userId);
+    return self.supabase.from('loads').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.updateLoad = function (load) {
-    return this._put('loads', load);
+    var self = this;
+    var row = _jsToRow(load, self.userId);
+    return self.supabase.from('loads').update(row)
+        .eq('id', load.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getLoad = function (id) {
-    return this._get('loads', id);
+    var self = this;
+    return self.supabase.from('loads').select()
+        .eq('id', id).eq('user_id', self.userId)
+        .maybeSingle()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getLoadsByRifle = function (rifleId) {
-    return this._getAllByIndex('loads', 'rifleId', rifleId);
+    var self = this;
+    return self.supabase.from('loads').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.deleteLoad = function (id) {
-    return this._delete('loads', id);
+    var self = this;
+    return self.supabase.from('loads').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
 };
 
 // ── Session CRUD ───────────────────────────────────────────────
 
 BallisticDB.prototype.addSession = function (data) {
+    var self = this;
     var session = {
         id: generateUUID(),
         rifleId: data.rifleId || null,
@@ -360,64 +332,129 @@ BallisticDB.prototype.addSession = function (data) {
         isZeroSession: data.isZeroSession || false,
         createdAt: new Date().toISOString()
     };
-    return this._put('sessions', session);
+    var row = _jsToRow(session, self.userId);
+    return self.supabase.from('sessions').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.updateSession = function (session) {
-    return this._put('sessions', session);
+    var self = this;
+    var row = _jsToRow(session, self.userId);
+    return self.supabase.from('sessions').update(row)
+        .eq('id', session.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getSession = function (id) {
-    return this._get('sessions', id);
+    var self = this;
+    return self.supabase.from('sessions').select()
+        .eq('id', id).eq('user_id', self.userId)
+        .maybeSingle()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getSessionsByRifle = function (rifleId) {
-    return this._getAllByIndex('sessions', 'rifleId', rifleId);
+    var self = this;
+    return self.supabase.from('sessions').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.getAllSessions = function () {
-    return this._getAll('sessions');
+    var self = this;
+    return self.supabase.from('sessions').select()
+        .eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
-/**
- * Get sessions with no rifle association (Quick/Misc mode).
- * IndexedDB indexes don't match null keys, so we fetch all and filter.
- */
 BallisticDB.prototype.getMiscSessions = function () {
-    return this._getAll('sessions').then(function (sessions) {
-        return sessions.filter(function (s) { return !s.rifleId; });
-    });
+    var self = this;
+    return self.supabase.from('sessions').select()
+        .eq('user_id', self.userId)
+        .is('rifle_id', null)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.deleteSession = function (id) {
     var self = this;
-    return this._delete('sessionImages', id).catch(function () {}).then(function () {
-        return self._delete('sessions', id);
+    return self.deleteSessionImage(id).catch(function () {}).then(function () {
+        return self.supabase.from('sessions').delete()
+            .eq('id', id).eq('user_id', self.userId);
+    }).then(function (res) {
+        if (res.error) throw res.error;
     });
 };
 
-// ── Session Images CRUD ────────────────────────────────────────
+// ── Session Images (Supabase Storage) ──────────────────────────
 
 BallisticDB.prototype.saveSessionImage = function (sessionId, fullBlob, thumbnailBlob) {
-    return this._put('sessionImages', {
-        sessionId: sessionId,
-        fullBlob: fullBlob,
-        thumbnailBlob: thumbnailBlob,
-        createdAt: new Date().toISOString()
+    var self = this;
+    var fullPath = self.userId + '/' + sessionId + '.jpg';
+    var thumbPath = self.userId + '/' + sessionId + '_thumb.jpg';
+    return Promise.all([
+        self.supabase.storage.from('session-images').upload(fullPath, fullBlob, {
+            upsert: true,
+            contentType: 'image/jpeg'
+        }),
+        self.supabase.storage.from('session-images').upload(thumbPath, thumbnailBlob, {
+            upsert: true,
+            contentType: 'image/jpeg'
+        })
+    ]).then(function (results) {
+        if (results[0].error) throw results[0].error;
+        if (results[1].error) throw results[1].error;
+        return { sessionId: sessionId, createdAt: new Date().toISOString() };
     });
 };
 
 BallisticDB.prototype.getSessionImage = function (sessionId) {
-    return this._get('sessionImages', sessionId);
+    var self = this;
+    var fullPath = self.userId + '/' + sessionId + '.jpg';
+    var thumbPath = self.userId + '/' + sessionId + '_thumb.jpg';
+    return Promise.all([
+        self.supabase.storage.from('session-images').download(fullPath),
+        self.supabase.storage.from('session-images').download(thumbPath)
+    ]).then(function (results) {
+        if (results[0].error || results[1].error) return null;
+        return {
+            sessionId: sessionId,
+            fullBlob: results[0].data,
+            thumbnailBlob: results[1].data
+        };
+    });
 };
 
 BallisticDB.prototype.deleteSessionImage = function (sessionId) {
-    return this._delete('sessionImages', sessionId);
+    var self = this;
+    var fullPath = self.userId + '/' + sessionId + '.jpg';
+    var thumbPath = self.userId + '/' + sessionId + '_thumb.jpg';
+    return self.supabase.storage.from('session-images').remove([fullPath, thumbPath])
+        .then(function () {});
 };
 
 // ── ZeroRecord CRUD ────────────────────────────────────────────
 
 BallisticDB.prototype.addZeroRecord = function (data) {
+    var self = this;
     var record = {
         id: generateUUID(),
         rifleId: data.rifleId,
@@ -428,20 +465,37 @@ BallisticDB.prototype.addZeroRecord = function (data) {
         weather: data.weather || null,
         notes: data.notes || ''
     };
-    return this._put('zeroRecords', record);
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('zero_records').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getZeroRecordsByRifle = function (rifleId) {
-    return this._getAllByIndex('zeroRecords', 'rifleId', rifleId);
+    var self = this;
+    return self.supabase.from('zero_records').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.deleteZeroRecord = function (id) {
-    return this._delete('zeroRecords', id);
+    var self = this;
+    return self.supabase.from('zero_records').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
 };
 
 // ── ScopeAdjustment CRUD ───────────────────────────────────────
 
 BallisticDB.prototype.addScopeAdjustment = function (data) {
+    var self = this;
     var adj = {
         id: generateUUID(),
         rifleId: data.rifleId,
@@ -452,20 +506,37 @@ BallisticDB.prototype.addScopeAdjustment = function (data) {
         reason: data.reason || '',
         notes: data.notes || ''
     };
-    return this._put('scopeAdjustments', adj);
+    var row = _jsToRow(adj, self.userId);
+    return self.supabase.from('scope_adjustments').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getScopeAdjustmentsByRifle = function (rifleId) {
-    return this._getAllByIndex('scopeAdjustments', 'rifleId', rifleId);
+    var self = this;
+    return self.supabase.from('scope_adjustments').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.deleteScopeAdjustment = function (id) {
-    return this._delete('scopeAdjustments', id);
+    var self = this;
+    return self.supabase.from('scope_adjustments').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
 };
 
 // ── CleaningLog CRUD ───────────────────────────────────────────
 
 BallisticDB.prototype.addCleaningLog = function (data) {
+    var self = this;
     var log = {
         id: generateUUID(),
         rifleId: data.rifleId,
@@ -474,69 +545,64 @@ BallisticDB.prototype.addCleaningLog = function (data) {
         roundCountAtCleaning: data.roundCountAtCleaning || 0,
         notes: data.notes || ''
     };
-    return this._put('cleaningLogs', log);
+    var row = _jsToRow(log, self.userId);
+    return self.supabase.from('cleaning_logs').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
 };
 
 BallisticDB.prototype.getCleaningLogsByRifle = function (rifleId) {
-    return this._getAllByIndex('cleaningLogs', 'rifleId', rifleId);
+    var self = this;
+    return self.supabase.from('cleaning_logs').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.getCleaningLogsByBarrel = function (barrelId) {
-    return this._getAllByIndex('cleaningLogs', 'barrelId', barrelId);
+    var self = this;
+    return self.supabase.from('cleaning_logs').select()
+        .eq('user_id', self.userId).eq('barrel_id', barrelId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
 };
 
 BallisticDB.prototype.deleteCleaningLog = function (id) {
-    return this._delete('cleaningLogs', id);
+    var self = this;
+    return self.supabase.from('cleaning_logs').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
 };
 
-// ── Settings CRUD ─────────────────────────────────────────────
+// ── Settings (localStorage fallback) ──────────────────────────
 
 BallisticDB.prototype.setSetting = function (key, value) {
-    console.log('[DB] setSetting called — key:', key, 'value length:', value ? String(value).length : 0);
-    if (!this.db) {
-        console.error('[DB] setSetting FAILED — db is null');
-        return Promise.reject(new Error('Database not open'));
+    try {
+        localStorage.setItem('yort_' + key, JSON.stringify(value));
+    } catch (e) {
+        console.error('[DB] setSetting failed:', e);
     }
-    if (!this.db.objectStoreNames.contains('settings')) {
-        console.error('[DB] setSetting FAILED — settings store does not exist. Stores:', Array.from(this.db.objectStoreNames));
-        return Promise.reject(new Error('Settings store missing — clear site data and reload'));
-    }
-    var self = this;
-    return this._put('settings', {
-        key: key,
-        value: value,
-        updatedAt: new Date().toISOString()
-    }).then(function (record) {
-        console.log('[DB] setSetting SUCCESS — key:', key);
-        // Verification: read it back immediately
-        return self._get('settings', key).then(function (readBack) {
-            if (readBack && readBack.value === value) {
-                console.log('[DB] setSetting VERIFIED — read-back matches');
-            } else {
-                console.error('[DB] setSetting VERIFY FAILED — read-back:', readBack);
-            }
-            return record;
-        });
-    });
+    return Promise.resolve({ key: key, value: value });
 };
 
 BallisticDB.prototype.getSetting = function (key) {
-    console.log('[DB] getSetting called — key:', key);
-    if (!this.db) {
-        console.error('[DB] getSetting FAILED — db is null');
+    try {
+        var raw = localStorage.getItem('yort_' + key);
+        return Promise.resolve(raw ? JSON.parse(raw) : null);
+    } catch (e) {
         return Promise.resolve(null);
     }
-    if (!this.db.objectStoreNames.contains('settings')) {
-        console.error('[DB] getSetting FAILED — settings store does not exist. Stores:', Array.from(this.db.objectStoreNames));
-        return Promise.resolve(null);
-    }
-    return this._get('settings', key).then(function (record) {
-        var val = record ? record.value : null;
-        console.log('[DB] getSetting result — key:', key, 'found:', val !== null, 'value length:', val ? String(val).length : 0);
-        return val;
-    });
 };
 
 BallisticDB.prototype.deleteSetting = function (key) {
-    return this._delete('settings', key);
+    localStorage.removeItem('yort_' + key);
+    return Promise.resolve();
 };

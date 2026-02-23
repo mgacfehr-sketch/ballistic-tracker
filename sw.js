@@ -8,9 +8,10 @@
  * Fetch strategy:
  *   App shell (HTML/JS/CSS) → network-first, cache fallback
  *   Static assets (icons)   → cache-first, network fallback
+ *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 10;
+var CACHE_VERSION = 11;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
@@ -31,7 +32,8 @@ var APP_SHELL = [
     './js/app.js',
     './manifest.json',
     './icons/icon-192.png',
-    './icons/icon-512.png'
+    './icons/icon-512.png',
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js'
 ];
 
 // Files that change with code updates — use network-first
@@ -91,11 +93,18 @@ self.addEventListener('activate', function (e) {
 // ── Fetch ───────────────────────────────────────────────────
 
 self.addEventListener('fetch', function (e) {
-    // Skip non-GET and cross-origin requests
+    // Skip non-GET requests
     if (e.request.method !== 'GET') return;
-    if (!e.request.url.startsWith(self.location.origin)) return;
 
-    if (isMutable(e.request.url)) {
+    // Never cache Supabase API and Storage requests — always use network
+    if (e.request.url.indexOf('supabase.co') !== -1) return;
+
+    // Handle same-origin and CDN requests
+    var isLocal = e.request.url.startsWith(self.location.origin);
+    var isCDN = e.request.url.indexOf('cdn.jsdelivr.net') !== -1;
+    if (!isLocal && !isCDN) return;
+
+    if (isLocal && isMutable(e.request.url)) {
         // Network-first for app code — always fetch fresh when online
         e.respondWith(
             fetch(e.request).then(function (response) {
@@ -117,7 +126,7 @@ self.addEventListener('fetch', function (e) {
             })
         );
     } else {
-        // Cache-first for static assets (icons, images)
+        // Cache-first for static assets (icons, images, CDN libs)
         e.respondWith(
             caches.match(e.request).then(function (cached) {
                 if (cached) return cached;

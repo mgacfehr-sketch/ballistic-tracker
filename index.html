@@ -12,7 +12,26 @@
     <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-    <div id="app">
+    <!-- Auth Screen (shown before login) -->
+    <div id="view-auth" class="auth-screen hidden">
+        <div class="auth-container">
+            <h1 class="auth-logo">Yort</h1>
+            <p class="auth-subtitle">Ballistic Tracker</p>
+            <div class="form-group">
+                <label for="auth-email">Email</label>
+                <input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label for="auth-password">Password</label>
+                <input type="password" id="auth-password" autocomplete="current-password" placeholder="Password">
+            </div>
+            <p id="auth-error" class="auth-error"></p>
+            <button id="btn-login" class="btn btn-primary auth-btn">Log In</button>
+            <button id="btn-signup" class="btn btn-secondary auth-btn">Sign Up</button>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
         <header id="app-header">
             <h1>Yort</h1>
             <nav id="app-nav">
@@ -21,7 +40,10 @@
                 <button class="nav-tab" data-view="ai">Ask Yort</button>
                 <button class="nav-tab" data-view="solver">Solver</button>
             </nav>
-            <button id="btn-new-session" class="header-btn" title="New Session">+</button>
+            <div class="header-actions">
+                <button id="btn-new-session" class="header-btn" title="New Session">+</button>
+                <button id="btn-logout" class="header-btn" title="Log Out">&#x2192;</button>
+            </div>
         </header>
 
         <!-- Session View (canvas + step panel) -->
@@ -221,6 +243,7 @@
 
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/db.js"></script>
     <script src="js/calculations.js"></script>
