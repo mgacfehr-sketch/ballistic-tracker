@@ -437,21 +437,29 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
         });
     }
 
-    // Async load barrel round counts
+    // Load barrel round counts from stored totalRounds
     if (activeBarrel && this.historyManager) {
-        Promise.all([
-            this.db.getSessionsByRifle(rifle.id),
-            this.db.getCleaningLogsByBarrel(activeBarrel.id)
-        ]).then(function (results) {
-            var sessions = results[0];
-            var cleaningLogs = results[1];
-            var totalRounds = self.historyManager._computeTotalRounds(sessions, activeBarrel.id);
-            var sinceCleaning = self.historyManager._computeRoundsSinceCleaning(sessions, cleaningLogs, activeBarrel.id);
+        var totalRounds = activeBarrel.totalRounds || 0;
+        this.db.getCleaningLogsByBarrel(activeBarrel.id).then(function (cleaningLogs) {
+            var sinceCleaning = self.historyManager._computeRoundsSinceCleaning(totalRounds, cleaningLogs);
 
             var statsEl = document.getElementById('barrel-stats');
             if (statsEl) {
-                statsEl.innerHTML = '<div class="dashboard-stat"><span class="dashboard-stat-value">' + totalRounds + '</span><span class="dashboard-stat-label">Total Rounds</span></div>'
+                statsEl.innerHTML = '<div class="dashboard-stat" id="stat-total-rounds" style="cursor:pointer;"><span class="dashboard-stat-value">' + totalRounds + '</span><span class="dashboard-stat-label">Total Rounds &#9998;</span></div>'
                     + '<div class="dashboard-stat"><span class="dashboard-stat-value">' + sinceCleaning + '</span><span class="dashboard-stat-label">Since Cleaning</span></div>';
+
+                document.getElementById('stat-total-rounds').addEventListener('click', function () {
+                    var newVal = prompt('Update total round count:', totalRounds);
+                    if (newVal !== null) {
+                        var parsed = parseInt(newVal, 10);
+                        if (!isNaN(parsed) && parsed >= 0) {
+                            activeBarrel.totalRounds = parsed;
+                            self.db.updateBarrel(activeBarrel).then(function () {
+                                self.showRifleDetail(rifle.id);
+                            });
+                        }
+                    }
+                });
             }
         });
     }
@@ -486,9 +494,15 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-group">';
+    html += '<div class="form-row">';
+    html += '<div class="form-group form-group-half">';
     html += '<label for="br-install-date">Install Date</label>';
     html += '<input type="date" id="br-install-date" value="' + escapeAttr(barrel ? barrel.installDate : new Date().toISOString().split('T')[0]) + '">';
+    html += '</div>';
+    html += '<div class="form-group form-group-half">';
+    html += '<label for="br-total-rounds">Total Rounds</label>';
+    html += '<input type="number" id="br-total-rounds" min="0" step="1" inputmode="numeric" placeholder="0" value="' + (barrel ? (barrel.totalRounds || 0) : 0) + '">';
+    html += '</div>';
     html += '</div>';
 
     html += '<div class="form-group">';
@@ -518,6 +532,7 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
             twistRate: document.getElementById('br-twist-rate').value.trim(),
             twistDirection: document.getElementById('br-twist-dir').value,
             installDate: document.getElementById('br-install-date').value,
+            totalRounds: parseInt(document.getElementById('br-total-rounds').value, 10) || 0,
             isActive: true,
             notes: document.getElementById('br-notes').value.trim()
         };
@@ -526,6 +541,7 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
             barrel.twistRate = data.twistRate;
             barrel.twistDirection = data.twistDirection;
             barrel.installDate = data.installDate;
+            barrel.totalRounds = data.totalRounds;
             barrel.notes = data.notes;
             self.db.updateBarrel(barrel).then(function () {
                 self.showRifleDetail(rifleId);

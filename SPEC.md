@@ -75,6 +75,7 @@ The heart of the app. A standalone flow that works without profiles.
 - `twistDirection` (string, "Right" or "Left")
 - `installDate` (ISO date)
 - `isActive` (boolean — only one active barrel per rifle)
+- `totalRounds` (number — manually tracked total round count)
 - `notes` (string, optional)
 
 #### Load (Ammo Profile)
@@ -144,14 +145,13 @@ The heart of the app. A standalone flow that works without profiles.
 - `rifleId` (FK → Rifle)
 - `barrelId` (FK → Barrel)
 - `date` (ISO datetime)
-- `roundCountAtCleaning` (number — auto-calculated total rounds on barrel at this point)
+- `roundCountAtCleaning` (number — barrel total rounds at time of cleaning, pre-filled from barrel)
 - `notes` (string, optional)
 
 **Profile limits:** Up to 50 rifle profiles. No hard limit on loads per rifle, sessions, or log entries.
 
 **Derived/computed values (not stored, calculated on read):**
-- Total round count on barrel = sum of `roundsFired` from all sessions linked to that barrel
-- Rounds since last cleaning = rounds fired after most recent cleaning log date
+- Rounds since last cleaning = barrel `totalRounds` minus `roundCountAtCleaning` from most recent cleaning log
 - Velocity trend = ordered list of `measuredVelocity` from sessions over time
 
 ---

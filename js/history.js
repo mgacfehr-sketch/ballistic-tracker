@@ -234,19 +234,19 @@ HistoryManager.prototype.showCleaningLog = function (rifleId, barrelId) {
     Promise.all([
         this.db.getRifle(rifleId),
         this.db.getCleaningLogsByBarrel(barrelId),
-        this.db.getSessionsByRifle(rifleId)
+        this.db.getBarrel(barrelId)
     ]).then(function (results) {
         var rifle = results[0];
         var logs = results[1];
-        var sessions = results[2];
+        var barrel = results[2];
         if (!rifle) { self.profileManager.showRifleList(); return; }
 
         logs.sort(function (a, b) {
             return (b.date || '').localeCompare(a.date || '');
         });
 
-        var totalRounds = self._computeTotalRounds(sessions, barrelId);
-        var roundsSinceCleaning = self._computeRoundsSinceCleaning(sessions, logs, barrelId);
+        var totalRounds = barrel ? (barrel.totalRounds || 0) : 0;
+        var roundsSinceCleaning = self._computeRoundsSinceCleaning(totalRounds, logs);
 
         self._renderCleaningLog(rifle, barrelId, logs, totalRounds, roundsSinceCleaning);
     });
@@ -326,13 +326,13 @@ HistoryManager.prototype.showCleaningForm = function (rifleId, barrelId) {
     var self = this;
     Promise.all([
         this.db.getRifle(rifleId),
-        this.db.getSessionsByRifle(rifleId)
+        this.db.getBarrel(barrelId)
     ]).then(function (results) {
         var rifle = results[0];
-        var sessions = results[1];
+        var barrel = results[1];
         if (!rifle) { self.profileManager.showRifleList(); return; }
 
-        var totalRounds = self._computeTotalRounds(sessions, barrelId);
+        var totalRounds = barrel ? (barrel.totalRounds || 0) : 0;
         self._renderCleaningForm(rifle, barrelId, totalRounds);
     });
 };
@@ -773,41 +773,27 @@ HistoryManager.prototype._renderMiscSessionDetail = function (session) {
 // ── Round Count Helpers ─────────────────────────────────────────
 
 /**
- * Sum roundsFired from sessions associated with a barrel.
+ * Rounds since last cleaning = barrel totalRounds minus roundCountAtCleaning
+ * from the most recent cleaning log entry.
+ * @param {number} totalRounds - The barrel's manually-tracked total round count.
+ * @param {Array} cleaningLogs - Cleaning log entries for this barrel.
+ * @returns {number}
  */
-HistoryManager.prototype._computeTotalRounds = function (sessions, barrelId) {
-    var total = 0;
-    for (var i = 0; i < sessions.length; i++) {
-        if (sessions[i].barrelId === barrelId) {
-            total += sessions[i].roundsFired || 0;
-        }
-    }
-    return total;
-};
-
-/**
- * Rounds fired after the most recent cleaning log entry.
- */
-HistoryManager.prototype._computeRoundsSinceCleaning = function (sessions, cleaningLogs, barrelId) {
+HistoryManager.prototype._computeRoundsSinceCleaning = function (totalRounds, cleaningLogs) {
     if (cleaningLogs.length === 0) {
-        return this._computeTotalRounds(sessions, barrelId);
+        return totalRounds;
     }
 
-    // Find latest cleaning date
-    var latest = cleaningLogs[0].date || '';
+    // Find the cleaning log with the latest date
+    var latest = cleaningLogs[0];
     for (var i = 1; i < cleaningLogs.length; i++) {
-        if ((cleaningLogs[i].date || '') > latest) {
-            latest = cleaningLogs[i].date;
+        if ((cleaningLogs[i].date || '') > (latest.date || '')) {
+            latest = cleaningLogs[i];
         }
     }
 
-    var rounds = 0;
-    for (var j = 0; j < sessions.length; j++) {
-        if (sessions[j].barrelId === barrelId && (sessions[j].date || '') > latest) {
-            rounds += sessions[j].roundsFired || 0;
-        }
-    }
-    return rounds;
+    var diff = totalRounds - (latest.roundCountAtCleaning || 0);
+    return diff >= 0 ? diff : 0;
 };
 
 // ── Image Helpers ───────────────────────────────────────────────

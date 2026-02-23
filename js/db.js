@@ -256,6 +256,7 @@ BallisticDB.prototype.addBarrel = function (data) {
         twistDirection: data.twistDirection || 'Right',
         installDate: data.installDate || new Date().toISOString().split('T')[0],
         isActive: data.isActive !== undefined ? data.isActive : true,
+        totalRounds: data.totalRounds || 0,
         notes: data.notes || ''
     };
     return this._put('barrels', barrel);
