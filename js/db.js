@@ -345,6 +345,16 @@ BallisticDB.prototype.getAllSessions = function () {
     return this._getAll('sessions');
 };
 
+/**
+ * Get sessions with no rifle association (Quick/Misc mode).
+ * IndexedDB indexes don't match null keys, so we fetch all and filter.
+ */
+BallisticDB.prototype.getMiscSessions = function () {
+    return this._getAll('sessions').then(function (sessions) {
+        return sessions.filter(function (s) { return !s.rifleId; });
+    });
+};
+
 BallisticDB.prototype.deleteSession = function (id) {
     return this._delete('sessions', id);
 };

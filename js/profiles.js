@@ -63,6 +63,19 @@ ProfileManager.prototype._renderRifleList = function (rifles) {
         html += '<p class="profile-count">' + rifles.length + ' / ' + MAX_RIFLES + ' profiles</p>';
     }
 
+    // Misc sessions link
+    html += '<div class="detail-section">';
+    html += '<div class="profile-list" style="padding:0 16px;">';
+    html += '<div class="profile-card" id="btn-misc-sessions">';
+    html += '<div class="profile-card-main">';
+    html += '<span class="profile-card-name">Misc Sessions</span>';
+    html += '<span class="profile-card-sub">Sessions saved without a rifle profile</span>';
+    html += '</div>';
+    html += '<span class="profile-card-arrow">&rsaquo;</span>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+
     html += '</div>';
     this.container.innerHTML = html;
     this._bindRifleListEvents();
@@ -77,11 +90,18 @@ ProfileManager.prototype._bindRifleListEvents = function () {
         });
     }
 
-    var cards = this.container.querySelectorAll('.profile-card');
+    var cards = this.container.querySelectorAll('.profile-card[data-rifle-id]');
     for (var i = 0; i < cards.length; i++) {
         cards[i].addEventListener('click', function () {
             var id = this.getAttribute('data-rifle-id');
             self.showRifleDetail(id);
+        });
+    }
+
+    var miscBtn = document.getElementById('btn-misc-sessions');
+    if (miscBtn && this.historyManager) {
+        miscBtn.addEventListener('click', function () {
+            self.historyManager.showMiscSessionList();
         });
     }
 };
