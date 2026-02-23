@@ -644,6 +644,10 @@ SessionFlow.prototype._calculate = function () {
         type: 'centroid',
         point: { x: this.results.centroid.x, y: this.results.centroid.y }
     });
+
+    // Show draggable results overlay on canvas
+    this.canvas.overlayResults = this.results;
+    this.canvas.overlayPos = null; // will default to bottom-right on first render
     this.canvas.render();
 
     this._renderResults();
@@ -843,7 +847,8 @@ SessionFlow.prototype._storeAnnotatedImage = function (sessionId) {
             this.canvas.markers,
             this.canvas.calibrationLine,
             this.canvas.bulletDiameterPx,
-            this.results
+            this.results,
+            this.canvas.overlayPos
         );
         console.log('[Session] Export canvas rendered — size:', exportCanvas.width, 'x', exportCanvas.height);
 
@@ -934,7 +939,8 @@ SessionFlow.prototype._saveImage = function () {
         this.canvas.markers,
         this.canvas.calibrationLine,
         this.canvas.bulletDiameterPx,
-        this.results
+        this.results,
+        this.canvas.overlayPos
     );
 
     exportCanvas.toBlob(function (blob) {
@@ -958,7 +964,8 @@ SessionFlow.prototype._shareImage = function () {
         this.canvas.markers,
         this.canvas.calibrationLine,
         this.canvas.bulletDiameterPx,
-        this.results
+        this.results,
+        this.canvas.overlayPos
     );
 
     exportCanvas.toBlob(function (blob) {

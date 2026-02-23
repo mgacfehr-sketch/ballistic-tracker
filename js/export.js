@@ -15,7 +15,7 @@
  * @param {object} results - Results from calculateSession
  * @returns {HTMLCanvasElement} The rendered canvas
  */
-function renderAnnotatedImage(image, markers, calibrationLine, bulletDiameterPx, results) {
+function renderAnnotatedImage(image, markers, calibrationLine, bulletDiameterPx, results, overlayPos) {
     var w = image.naturalWidth || image.width;
     var h = image.naturalHeight || image.height;
 
@@ -44,7 +44,7 @@ function renderAnnotatedImage(image, markers, calibrationLine, bulletDiameterPx,
 
     // Draw results overlay card
     if (results) {
-        _drawResultsOverlay(ctx, w, h, results, sf);
+        _drawResultsOverlay(ctx, w, h, results, sf, overlayPos);
     }
 
     return canvas;
@@ -145,7 +145,7 @@ function _drawExportMarker(ctx, marker, bulletDiameterPx, sf) {
     }
 }
 
-function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf) {
+function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     var padding = 18 * sf;
     var lineHeight = 22 * sf;
     var fontSize = 14 * sf;
@@ -192,8 +192,14 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf) {
 
     var cardW = maxWidth + padding * 2;
     var cardH = totalHeight;
-    var cardX = canvasW - cardW - padding;
-    var cardY = canvasH - cardH - padding;
+    var cardX, cardY;
+    if (overlayPos) {
+        cardX = overlayPos.x;
+        cardY = overlayPos.y;
+    } else {
+        cardX = canvasW - cardW - padding;
+        cardY = canvasH - cardH - padding;
+    }
 
     // Draw card background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';

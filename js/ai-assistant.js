@@ -164,12 +164,8 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
     this._appendMessage('user', userText);
     this._showLoading(true);
 
-    // Gather context and call API
-    var contextPromise = this.selectedRifleId
-        ? this._gatherContext(this.selectedRifleId)
-        : Promise.resolve(null);
-
-    contextPromise.then(function (context) {
+    // Always gather context (all rifles + trajectories)
+    this._gatherContext(this.selectedRifleId).then(function (context) {
         var systemPrompt = self._buildSystemPrompt(context);
         return self._callAPI(systemPrompt);
     }).then(function (responseText) {
@@ -183,38 +179,133 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
 };
 
 /**
- * Gather all relevant data for a rifle to build context.
+ * Gather all relevant data: all rifles + loads (for trajectories), plus
+ * detailed data for the selected rifle if one is chosen.
  */
-AIAssistantManager.prototype._gatherContext = function (rifleId) {
+AIAssistantManager.prototype._gatherContext = function (selectedRifleId) {
     var self = this;
     var ctx = {};
 
-    return Promise.all([
-        self.db.getRifle(rifleId),
-        self.db.getLoadsByRifle(rifleId),
-        self.db.getBarrelsByRifle(rifleId),
-        self.db.getSessionsByRifle(rifleId),
-        self.db.getCleaningLogsByRifle(rifleId),
-        self.db.getScopeAdjustmentsByRifle(rifleId),
-        self.db.getZeroRecordsByRifle(rifleId)
-    ]).then(function (results) {
-        ctx.rifle = results[0];
-        ctx.loads = results[1];
-        ctx.barrels = results[2];
+    return self.db.getAllRifles().then(function (allRifles) {
+        ctx.allRifles = allRifles || [];
 
-        // Sort sessions by date desc, take last 20
-        var sessions = results[3] || [];
-        sessions.sort(function (a, b) {
-            return (b.date || '').localeCompare(a.date || '');
+        // Fetch loads for every rifle
+        var loadPromises = ctx.allRifles.map(function (r) {
+            return self.db.getLoadsByRifle(r.id).then(function (loads) {
+                return { rifleId: r.id, loads: loads || [] };
+            });
         });
-        ctx.sessions = sessions.slice(0, 20);
+        return Promise.all(loadPromises);
+    }).then(function (loadResults) {
+        // Build a map: rifleId → loads array
+        ctx.allLoadsMap = {};
+        for (var i = 0; i < loadResults.length; i++) {
+            ctx.allLoadsMap[loadResults[i].rifleId] = loadResults[i].loads;
+        }
 
-        ctx.cleaningLogs = results[4] || [];
-        ctx.scopeAdjustments = results[5] || [];
-        ctx.zeroRecords = results[6] || [];
+        // If a rifle is selected, fetch detailed data for it
+        if (selectedRifleId) {
+            return Promise.all([
+                self.db.getRifle(selectedRifleId),
+                self.db.getBarrelsByRifle(selectedRifleId),
+                self.db.getSessionsByRifle(selectedRifleId),
+                self.db.getCleaningLogsByRifle(selectedRifleId),
+                self.db.getScopeAdjustmentsByRifle(selectedRifleId),
+                self.db.getZeroRecordsByRifle(selectedRifleId)
+            ]).then(function (results) {
+                ctx.rifle = results[0];
+                ctx.loads = ctx.allLoadsMap[selectedRifleId] || [];
+                ctx.barrels = results[1] || [];
+
+                var sessions = results[2] || [];
+                sessions.sort(function (a, b) {
+                    return (b.date || '').localeCompare(a.date || '');
+                });
+                ctx.sessions = sessions.slice(0, 20);
+
+                ctx.cleaningLogs = results[3] || [];
+                ctx.scopeAdjustments = results[4] || [];
+                ctx.zeroRecords = results[5] || [];
+
+                return ctx;
+            });
+        }
+        return ctx;
+    }).then(function (ctx) {
+        // Extract weather from most recent session (if available)
+        var weather = {};
+        if (ctx.sessions && ctx.sessions.length > 0) {
+            var recentSession = ctx.sessions[0];
+            if (recentSession.weather) {
+                var w = recentSession.weather;
+                if (w.tempF !== undefined && w.tempF !== null) weather.tempF = w.tempF;
+                if (w.humidity !== undefined && w.humidity !== null) weather.humidity = w.humidity;
+                if (w.windMph !== undefined && w.windMph !== null) weather.windSpeedMph = w.windMph;
+            }
+        }
+        ctx.weather = weather;
+
+        // Compute trajectories for all rifle+load pairs
+        ctx.trajectories = self._computeTrajectories(ctx.allRifles, ctx.allLoadsMap, weather);
 
         return ctx;
     });
+};
+
+/**
+ * Compute trajectory tables for every rifle+load pair that has sufficient data.
+ * Returns an array of { rifleName, rifleId, loadName, loadId, conditions, table }.
+ */
+AIAssistantManager.prototype._computeTrajectories = function (allRifles, allLoadsMap, weather) {
+    var results = [];
+
+    for (var i = 0; i < allRifles.length; i++) {
+        var rifle = allRifles[i];
+        var loads = allLoadsMap[rifle.id] || [];
+
+        for (var j = 0; j < loads.length; j++) {
+            var load = loads[j];
+
+            // Skip loads missing BC or muzzle velocity — can't compute
+            if (!load.bulletBC || !load.muzzleVelocity) continue;
+
+            var params = {
+                bc: load.bulletBC,
+                dragModel: load.dragModel || 'G1',
+                muzzleVelocity: load.muzzleVelocity,
+                scopeHeight: rifle.scopeHeight || 1.5,
+                zeroRange: rifle.zeroRange || 100,
+                bulletWeight: load.bulletWeight || 168,
+                maxRange: 1500,
+                rangeStep: 50,
+                tempF: weather.tempF || 59,
+                pressureInHg: weather.pressureInHg || 29.92,
+                humidity: weather.humidity || 0,
+                windSpeedMph: weather.windSpeedMph || 0
+            };
+
+            try {
+                var table = computeTrajectory(params);
+                results.push({
+                    rifleName: rifle.name || 'Unnamed',
+                    rifleId: rifle.id,
+                    loadName: load.name || 'Unnamed',
+                    loadId: load.id,
+                    conditions: {
+                        tempF: params.tempF,
+                        pressureInHg: params.pressureInHg,
+                        humidity: params.humidity,
+                        windSpeedMph: params.windSpeedMph
+                    },
+                    table: table
+                });
+            } catch (e) {
+                // Skip failed computations silently
+            }
+        }
+    }
+
+    return results;
 };
 
 /**
@@ -227,10 +318,28 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
     lines.push('Be concise and practical. Use MOA or MIL as appropriate. Reference specific data when available.');
     lines.push('When introducing yourself or asked who you are, say you are Yort.');
     lines.push('');
+    lines.push('You have access to pre-computed ballistic trajectory tables below. Use them to answer questions about drop, dial-up, come-up, holdover, wind drift, velocity, and energy at any range.');
+    lines.push('For ranges between table rows, interpolate linearly.');
+    lines.push('If a user asks a ballistics question and the rifle has MULTIPLE loads, ask which load they want to use. List the load names. If the rifle has only ONE load, use it automatically without asking.');
+    lines.push('If no rifle is selected and there are multiple rifles, ask which rifle. If only one rifle exists, use it automatically.');
+    lines.push('When giving dial-up/come-up values, reference the ComeUp(MOA) column. State the conditions used.');
+    lines.push('');
 
     if (!context) {
-        lines.push('The user has not selected a specific rifle. Answer general ballistics and shooting questions.');
+        lines.push('No rifle data available. Answer general ballistics and shooting questions.');
         return lines.join('\n');
+    }
+
+    // If no rifle is selected, still show all rifles and trajectories
+    if (!context.rifle && context.allRifles && context.allRifles.length > 0) {
+        lines.push('The user has not selected a specific rifle. The following rifles are available:');
+        for (var ri = 0; ri < context.allRifles.length; ri++) {
+            var ar = context.allRifles[ri];
+            var arLoads = context.allLoadsMap[ar.id] || [];
+            lines.push('- ' + (ar.name || 'Unnamed') + (ar.caliber ? ' (' + ar.caliber + ')' : '') +
+                ' — ' + arLoads.length + ' load(s)');
+        }
+        lines.push('');
     }
 
     // Rifle info
@@ -370,6 +479,35 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
                 (zr.notes ? ' — ' + zr.notes : ''));
         }
         lines.push('');
+    }
+
+    // Trajectory tables for all rifle+load pairs
+    if (context.trajectories && context.trajectories.length > 0) {
+        lines.push('=== BALLISTIC TRAJECTORY TABLES ===');
+        lines.push('');
+        for (var t = 0; t < context.trajectories.length; t++) {
+            var traj = context.trajectories[t];
+            lines.push('=== TRAJECTORY: ' + traj.rifleName + ' / ' + traj.loadName + ' ===');
+            lines.push('Conditions: ' + traj.conditions.tempF + '\u00B0F, ' +
+                traj.conditions.pressureInHg + ' inHg, ' +
+                traj.conditions.humidity + '% RH, wind ' +
+                traj.conditions.windSpeedMph + ' mph');
+            lines.push('Range(yd) | Drop(in) | Drop(MOA) | ComeUp(MOA) | Wind(in) | Wind(MOA) | Vel(fps) | Energy(ft-lb)');
+            for (var row = 0; row < traj.table.length; row++) {
+                var d = traj.table[row];
+                lines.push(
+                    d.rangeYards + ' | ' +
+                    d.dropInches.toFixed(1) + ' | ' +
+                    d.dropMOA.toFixed(2) + ' | ' +
+                    d.comeUpMOA.toFixed(2) + ' | ' +
+                    d.windDriftInches.toFixed(1) + ' | ' +
+                    d.windDriftMOA.toFixed(2) + ' | ' +
+                    d.velocityFps + ' | ' +
+                    d.energyFtLbs
+                );
+            }
+            lines.push('');
+        }
     }
 
     return lines.join('\n');

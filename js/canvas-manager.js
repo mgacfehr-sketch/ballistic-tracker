@@ -40,6 +40,14 @@ function CanvasManager(canvasEl, hintEl, zoomIndicatorEl) {
     this._lastPanX = 0;
     this._lastPanY = 0;
 
+    // Results overlay (draggable)
+    this.overlayResults = null;      // results object — when set, overlay is drawn
+    this.overlayPos = null;          // {x, y} in image coords (top-left of card)
+    this._overlayScreenRect = null;  // {x, y, w, h} in CSS coords for hit-testing
+    this._overlayDragging = false;
+    this._overlayDragOffsetX = 0;
+    this._overlayDragOffsetY = 0;
+
     // Callback
     this.onTap = null;         // function({x, y}) in IMAGE coordinates
 
@@ -64,6 +72,9 @@ CanvasManager.prototype.clearImage = function () {
     this.markers = [];
     this.calibrationLine = null;
     this.bulletDiameterPx = 0;
+    this.overlayResults = null;
+    this.overlayPos = null;
+    this._overlayScreenRect = null;
     this.zoomLevel = 1;
     this.offsetX = 0;
     this.offsetY = 0;
@@ -186,6 +197,11 @@ CanvasManager.prototype.render = function () {
     for (var i = 0; i < this.markers.length; i++) {
         this._drawMarker(this.markers[i]);
     }
+
+    // Draw draggable results overlay
+    if (this.overlayResults) {
+        this._drawLiveOverlay();
+    }
 };
 
 CanvasManager.prototype._clearCanvas = function () {
@@ -299,6 +315,129 @@ CanvasManager.prototype._drawCalibrationLine = function (a, b) {
     ctx.setLineDash([]);
 };
 
+// ── Results Overlay (Draggable) ─────────────────────────────────
+
+CanvasManager.prototype._drawLiveOverlay = function () {
+    if (!this.overlayResults) return;
+
+    var ctx = this.ctx;
+    var dpr = window.devicePixelRatio || 1;
+    var sf = dpr;
+    var padding = 12 * sf;
+    var lineHeight = 17 * sf;
+    var fontSize = 11 * sf;
+    var titleFontSize = 13 * sf;
+    var smallFontSize = 9 * sf;
+
+    var results = this.overlayResults;
+    var atzElevInches = Math.abs(results.elevationOffsetInches || 0);
+    var atzWindInches = Math.abs(results.windageOffsetInches || 0);
+    var atzElevAbbr = (results.atzElevationDir || '')[0] || '';
+    var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
+
+    var lines = [];
+    lines.push({ text: 'YORT', bold: true, size: titleFontSize, color: '#4caf50' });
+    lines.push({ text: '', gap: 0.4 });
+    lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot Group', bold: false, size: fontSize, color: '#e0e0e0' });
+    lines.push({ text: '', gap: 0.2 });
+    lines.push({ text: 'Group: ' + formatFixed(results.groupSizeInches, 3) + '" (' + formatFixed(results.groupSizeMOA, 2) + ' MOA)', bold: true, size: fontSize, color: '#ffffff' });
+    lines.push({ text: '', gap: 0.2 });
+    lines.push({ text: 'ATZ(INCH): ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2), bold: true, size: fontSize, color: '#4caf50' });
+    lines.push({ text: 'ATZ(MOA):  ' + atzElevAbbr + ': ' + formatFixed(results.atzElevationMOA, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(results.atzWindageMOA, 2), bold: false, size: smallFontSize, color: '#aaaaaa' });
+
+    // Measure card dimensions
+    var maxWidth = 0;
+    for (var i = 0; i < lines.length; i++) {
+        if (!lines[i].text) continue;
+        ctx.font = (lines[i].bold ? 'bold ' : '') + Math.round(lines[i].size || fontSize) + 'px sans-serif';
+        var w = ctx.measureText(lines[i].text).width;
+        if (w > maxWidth) maxWidth = w;
+    }
+
+    var totalHeight = padding * 2;
+    for (var k = 0; k < lines.length; k++) {
+        if (!lines[k].text) {
+            totalHeight += lineHeight * (lines[k].gap || 0.3);
+        } else {
+            totalHeight += lineHeight;
+        }
+    }
+
+    var cardW = maxWidth + padding * 2;
+    var cardH = totalHeight;
+
+    // Default position: bottom-right of the image
+    if (!this.overlayPos) {
+        var cardWImg = cardW / this.scale;
+        var cardHImg = cardH / this.scale;
+        this.overlayPos = {
+            x: this.imageWidth - cardWImg - (10 * dpr / this.scale),
+            y: this.imageHeight - cardHImg - (10 * dpr / this.scale)
+        };
+    }
+
+    var sp = this.imageToScreen(this.overlayPos.x, this.overlayPos.y);
+    var cardX = sp.x;
+    var cardY = sp.y;
+
+    // Save screen rect for hit-testing (CSS pixel coords)
+    this._overlayScreenRect = {
+        x: cardX / dpr,
+        y: cardY / dpr,
+        w: cardW / dpr,
+        h: cardH / dpr
+    };
+
+    // Card background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';
+    _roundRect(ctx, cardX, cardY, cardW, cardH, 6 * sf);
+    ctx.fill();
+
+    // Card border
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.7)';
+    ctx.lineWidth = 1.5 * sf;
+    _roundRect(ctx, cardX, cardY, cardW, cardH, 6 * sf);
+    ctx.stroke();
+
+    // Draw text
+    var textX = cardX + padding;
+    var textY = cardY + padding;
+
+    for (var j = 0; j < lines.length; j++) {
+        var line = lines[j];
+        if (!line.text) {
+            textY += lineHeight * (line.gap || 0.3);
+            continue;
+        }
+        ctx.font = (line.bold ? 'bold ' : '') + Math.round(line.size || fontSize) + 'px sans-serif';
+        ctx.fillStyle = line.color || '#e0e0e0';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(line.text, textX, textY);
+        textY += lineHeight;
+    }
+
+    // Drag handle dots (top-right corner of card)
+    var gripX = cardX + cardW - padding;
+    var gripY = cardY + 6 * sf;
+    var dotSize = 1.5 * sf;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (var row = 0; row < 3; row++) {
+        for (var col = 0; col < 2; col++) {
+            ctx.beginPath();
+            ctx.arc(gripX - col * 5 * sf, gripY + row * 5 * sf, dotSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+};
+
+CanvasManager.prototype._isPointInOverlay = function (cssX, cssY) {
+    if (!this._overlayScreenRect) return false;
+    var r = this._overlayScreenRect;
+    return cssX >= r.x && cssX <= r.x + r.w &&
+           cssY >= r.y && cssY <= r.y + r.h;
+};
+
 // ── Hint Text ──────────────────────────────────────────────────
 
 CanvasManager.prototype.setHint = function (text) {
@@ -359,13 +498,24 @@ CanvasManager.prototype._onTouchStart = function (e) {
 
     if (touches.length === 1) {
         var pos = this._getTouchPos(touches[0]);
+
+        // Check if touching the overlay card
+        if (this.overlayResults && this._isPointInOverlay(pos.x, pos.y)) {
+            this._overlayDragging = true;
+            this._overlayDragOffsetX = pos.x - this._overlayScreenRect.x;
+            this._overlayDragOffsetY = pos.y - this._overlayScreenRect.y;
+            this._tapStart = null;
+            return;
+        }
+
         this._tapStart = { x: pos.x, y: pos.y, time: Date.now() };
         this._isDragging = false;
         this._lastPanX = pos.x;
         this._lastPanY = pos.y;
     }
     else if (touches.length === 2) {
-        // Start pinch
+        // Start pinch — cancel overlay drag
+        this._overlayDragging = false;
         this._tapStart = null; // cancel tap
         var p1 = this._getTouchPos(touches[0]);
         var p2 = this._getTouchPos(touches[1]);
@@ -379,6 +529,16 @@ CanvasManager.prototype._onTouchStart = function (e) {
 CanvasManager.prototype._onTouchMove = function (e) {
     e.preventDefault();
     var touches = e.touches;
+
+    if (touches.length === 1 && this._overlayDragging) {
+        var pos = this._getTouchPos(touches[0]);
+        this.overlayPos = this.screenToImage(
+            pos.x - this._overlayDragOffsetX,
+            pos.y - this._overlayDragOffsetY
+        );
+        this.render();
+        return;
+    }
 
     if (touches.length === 1 && this._tapStart) {
         var pos = this._getTouchPos(touches[0]);
@@ -425,6 +585,11 @@ CanvasManager.prototype._onTouchMove = function (e) {
 CanvasManager.prototype._onTouchEnd = function (e) {
     e.preventDefault();
 
+    if (this._overlayDragging && e.touches.length === 0) {
+        this._overlayDragging = false;
+        return;
+    }
+
     if (e.touches.length === 0 && this._tapStart && !this._isDragging) {
         var elapsed = Date.now() - this._tapStart.time;
         if (elapsed < 400) {
@@ -442,6 +607,15 @@ CanvasManager.prototype._onMouseDown = function (e) {
     var rect = this.canvas.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
+
+    // Check if clicking the overlay card
+    if (this.overlayResults && this._isPointInOverlay(x, y)) {
+        this._overlayDragging = true;
+        this._overlayDragOffsetX = x - this._overlayScreenRect.x;
+        this._overlayDragOffsetY = y - this._overlayScreenRect.y;
+        return;
+    }
+
     this._tapStart = { x: x, y: y, time: Date.now() };
     this._isDragging = false;
     this._lastPanX = x;
@@ -449,10 +623,20 @@ CanvasManager.prototype._onMouseDown = function (e) {
 };
 
 CanvasManager.prototype._onMouseMove = function (e) {
-    if (!this._tapStart) return;
     var rect = this.canvas.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
+
+    if (this._overlayDragging) {
+        this.overlayPos = this.screenToImage(
+            x - this._overlayDragOffsetX,
+            y - this._overlayDragOffsetY
+        );
+        this.render();
+        return;
+    }
+
+    if (!this._tapStart) return;
     var moved = dist({ x: x, y: y }, this._tapStart);
     if (moved > 5) {
         this._isDragging = true;
@@ -469,6 +653,10 @@ CanvasManager.prototype._onMouseMove = function (e) {
 };
 
 CanvasManager.prototype._onMouseUp = function (e) {
+    if (this._overlayDragging) {
+        this._overlayDragging = false;
+        return;
+    }
     if (this._tapStart && !this._isDragging) {
         this._handleTap(this._tapStart.x, this._tapStart.y);
     }
