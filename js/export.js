@@ -153,7 +153,7 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf) {
 
     // Build text lines
     var lines = [];
-    lines.push({ text: 'BALLISTIC TRACKER', bold: true, size: titleFontSize });
+    lines.push({ text: 'YORT BALLISTICS', bold: true, size: titleFontSize });
     lines.push({ text: '' }); // spacer
     lines.push({ text: results.shotCount + ' shots @ ' + results.distanceYards + ' yds', bold: false, size: fontSize });
     lines.push({ text: '' });
