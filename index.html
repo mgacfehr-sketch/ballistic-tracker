@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#121212">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Yort Ballistics</title>
+    <title>Yort</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="css/main.css">
@@ -14,7 +14,7 @@
 <body>
     <div id="app">
         <header id="app-header">
-            <h1>Yort Ballistics</h1>
+            <h1>Yort</h1>
             <nav id="app-nav">
                 <button class="nav-tab active" data-view="session">Session</button>
                 <button class="nav-tab" data-view="profiles">Profiles</button>
@@ -238,8 +238,19 @@
     <script src="js/app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(function (err) {
+            navigator.serviceWorker.register('./sw.js').then(function (reg) {
+                // Check for updates on every page load
+                reg.update();
+            }).catch(function (err) {
                 console.warn('SW registration failed:', err);
+            });
+
+            // Reload when a new service worker version activates
+            navigator.serviceWorker.addEventListener('message', function (e) {
+                if (e.data && e.data.type === 'SW_UPDATED') {
+                    console.log('[App] New SW version detected:', e.data.version, '— reloading');
+                    window.location.reload();
+                }
             });
         }
     </script>

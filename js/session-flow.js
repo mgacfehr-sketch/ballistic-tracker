@@ -829,6 +829,14 @@ SessionFlow.prototype._saveSession = function () {
  */
 SessionFlow.prototype._storeAnnotatedImage = function (sessionId) {
     var self = this;
+    console.log('[Session] _storeAnnotatedImage called — sessionId:', sessionId);
+    console.log('[Session] image:', !!this.image, 'markers:', this.canvas.markers.length, 'results:', !!this.results);
+
+    if (!this.image) {
+        console.error('[Session] Cannot store annotated image — this.image is null');
+        return;
+    }
+
     try {
         var exportCanvas = renderAnnotatedImage(
             this.image,
@@ -837,17 +845,32 @@ SessionFlow.prototype._storeAnnotatedImage = function (sessionId) {
             this.canvas.bulletDiameterPx,
             this.results
         );
+        console.log('[Session] Export canvas rendered — size:', exportCanvas.width, 'x', exportCanvas.height);
+
         var thumbCanvas = generateThumbnail(exportCanvas, 400);
+        console.log('[Session] Thumbnail generated — size:', thumbCanvas.width, 'x', thumbCanvas.height);
+
         Promise.all([
             canvasToJpegBlob(exportCanvas, 0.85),
             canvasToJpegBlob(thumbCanvas, 0.75)
         ]).then(function (blobs) {
+            console.log('[Session] Blobs created — full:', blobs[0].size, 'bytes, thumb:', blobs[1].size, 'bytes');
             return self.db.saveSessionImage(sessionId, blobs[0], blobs[1]);
+        }).then(function () {
+            console.log('[Session] Annotated image saved to DB successfully');
+            // Verification: read it back
+            return self.db.getSessionImage(sessionId);
+        }).then(function (record) {
+            if (record && record.fullBlob) {
+                console.log('[Session] Image verified in DB — full blob size:', record.fullBlob.size);
+            } else {
+                console.error('[Session] Image verification FAILED — record:', record);
+            }
         }).catch(function (err) {
-            console.error('Failed to store annotated image:', err);
+            console.error('[Session] Failed to store annotated image:', err);
         });
     } catch (err) {
-        console.error('Failed to render annotated image:', err);
+        console.error('[Session] Failed to render annotated image:', err);
     }
 };
 

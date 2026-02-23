@@ -100,7 +100,12 @@ BallisticDB.prototype.open = function () {
 
         request.onsuccess = function (e) {
             self.db = e.target.result;
+            console.log('[DB] Opened successfully — version:', self.db.version, 'stores:', Array.from(self.db.objectStoreNames));
+            if (!self.db.objectStoreNames.contains('settings')) {
+                console.error('[DB] WARNING: settings store missing after open! Version:', self.db.version);
+            }
             self.db.onversionchange = function () {
+                console.warn('[DB] Version change detected — closing database');
                 self.db.close();
                 self.db = null;
             };
@@ -487,16 +492,48 @@ BallisticDB.prototype.deleteCleaningLog = function (id) {
 // ── Settings CRUD ─────────────────────────────────────────────
 
 BallisticDB.prototype.setSetting = function (key, value) {
+    console.log('[DB] setSetting called — key:', key, 'value length:', value ? String(value).length : 0);
+    if (!this.db) {
+        console.error('[DB] setSetting FAILED — db is null');
+        return Promise.reject(new Error('Database not open'));
+    }
+    if (!this.db.objectStoreNames.contains('settings')) {
+        console.error('[DB] setSetting FAILED — settings store does not exist. Stores:', Array.from(this.db.objectStoreNames));
+        return Promise.reject(new Error('Settings store missing — clear site data and reload'));
+    }
+    var self = this;
     return this._put('settings', {
         key: key,
         value: value,
         updatedAt: new Date().toISOString()
+    }).then(function (record) {
+        console.log('[DB] setSetting SUCCESS — key:', key);
+        // Verification: read it back immediately
+        return self._get('settings', key).then(function (readBack) {
+            if (readBack && readBack.value === value) {
+                console.log('[DB] setSetting VERIFIED — read-back matches');
+            } else {
+                console.error('[DB] setSetting VERIFY FAILED — read-back:', readBack);
+            }
+            return record;
+        });
     });
 };
 
 BallisticDB.prototype.getSetting = function (key) {
+    console.log('[DB] getSetting called — key:', key);
+    if (!this.db) {
+        console.error('[DB] getSetting FAILED — db is null');
+        return Promise.resolve(null);
+    }
+    if (!this.db.objectStoreNames.contains('settings')) {
+        console.error('[DB] getSetting FAILED — settings store does not exist. Stores:', Array.from(this.db.objectStoreNames));
+        return Promise.resolve(null);
+    }
     return this._get('settings', key).then(function (record) {
-        return record ? record.value : null;
+        var val = record ? record.value : null;
+        console.log('[DB] getSetting result — key:', key, 'found:', val !== null, 'value length:', val ? String(val).length : 0);
+        return val;
     });
 };
 

@@ -146,61 +146,96 @@ function _drawExportMarker(ctx, marker, bulletDiameterPx, sf) {
 }
 
 function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf) {
-    var padding = 16 * sf;
-    var lineHeight = 20 * sf;
+    var padding = 18 * sf;
+    var lineHeight = 22 * sf;
     var fontSize = 14 * sf;
-    var titleFontSize = 16 * sf;
+    var titleFontSize = 18 * sf;
+    var smallFontSize = 12 * sf;
+
+    // ATZ in inches: absolute value of POA offsets (ATZ negates the offset direction)
+    var atzElevInches = Math.abs(results.elevationOffsetInches || 0);
+    var atzWindInches = Math.abs(results.windageOffsetInches || 0);
+    // Abbreviate direction: Down→D, Up→U, Left→L, Right→R
+    var atzElevAbbr = (results.atzElevationDir || '')[0] || '';
+    var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
 
     // Build text lines
     var lines = [];
-    lines.push({ text: 'YORT BALLISTICS', bold: true, size: titleFontSize });
-    lines.push({ text: '' }); // spacer
-    lines.push({ text: results.shotCount + ' shots @ ' + results.distanceYards + ' yds', bold: false, size: fontSize });
-    lines.push({ text: '' });
-    lines.push({ text: 'Group: ' + formatFixed(results.groupSizeInches, 3) + '" / ' + formatFixed(results.groupSizeMOA, 2) + ' MOA', bold: true, size: fontSize });
-    lines.push({ text: 'Mean Radius: ' + formatFixed(results.meanRadiusInches, 3) + '" / ' + formatFixed(results.meanRadiusMOA, 2) + ' MOA', bold: false, size: fontSize });
-    lines.push({ text: '' });
-    lines.push({ text: 'ATZ: ' + results.atzElevationDir + ' ' + formatFixed(results.atzElevationMOA, 2) + ', ' + results.atzWindageDir + ' ' + formatFixed(results.atzWindageMOA, 2) + ' MOA', bold: true, size: fontSize });
+    lines.push({ text: 'YORT', bold: true, size: titleFontSize, color: '#4caf50' });
+    lines.push({ text: '', gap: 0.5 }); // spacer
+    lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot Group', bold: false, size: fontSize, color: '#e0e0e0' });
+    lines.push({ text: '', gap: 0.3 });
+    lines.push({ text: 'Group: ' + formatFixed(results.groupSizeInches, 3) + '" (' + formatFixed(results.groupSizeMOA, 2) + ' MOA)', bold: true, size: fontSize, color: '#ffffff' });
+    lines.push({ text: '', gap: 0.3 });
+    lines.push({ text: 'ATZ(INCH): ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2), bold: true, size: fontSize, color: '#4caf50' });
+    lines.push({ text: 'ATZ(MOA):  ' + atzElevAbbr + ': ' + formatFixed(results.atzElevationMOA, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(results.atzWindageMOA, 2), bold: false, size: smallFontSize, color: '#aaaaaa' });
 
     // Measure card dimensions
-    ctx.font = 'bold ' + Math.round(titleFontSize) + 'px sans-serif';
     var maxWidth = 0;
     for (var i = 0; i < lines.length; i++) {
+        if (!lines[i].text) continue;
         var f = (lines[i].bold ? 'bold ' : '') + Math.round(lines[i].size || fontSize) + 'px sans-serif';
         ctx.font = f;
         var w = ctx.measureText(lines[i].text).width;
         if (w > maxWidth) maxWidth = w;
     }
 
+    // Calculate total height
+    var totalHeight = padding * 2;
+    for (var k = 0; k < lines.length; k++) {
+        if (!lines[k].text) {
+            totalHeight += lineHeight * (lines[k].gap || 0.4);
+        } else {
+            totalHeight += lineHeight;
+        }
+    }
+
     var cardW = maxWidth + padding * 2;
-    var cardH = lines.length * lineHeight + padding * 2;
+    var cardH = totalHeight;
     var cardX = canvasW - cardW - padding;
     var cardY = canvasH - cardH - padding;
 
     // Draw card background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';
     _roundRect(ctx, cardX, cardY, cardW, cardH, 8 * sf);
     ctx.fill();
 
     // Draw card border
-    ctx.strokeStyle = 'rgba(76, 175, 80, 0.6)';
-    ctx.lineWidth = 1.5 * sf;
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.7)';
+    ctx.lineWidth = 2 * sf;
     _roundRect(ctx, cardX, cardY, cardW, cardH, 8 * sf);
     ctx.stroke();
 
-    // Draw text
+    // Draw accent line under title
     var textX = cardX + padding;
-    var textY = cardY + padding + fontSize;
+    var textY = cardY + padding + titleFontSize;
 
-    for (var j = 0; j < lines.length; j++) {
+    // Draw title
+    ctx.font = 'bold ' + Math.round(titleFontSize) + 'px sans-serif';
+    ctx.fillStyle = lines[0].color;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(lines[0].text, textX, textY);
+    textY += lineHeight;
+
+    // Accent line under title
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.5)';
+    ctx.lineWidth = 1 * sf;
+    ctx.beginPath();
+    ctx.moveTo(textX, textY);
+    ctx.lineTo(textX + maxWidth, textY);
+    ctx.stroke();
+
+    // Draw remaining lines
+    for (var j = 1; j < lines.length; j++) {
         var line = lines[j];
         if (!line.text) {
-            textY += lineHeight * 0.4;
+            textY += lineHeight * (line.gap || 0.4);
             continue;
         }
         var font = (line.bold ? 'bold ' : '') + Math.round(line.size || fontSize) + 'px sans-serif';
         ctx.font = font;
-        ctx.fillStyle = line.bold ? '#4caf50' : '#e0e0e0';
+        ctx.fillStyle = line.color || '#e0e0e0';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.fillText(line.text, textX, textY);

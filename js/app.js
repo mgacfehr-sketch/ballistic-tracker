@@ -158,9 +158,11 @@
                 document.getElementById('settings-save-key').addEventListener('click', function () {
                     var input = document.getElementById('settings-api-key');
                     var statusEl = document.getElementById('settings-status');
+                    console.log('[Settings] Save clicked — input exists:', !!input, 'db exists:', !!db);
                     if (!input || !db) return;
 
                     var value = input.value.trim();
+                    console.log('[Settings] Value to save — length:', value.length, 'prefix:', value.substring(0, 8));
                     if (!value) {
                         db.deleteSetting('anthropic-api-key').then(function () {
                             if (aiAssistant) aiAssistant.apiKey = null;
@@ -171,10 +173,12 @@
                     }
 
                     db.setSetting('anthropic-api-key', value).then(function () {
+                        console.log('[Settings] Key saved to DB, updating aiAssistant.apiKey');
                         if (aiAssistant) aiAssistant.apiKey = value;
                         statusEl.className = 'settings-status settings-status-success';
                         statusEl.textContent = 'API key saved.';
                     }).catch(function (err) {
+                        console.error('[Settings] Save FAILED:', err);
                         statusEl.className = 'settings-status settings-status-error';
                         statusEl.textContent = 'Error saving key: ' + err.message;
                     });
@@ -182,12 +186,16 @@
             }
 
             // Always reload key from DB when settings tab is shown
+            console.log('[Settings] Reloading key from DB on tab show — db exists:', !!db);
             if (db) {
                 db.getSetting('anthropic-api-key').then(function (key) {
+                    console.log('[Settings] Loaded key from DB — found:', key !== null, 'length:', key ? key.length : 0);
                     var input = document.getElementById('settings-api-key');
                     if (input) {
                         input.value = key || '';
                     }
+                }).catch(function (err) {
+                    console.error('[Settings] Failed to load key from DB:', err);
                 });
             }
         }

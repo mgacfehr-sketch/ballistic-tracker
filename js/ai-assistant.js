@@ -20,10 +20,13 @@ function AIAssistantManager(db) {
 AIAssistantManager.prototype.init = function () {
     this.container = document.getElementById('view-ai');
     var self = this;
+    console.log('[AI] init — db exists:', !!this.db);
     if (this.db) {
         this.db.getSetting('anthropic-api-key').then(function (key) {
             self.apiKey = key || null;
-        }).catch(function () {
+            console.log('[AI] init loaded key — found:', key !== null, 'length:', key ? key.length : 0);
+        }).catch(function (err) {
+            console.error('[AI] init failed to load key:', err);
             self.apiKey = null;
         });
     }
@@ -44,14 +47,17 @@ AIAssistantManager.prototype.show = function () {
     }
 
     // Reload API key each time we show (in case it was just saved)
+    console.log('[AI] show — reloading key from DB');
     this.db.getSetting('anthropic-api-key').then(function (key) {
         self.apiKey = key || null;
+        console.log('[AI] show loaded key — found:', key !== null, 'length:', key ? key.length : 0);
         if (!self.apiKey) {
             self._renderNoKey();
         } else {
             self._renderChat();
         }
-    }).catch(function () {
+    }).catch(function (err) {
+        console.error('[AI] show failed to load key:', err);
         self.apiKey = null;
         self._renderNoKey();
     });
@@ -263,9 +269,10 @@ AIAssistantManager.prototype._gatherContext = function (rifleId) {
  */
 AIAssistantManager.prototype._buildSystemPrompt = function (context) {
     var lines = [];
-    lines.push('You are an expert precision rifle shooting coach and ballistics analyst.');
+    lines.push('You are Yort, an expert precision rifle shooting coach and ballistics analyst.');
     lines.push('You help shooters analyze their performance data, diagnose issues, and improve accuracy.');
     lines.push('Be concise and practical. Use MOA or MIL as appropriate. Reference specific data when available.');
+    lines.push('When introducing yourself or asked who you are, say you are Yort.');
     lines.push('');
 
     if (!context) {
