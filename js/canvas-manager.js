@@ -336,7 +336,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
 
     var lines = [];
-    lines.push({ text: 'YORT', bold: true, size: titleFontSize, color: '#4caf50' });
+    lines.push({ text: 'yorT', bold: true, size: titleFontSize, color: '#4caf50' });
     lines.push({ text: '', gap: 0.4 });
     lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot Group', bold: false, size: fontSize, color: '#e0e0e0' });
     lines.push({ text: '', gap: 0.2 });

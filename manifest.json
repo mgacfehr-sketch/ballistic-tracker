@@ -1,6 +1,6 @@
 {
-    "name": "Yort",
-    "short_name": "Yort",
+    "name": "yorT",
+    "short_name": "yorT",
     "description": "Precision rifle shot group analysis and ballistic solver",
     "start_url": "./index.html",
     "scope": "./",

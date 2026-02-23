@@ -351,10 +351,10 @@ AIAssistantManager.prototype._extractWeatherFromChat = function () {
  */
 AIAssistantManager.prototype._buildSystemPrompt = function (context) {
     var lines = [];
-    lines.push('You are Yort, an expert precision rifle shooting coach and ballistics analyst.');
+    lines.push('You are yorT, an expert precision rifle shooting coach and ballistics analyst.');
     lines.push('You help shooters analyze their performance data, diagnose issues, and improve accuracy.');
     lines.push('Be concise and practical. Use MOA or MIL as appropriate. Reference specific data when available.');
-    lines.push('When introducing yourself or asked who you are, say you are Yort.');
+    lines.push('When introducing yourself or asked who you are, say you are yorT.');
     lines.push('');
     lines.push('You have access to pre-computed ballistic trajectory tables below.');
     lines.push('STANDARD tables use standard atmosphere (59\u00B0F, 29.92 inHg, 0% humidity, zero wind).');
