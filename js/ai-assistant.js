@@ -10,33 +10,20 @@ function AIAssistantManager(db) {
     this.container = null;
     this.messages = [];
     this.selectedRifleId = null;
-    this.apiKey = null;
     this.isLoading = false;
 }
 
 /**
- * Grab DOM container and load API key from DB.
+ * Grab DOM container.
  */
 AIAssistantManager.prototype.init = function () {
     this.container = document.getElementById('view-ai');
-    var self = this;
-    console.log('[AI] init — db exists:', !!this.db);
-    if (this.db) {
-        this.db.getSetting('anthropic-api-key').then(function (key) {
-            self.apiKey = key || null;
-            console.log('[AI] init loaded key — found:', key !== null, 'length:', key ? key.length : 0);
-        }).catch(function (err) {
-            console.error('[AI] init failed to load key:', err);
-            self.apiKey = null;
-        });
-    }
 };
 
 /**
  * Called when AI tab is activated. Renders the full chat UI.
  */
 AIAssistantManager.prototype.show = function () {
-    var self = this;
     if (!this.db) {
         this.container.innerHTML =
             '<div class="ai-no-key">' +
@@ -46,41 +33,7 @@ AIAssistantManager.prototype.show = function () {
         return;
     }
 
-    // Reload API key each time we show (in case it was just saved)
-    console.log('[AI] show — reloading key from DB');
-    this.db.getSetting('anthropic-api-key').then(function (key) {
-        self.apiKey = key || null;
-        console.log('[AI] show loaded key — found:', key !== null, 'length:', key ? key.length : 0);
-        if (!self.apiKey) {
-            self._renderNoKey();
-        } else {
-            self._renderChat();
-        }
-    }).catch(function (err) {
-        console.error('[AI] show failed to load key:', err);
-        self.apiKey = null;
-        self._renderNoKey();
-    });
-};
-
-/**
- * Show message prompting user to set API key in Settings.
- */
-AIAssistantManager.prototype._renderNoKey = function () {
-    this.container.innerHTML =
-        '<div class="ai-no-key">' +
-        '<div class="ai-no-key-title">API Key Required</div>' +
-        '<div class="ai-no-key-text">Configure your Anthropic API key in the Settings tab to use the AI assistant.</div>' +
-        '<button class="btn btn-primary" id="ai-go-settings">Open Settings</button>' +
-        '</div>';
-
-    var settingsBtn = document.getElementById('ai-go-settings');
-    if (settingsBtn) {
-        settingsBtn.addEventListener('click', function () {
-            var settingsTab = document.querySelector('.nav-tab[data-view="settings"]');
-            if (settingsTab) settingsTab.click();
-        });
-    }
+    this._renderChat();
 };
 
 /**
@@ -423,23 +376,18 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
 };
 
 /**
- * Call the Anthropic Messages API.
+ * Call the API proxy at /api/chat.
  */
 AIAssistantManager.prototype._callAPI = function (systemPrompt) {
     var self = this;
 
     return new Promise(function (resolve, reject) {
-        fetch('https://api.anthropic.com/v1/messages', {
+        fetch('/api/chat', {
             method: 'POST',
             headers: {
-                'x-api-key': self.apiKey,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-                'anthropic-dangerous-direct-browser-access': 'true'
+                'content-type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'claude-sonnet-4-5-20250929',
-                max_tokens: 1024,
                 system: systemPrompt,
                 messages: self.messages.filter(function (m) {
                     return m.role === 'user' || m.role === 'assistant';
@@ -449,14 +397,14 @@ AIAssistantManager.prototype._callAPI = function (systemPrompt) {
             return response.json().then(function (data) {
                 if (!response.ok) {
                     var errMsg = 'API error';
-                    if (response.status === 401) {
-                        errMsg = 'Invalid API key. Check your key in Settings.';
-                    } else if (response.status === 429) {
+                    if (response.status === 429) {
                         errMsg = 'Rate limited. Please wait a moment and try again.';
                     } else if (response.status === 529) {
                         errMsg = 'API is overloaded. Please try again later.';
                     } else if (data && data.error && data.error.message) {
                         errMsg = data.error.message;
+                    } else if (data && data.error) {
+                        errMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
                     }
                     throw new Error(errMsg);
                 }

@@ -1219,33 +1219,6 @@ html, body {
     line-height: 1.4;
 }
 
-/* ── Settings View ─────────────────────────────────────────── */
-
-#view-settings {
-    background: var(--bg);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
-}
-
-.settings-status {
-    padding: 8px 12px;
-    border-radius: var(--radius);
-    font-size: 13px;
-    margin-top: 4px;
-    text-align: center;
-}
-
-.settings-status-success {
-    background: rgba(76, 175, 80, 0.15);
-    color: var(--primary);
-}
-
-.settings-status-error {
-    background: rgba(244, 67, 54, 0.15);
-    color: var(--danger);
-}
-
 /* ── Solver View ──────────────────────────────────────────────── */
 
 #view-solver {

@@ -63,8 +63,7 @@
             session: document.getElementById('view-session'),
             profiles: document.getElementById('view-profiles'),
             ai: document.getElementById('view-ai'),
-            solver: document.getElementById('view-solver'),
-            settings: document.getElementById('view-settings')
+            solver: document.getElementById('view-solver')
         };
         var btnNewSession = document.getElementById('btn-new-session');
 
@@ -107,11 +106,6 @@
                 solverManager.show();
             }
 
-            // Render settings when switching to settings tab
-            if (viewName === 'settings') {
-                renderSettings();
-            }
-
             // Refresh profile picker and resize canvas when switching back to session
             if (viewName === 'session') {
                 if (sessionFlow && sessionFlow.currentStep === 0) {
@@ -127,85 +121,11 @@
             });
         }
 
-        // ── Settings Rendering ────────────────────────────
-        function renderSettings() {
-            var container = views.settings;
-            if (!container) return;
-
-            // Build HTML only once; reload key from DB every time
-            if (!container.querySelector('.profile-screen')) {
-                var html = '<div class="profile-screen">';
-                html += '<div class="profile-toolbar"><div class="toolbar-spacer"></div>';
-                html += '<span class="profile-title">Settings</span>';
-                html += '<div class="toolbar-spacer"></div></div>';
-
-                html += '<div class="profile-form">';
-                html += '<div class="form-group">';
-                html += '<label for="settings-api-key">Anthropic API Key</label>';
-                html += '<input type="password" id="settings-api-key" placeholder="sk-ant-..." autocomplete="off">';
-                html += '<span class="form-hint">Your key is stored locally and only sent to api.anthropic.com</span>';
-                html += '</div>';
-
-                html += '<div class="btn-row">';
-                html += '<button class="btn btn-primary" id="settings-save-key">Save Key</button>';
-                html += '</div>';
-                html += '<div id="settings-status"></div>';
-                html += '</div></div>';
-
-                container.innerHTML = html;
-
-                // Save handler (bound once)
-                document.getElementById('settings-save-key').addEventListener('click', function () {
-                    var input = document.getElementById('settings-api-key');
-                    var statusEl = document.getElementById('settings-status');
-                    console.log('[Settings] Save clicked — input exists:', !!input, 'db exists:', !!db);
-                    if (!input || !db) return;
-
-                    var value = input.value.trim();
-                    console.log('[Settings] Value to save — length:', value.length, 'prefix:', value.substring(0, 8));
-                    if (!value) {
-                        db.deleteSetting('anthropic-api-key').then(function () {
-                            if (aiAssistant) aiAssistant.apiKey = null;
-                            statusEl.className = 'settings-status settings-status-success';
-                            statusEl.textContent = 'API key removed.';
-                        });
-                        return;
-                    }
-
-                    db.setSetting('anthropic-api-key', value).then(function () {
-                        console.log('[Settings] Key saved to DB, updating aiAssistant.apiKey');
-                        if (aiAssistant) aiAssistant.apiKey = value;
-                        statusEl.className = 'settings-status settings-status-success';
-                        statusEl.textContent = 'API key saved.';
-                    }).catch(function (err) {
-                        console.error('[Settings] Save FAILED:', err);
-                        statusEl.className = 'settings-status settings-status-error';
-                        statusEl.textContent = 'Error saving key: ' + err.message;
-                    });
-                });
-            }
-
-            // Always reload key from DB when settings tab is shown
-            console.log('[Settings] Reloading key from DB on tab show — db exists:', !!db);
-            if (db) {
-                db.getSetting('anthropic-api-key').then(function (key) {
-                    console.log('[Settings] Loaded key from DB — found:', key !== null, 'length:', key ? key.length : 0);
-                    var input = document.getElementById('settings-api-key');
-                    if (input) {
-                        input.value = key || '';
-                    }
-                }).catch(function (err) {
-                    console.error('[Settings] Failed to load key from DB:', err);
-                });
-            }
-        }
-
         // ── Touch Prevention ───────────────────────────────
         document.getElementById('app').addEventListener('touchmove', function (e) {
-            // Allow scrolling inside the step panel, profiles, AI, and settings views
+            // Allow scrolling inside the step panel, profiles, AI, and solver views
             if (e.target.closest('#step-panel') || e.target.closest('#view-profiles') ||
-                e.target.closest('#view-ai') || e.target.closest('#view-solver') ||
-                e.target.closest('#view-settings')) return;
+                e.target.closest('#view-ai') || e.target.closest('#view-solver')) return;
             e.preventDefault();
         }, { passive: false });
 

@@ -10,7 +10,7 @@
  *   Static assets (icons)   → cache-first, network fallback
  */
 
-var CACHE_VERSION = 5;
+var CACHE_VERSION = 6;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
