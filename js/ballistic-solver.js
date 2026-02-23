@@ -141,27 +141,53 @@ function estimatePressureAtAltitude(altitudeFt) {
 }
 
 /**
+ * Decompose wind speed from a clock position into x (headwind/tailwind)
+ * and z (crosswind) components in ft/s.
+ *
+ * Clock positions: 12 = full headwind, 6 = full tailwind,
+ * 3 = full crosswind from right, 9 = full crosswind from left.
+ *
+ * Returns air velocity in the ground frame:
+ *   windVx: negative = headwind (air opposes bullet), positive = tailwind
+ *   windVz: negative = air moving left (from right), positive = air moving right (from left)
+ *
+ * @param {number} clockPos - Clock position (1-12)
+ * @param {number} speedMph - Wind speed in mph
+ * @returns {{windVxFps: number, windVzFps: number}}
+ */
+function windComponentsFromClock(clockPos, speedMph) {
+    var speedFps = speedMph * 5280 / 3600;
+    var angleDeg = (clockPos % 12) * 30;
+    var angleRad = angleDeg * Math.PI / 180;
+    return {
+        windVxFps: -speedFps * Math.cos(angleRad),
+        windVzFps: -speedFps * Math.sin(angleRad)
+    };
+}
+
+/**
  * Compute derivatives for the equations of motion.
  * State: [x, y, vx, vy, z, vz]
  *   x = downrange (ft), y = vertical (ft), z = crosswind (ft)
  *   vx = downrange velocity, vy = vertical velocity, vz = crosswind velocity
  *
  * @param {number[]} state - [x, y, vx, vy, z, vz]
- * @param {number} windVz - crosswind velocity in ft/s (positive = from shooter's right)
+ * @param {number} windVx - headwind/tailwind air velocity in ft/s (negative = headwind)
+ * @param {number} windVz - crosswind air velocity in ft/s (negative = from right)
  * @param {number} speedOfSound - ft/s
  * @param {number} bc - ballistic coefficient
  * @param {Array} dragTable - G1 or G7 table
  * @param {number} airDensityRatio
  * @returns {number[]} derivatives [dx, dy, dvx, dvy, dz, dvz]
  */
-function solverDerivatives(state, windVz, speedOfSound, bc, dragTable, airDensityRatio) {
+function solverDerivatives(state, windVx, windVz, speedOfSound, bc, dragTable, airDensityRatio) {
     var vx = state[2];
     var vy = state[3];
-    var vz = state[4] === undefined ? 0 : state[5];
 
-    // Velocity relative to air (wind only on z-axis)
+    // Velocity relative to air
+    var vrx = vx - windVx;
     var vrz = (state[5] || 0) - windVz;
-    var V = Math.sqrt(vx * vx + vy * vy + vrz * vrz);
+    var V = Math.sqrt(vrx * vrx + vy * vy + vrz * vrz);
 
     if (V < 1) return [vx, vy, 0, -GRAVITY, state[5] || 0, 0];
 
@@ -172,7 +198,7 @@ function solverDerivatives(state, windVz, speedOfSound, bc, dragTable, airDensit
     var dragAccel = airDensityRatio * DRAG_CONSTANT * cd * V * V / bc;
 
     // Resolve drag along velocity-relative-to-air vector
-    var dvx = -dragAccel * (vx / V);
+    var dvx = -dragAccel * (vrx / V);
     var dvy = -dragAccel * (vy / V) - GRAVITY;
     var dvz = -dragAccel * (vrz / V);
 
@@ -183,27 +209,28 @@ function solverDerivatives(state, windVz, speedOfSound, bc, dragTable, airDensit
  * Standard 4th-order Runge-Kutta integration step.
  * @param {number[]} state - current state [x, y, vx, vy, z, vz]
  * @param {number} dt - time step
- * @param {number} windVz
+ * @param {number} windVx - headwind/tailwind air velocity ft/s
+ * @param {number} windVz - crosswind air velocity ft/s
  * @param {number} speedOfSound
  * @param {number} bc
  * @param {Array} dragTable
  * @param {number} airDensityRatio
  * @returns {number[]} new state
  */
-function rk4Step(state, dt, windVz, speedOfSound, bc, dragTable, airDensityRatio) {
-    var k1 = solverDerivatives(state, windVz, speedOfSound, bc, dragTable, airDensityRatio);
+function rk4Step(state, dt, windVx, windVz, speedOfSound, bc, dragTable, airDensityRatio) {
+    var k1 = solverDerivatives(state, windVx, windVz, speedOfSound, bc, dragTable, airDensityRatio);
 
     var s2 = [];
     for (var i = 0; i < 6; i++) s2[i] = state[i] + 0.5 * dt * k1[i];
-    var k2 = solverDerivatives(s2, windVz, speedOfSound, bc, dragTable, airDensityRatio);
+    var k2 = solverDerivatives(s2, windVx, windVz, speedOfSound, bc, dragTable, airDensityRatio);
 
     var s3 = [];
     for (var j = 0; j < 6; j++) s3[j] = state[j] + 0.5 * dt * k2[j];
-    var k3 = solverDerivatives(s3, windVz, speedOfSound, bc, dragTable, airDensityRatio);
+    var k3 = solverDerivatives(s3, windVx, windVz, speedOfSound, bc, dragTable, airDensityRatio);
 
     var s4 = [];
     for (var m = 0; m < 6; m++) s4[m] = state[m] + dt * k3[m];
-    var k4 = solverDerivatives(s4, windVz, speedOfSound, bc, dragTable, airDensityRatio);
+    var k4 = solverDerivatives(s4, windVx, windVz, speedOfSound, bc, dragTable, airDensityRatio);
 
     var next = [];
     for (var n = 0; n < 6; n++) {
@@ -231,7 +258,7 @@ function _simulateToRange(params, angleDeg) {
     var maxSteps = 200000;
 
     for (var i = 0; i < maxSteps; i++) {
-        state = rk4Step(state, dt, 0, params.speedOfSound, params.bc, params.dragTable, params.airDensityRatio);
+        state = rk4Step(state, dt, 0, 0, params.speedOfSound, params.bc, params.dragTable, params.airDensityRatio);
         if (state[0] >= zeroRangeFt) break;
     }
 
@@ -294,8 +321,8 @@ function findZeroAngle(params) {
  * @param {number} params.bulletWeight - grain
  * @param {number} params.maxRange - max range in yards
  * @param {number} params.rangeStep - step in yards
- * @param {number} params.crosswindMph - crosswind speed in mph
- * @param {number} params.windFromRight - true if wind from right (3 o'clock), false if from left
+ * @param {number} params.windSpeedMph - wind speed in mph
+ * @param {number} params.windClockPos - wind clock position (1-12)
  * @param {number} params.tempF - temperature Fahrenheit
  * @param {number} params.pressureInHg - barometric pressure
  * @param {number} params.humidity - relative humidity 0-100
@@ -310,12 +337,10 @@ function computeTrajectory(params) {
         params.humidity || 0
     );
 
-    // Crosswind in ft/s (mph * 5280/3600)
-    var windMph = params.crosswindMph || 0;
-    var windFps = windMph * 5280 / 3600;
-    // Positive windVz = wind pushing bullet to the right (from shooter's left, i.e. 9 o'clock)
-    // If wind is from the right (3 o'clock), bullet drifts left = negative z
-    if (params.windFromRight) windFps = -windFps;
+    // Decompose wind into headwind/tailwind and crosswind components
+    var windComps = windComponentsFromClock(params.windClockPos || 3, params.windSpeedMph || 0);
+    var windVx = windComps.windVxFps;
+    var windVz = windComps.windVzFps;
 
     var solverParams = {
         muzzleVelocity: params.muzzleVelocity,
@@ -376,7 +401,7 @@ function computeTrajectory(params) {
     var tof = 0;
 
     while (state[0] < maxRangeFt && step < maxSteps) {
-        state = rk4Step(state, dt, windFps, speedOfSound, params.bc, dragTable, airDensityRatio);
+        state = rk4Step(state, dt, windVx, windVz, speedOfSound, params.bc, dragTable, airDensityRatio);
         tof += dt;
         step++;
 
@@ -475,6 +500,7 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateSpeedOfSound: calculateSpeedOfSound,
         calculateAirDensityRatio: calculateAirDensityRatio,
         estimatePressureAtAltitude: estimatePressureAtAltitude,
+        windComponentsFromClock: windComponentsFromClock,
         solverDerivatives: solverDerivatives,
         rk4Step: rk4Step,
         findZeroAngle: findZeroAngle,
@@ -612,14 +638,24 @@ BallisticSolverManager.prototype._render = function () {
     // Wind inputs
     html += '<div class="form-row">';
     html += '<div class="form-group form-group-half">';
-    html += '<label for="solver-wind">Crosswind (mph)</label>';
+    html += '<label for="solver-wind">Wind Speed (mph)</label>';
     html += '<input type="number" id="solver-wind" value="10" min="0" max="60" step="1" inputmode="numeric">';
     html += '</div>';
     html += '<div class="form-group form-group-half">';
     html += '<label for="solver-wind-dir">Wind Direction</label>';
     html += '<select id="solver-wind-dir">';
-    html += '<option value="right">3 o\'clock (from right)</option>';
-    html += '<option value="left">9 o\'clock (from left)</option>';
+    html += '<option value="12">12 o\'clock (headwind)</option>';
+    html += '<option value="1">1 o\'clock</option>';
+    html += '<option value="2">2 o\'clock</option>';
+    html += '<option value="3" selected>3 o\'clock (from right)</option>';
+    html += '<option value="4">4 o\'clock</option>';
+    html += '<option value="5">5 o\'clock</option>';
+    html += '<option value="6">6 o\'clock (tailwind)</option>';
+    html += '<option value="7">7 o\'clock</option>';
+    html += '<option value="8">8 o\'clock</option>';
+    html += '<option value="9">9 o\'clock (from left)</option>';
+    html += '<option value="10">10 o\'clock</option>';
+    html += '<option value="11">11 o\'clock</option>';
     html += '</select>';
     html += '</div>';
     html += '</div>';
@@ -747,8 +783,8 @@ BallisticSolverManager.prototype._calculate = function () {
 
     var maxRange = parseInt(document.getElementById('solver-max-range').value) || 1000;
     var rangeStep = parseInt(document.getElementById('solver-range-step').value) || 50;
-    var crosswind = parseFloat(document.getElementById('solver-wind').value) || 0;
-    var windDir = document.getElementById('solver-wind-dir').value;
+    var windSpeed = parseFloat(document.getElementById('solver-wind').value) || 0;
+    var windClockPos = parseInt(document.getElementById('solver-wind-dir').value) || 3;
     var tempF = parseFloat(document.getElementById('solver-temp').value) || 59;
     var altitude = parseFloat(document.getElementById('solver-altitude').value) || 0;
     var pressure = parseFloat(document.getElementById('solver-pressure').value) || 29.92;
@@ -763,8 +799,8 @@ BallisticSolverManager.prototype._calculate = function () {
         bulletWeight: load.bulletWeight ? parseFloat(load.bulletWeight) : 168,
         maxRange: maxRange,
         rangeStep: rangeStep,
-        crosswindMph: crosswind,
-        windFromRight: windDir === 'right',
+        windSpeedMph: windSpeed,
+        windClockPos: windClockPos,
         tempF: tempF,
         pressureInHg: pressure,
         humidity: humidity
