@@ -815,11 +815,40 @@ SessionFlow.prototype._saveSession = function () {
     this.db.addSession(sessionData).then(function (saved) {
         self.savedSessionId = saved.id;
         btn.textContent = 'Saved';
+        self._storeAnnotatedImage(saved.id);
     }).catch(function (err) {
         btn.disabled = false;
         btn.textContent = 'Save Session';
         alert('Failed to save: ' + err.message);
     });
+};
+
+/**
+ * Render and store the annotated image + thumbnail for a saved session.
+ * Non-fatal: errors are logged but do not affect the saved session.
+ */
+SessionFlow.prototype._storeAnnotatedImage = function (sessionId) {
+    var self = this;
+    try {
+        var exportCanvas = renderAnnotatedImage(
+            this.image,
+            this.canvas.markers,
+            this.canvas.calibrationLine,
+            this.canvas.bulletDiameterPx,
+            this.results
+        );
+        var thumbCanvas = generateThumbnail(exportCanvas, 400);
+        Promise.all([
+            canvasToJpegBlob(exportCanvas, 0.85),
+            canvasToJpegBlob(thumbCanvas, 0.75)
+        ]).then(function (blobs) {
+            return self.db.saveSessionImage(sessionId, blobs[0], blobs[1]);
+        }).catch(function (err) {
+            console.error('Failed to store annotated image:', err);
+        });
+    } catch (err) {
+        console.error('Failed to render annotated image:', err);
+    }
 };
 
 // ── Canvas Tap Routing ─────────────────────────────────────────

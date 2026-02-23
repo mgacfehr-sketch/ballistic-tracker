@@ -10,7 +10,7 @@
  */
 
 var DB_NAME = 'ballistic-tracker';
-var DB_VERSION = 1;
+var DB_VERSION = 2;
 var MAX_RIFLES = 50;
 
 function BallisticDB() {
@@ -74,6 +74,11 @@ BallisticDB.prototype.open = function () {
                 var cleanStore = db.createObjectStore('cleaningLogs', { keyPath: 'id' });
                 cleanStore.createIndex('rifleId', 'rifleId', { unique: false });
                 cleanStore.createIndex('barrelId', 'barrelId', { unique: false });
+            }
+
+            // Session Images (annotated export images)
+            if (!db.objectStoreNames.contains('sessionImages')) {
+                db.createObjectStore('sessionImages', { keyPath: 'sessionId' });
             }
         };
 
@@ -206,10 +211,13 @@ BallisticDB.prototype.deleteRifle = function (id) {
         self._getAllByIndex('cleaningLogs', 'rifleId', id)
     ]).then(function (results) {
         var deletes = [];
+        var storeNames = ['barrels', 'loads', 'sessions', 'zeroRecords', 'scopeAdjustments', 'cleaningLogs'];
         for (var s = 0; s < results.length; s++) {
-            var storeNames = ['barrels', 'loads', 'sessions', 'zeroRecords', 'scopeAdjustments', 'cleaningLogs'];
             for (var i = 0; i < results[s].length; i++) {
                 deletes.push(self._delete(storeNames[s], results[s][i].id));
+                if (storeNames[s] === 'sessions') {
+                    deletes.push(self._delete('sessionImages', results[s][i].id).catch(function () {}));
+                }
             }
         }
         return Promise.all(deletes);
@@ -356,7 +364,29 @@ BallisticDB.prototype.getMiscSessions = function () {
 };
 
 BallisticDB.prototype.deleteSession = function (id) {
-    return this._delete('sessions', id);
+    var self = this;
+    return this._delete('sessionImages', id).catch(function () {}).then(function () {
+        return self._delete('sessions', id);
+    });
+};
+
+// ── Session Images CRUD ────────────────────────────────────────
+
+BallisticDB.prototype.saveSessionImage = function (sessionId, fullBlob, thumbnailBlob) {
+    return this._put('sessionImages', {
+        sessionId: sessionId,
+        fullBlob: fullBlob,
+        thumbnailBlob: thumbnailBlob,
+        createdAt: new Date().toISOString()
+    });
+};
+
+BallisticDB.prototype.getSessionImage = function (sessionId) {
+    return this._get('sessionImages', sessionId);
+};
+
+BallisticDB.prototype.deleteSessionImage = function (sessionId) {
+    return this._delete('sessionImages', sessionId);
 };
 
 // ── ZeroRecord CRUD ────────────────────────────────────────────

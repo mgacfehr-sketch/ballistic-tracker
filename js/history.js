@@ -8,6 +8,7 @@
 function HistoryManager(db, profileManager) {
     this.db = db;
     this.profileManager = profileManager;
+    this._thumbnailUrls = [];
 }
 
 // ── Session List ────────────────────────────────────────────────
@@ -59,6 +60,7 @@ HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
             var shotCount = s.impacts ? s.impacts.length : 0;
 
             html += '<div class="profile-card session-card" data-session-id="' + escapeAttr(s.id) + '">';
+            html += '<img class="session-thumbnail" data-session-id="' + escapeAttr(s.id) + '">';
             html += '<div class="profile-card-main">';
             html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + s.distanceYards + ' yds</span>';
             html += '<span class="profile-card-sub">' + shotCount + ' shots &middot; ES: ' + groupStr + '</span>';
@@ -85,6 +87,8 @@ HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
             self.showSessionDetail(sid, rifle.id);
         });
     }
+
+    this._loadThumbnails(container);
 };
 
 // ── Session Detail ──────────────────────────────────────────────
@@ -185,6 +189,16 @@ HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
 
     html += '</div></div></details>';
 
+    // Annotated image
+    html += '<div class="session-image-container">';
+    html += '<p class="session-image-loading" id="session-image-loading">Loading image...</p>';
+    html += '<img class="session-full-image" id="session-full-image" style="display:none">';
+    html += '</div>';
+    html += '<div class="btn-row" id="session-image-actions" style="display:none;padding:0 16px 8px;">';
+    html += '<button class="btn btn-secondary" id="btn-session-save-image">Save Image</button>';
+    html += '<button class="btn btn-secondary" id="btn-session-share-image">Share</button>';
+    html += '</div>';
+
     // Delete button
     html += '<div class="btn-row" style="padding: 16px;">';
     html += '<button class="btn btn-danger" id="btn-delete-session">Delete Session</button>';
@@ -206,6 +220,8 @@ HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
             });
         }
     });
+
+    this._loadFullImage(session.id);
 };
 
 // ── Cleaning Log ────────────────────────────────────────────────
@@ -590,6 +606,7 @@ HistoryManager.prototype._renderMiscSessionList = function (sessions) {
             var shotCount = s.impacts ? s.impacts.length : 0;
 
             html += '<div class="profile-card session-card" data-session-id="' + escapeAttr(s.id) + '">';
+            html += '<img class="session-thumbnail" data-session-id="' + escapeAttr(s.id) + '">';
             html += '<div class="profile-card-main">';
             html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + s.distanceYards + ' yds</span>';
             html += '<span class="profile-card-sub">' + shotCount + ' shots &middot; ES: ' + groupStr + '</span>';
@@ -616,6 +633,8 @@ HistoryManager.prototype._renderMiscSessionList = function (sessions) {
             self.showMiscSessionDetail(sid);
         });
     }
+
+    this._loadThumbnails(container);
 };
 
 /**
@@ -716,6 +735,16 @@ HistoryManager.prototype._renderMiscSessionDetail = function (session) {
 
     html += '</div></div></details>';
 
+    // Annotated image
+    html += '<div class="session-image-container">';
+    html += '<p class="session-image-loading" id="session-image-loading">Loading image...</p>';
+    html += '<img class="session-full-image" id="session-full-image" style="display:none">';
+    html += '</div>';
+    html += '<div class="btn-row" id="session-image-actions" style="display:none;padding:0 16px 8px;">';
+    html += '<button class="btn btn-secondary" id="btn-session-save-image">Save Image</button>';
+    html += '<button class="btn btn-secondary" id="btn-session-share-image">Share</button>';
+    html += '</div>';
+
     // Delete button
     html += '<div class="btn-row" style="padding: 16px;">';
     html += '<button class="btn btn-danger" id="btn-delete-session">Delete Session</button>';
@@ -737,6 +766,8 @@ HistoryManager.prototype._renderMiscSessionDetail = function (session) {
             });
         }
     });
+
+    this._loadFullImage(session.id);
 };
 
 // ── Round Count Helpers ─────────────────────────────────────────
@@ -777,4 +808,114 @@ HistoryManager.prototype._computeRoundsSinceCleaning = function (sessions, clean
         }
     }
     return rounds;
+};
+
+// ── Image Helpers ───────────────────────────────────────────────
+
+/**
+ * Revoke all tracked thumbnail object URLs.
+ */
+HistoryManager.prototype._revokeThumbnailUrls = function () {
+    for (var i = 0; i < this._thumbnailUrls.length; i++) {
+        URL.revokeObjectURL(this._thumbnailUrls[i]);
+    }
+    this._thumbnailUrls = [];
+};
+
+/**
+ * Load thumbnails for all session-thumbnail images in a container.
+ */
+HistoryManager.prototype._loadThumbnails = function (container) {
+    this._revokeThumbnailUrls();
+    var self = this;
+    var imgs = container.querySelectorAll('img.session-thumbnail');
+    for (var i = 0; i < imgs.length; i++) {
+        (function (img) {
+            var sid = img.getAttribute('data-session-id');
+            if (!sid) return;
+            self.db.getSessionImage(sid).then(function (record) {
+                if (record && record.thumbnailBlob) {
+                    var url = URL.createObjectURL(record.thumbnailBlob);
+                    self._thumbnailUrls.push(url);
+                    img.src = url;
+                    img.classList.add('loaded');
+                }
+            }).catch(function () {});
+        })(imgs[i]);
+    }
+};
+
+/**
+ * Load and display the full annotated image for a session detail view.
+ */
+HistoryManager.prototype._loadFullImage = function (sessionId) {
+    var self = this;
+    var imgEl = document.getElementById('session-full-image');
+    var loadingEl = document.getElementById('session-image-loading');
+    var actionsEl = document.getElementById('session-image-actions');
+    if (!imgEl || !loadingEl) return;
+
+    this.db.getSessionImage(sessionId).then(function (record) {
+        if (record && record.fullBlob) {
+            var url = URL.createObjectURL(record.fullBlob);
+            imgEl.src = url;
+            imgEl.style.display = 'block';
+            loadingEl.style.display = 'none';
+            if (actionsEl) actionsEl.style.display = '';
+
+            // Bind save button
+            var saveBtn = document.getElementById('btn-session-save-image');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function () {
+                    self._downloadBlob(record.fullBlob, 'ballistic-group-' + Date.now() + '.jpg');
+                });
+            }
+
+            // Bind share button
+            var shareBtn = document.getElementById('btn-session-share-image');
+            if (shareBtn) {
+                shareBtn.addEventListener('click', function () {
+                    self._shareBlob(record.fullBlob);
+                });
+            }
+
+            // Clean up object URL when image view changes
+            imgEl.addEventListener('load', function () {
+                // URL stays valid until page navigates away; revoke on next render
+            });
+        } else {
+            loadingEl.textContent = 'No image available';
+        }
+    }).catch(function () {
+        loadingEl.textContent = 'Failed to load image';
+    });
+};
+
+/**
+ * Download a blob as a file.
+ */
+HistoryManager.prototype._downloadBlob = function (blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
+/**
+ * Share a blob via Web Share API, falling back to download.
+ */
+HistoryManager.prototype._shareBlob = function (blob) {
+    if (navigator.share && navigator.canShare) {
+        var file = new File([blob], 'ballistic-group.jpg', { type: 'image/jpeg' });
+        var shareData = { files: [file] };
+        if (navigator.canShare(shareData)) {
+            navigator.share(shareData).catch(function () {});
+            return;
+        }
+    }
+    this._downloadBlob(blob, 'ballistic-group-' + Date.now() + '.jpg');
 };

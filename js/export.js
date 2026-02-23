@@ -209,6 +209,40 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf) {
 }
 
 /**
+ * Generate a scaled-down thumbnail canvas from a source canvas.
+ * @param {HTMLCanvasElement} sourceCanvas
+ * @param {number} maxWidth - Maximum width in pixels (default 400)
+ * @returns {HTMLCanvasElement}
+ */
+function generateThumbnail(sourceCanvas, maxWidth) {
+    maxWidth = maxWidth || 400;
+    if (sourceCanvas.width <= maxWidth) return sourceCanvas;
+
+    var scale = maxWidth / sourceCanvas.width;
+    var thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = Math.round(sourceCanvas.width * scale);
+    thumbCanvas.height = Math.round(sourceCanvas.height * scale);
+    var ctx = thumbCanvas.getContext('2d');
+    ctx.drawImage(sourceCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+    return thumbCanvas;
+}
+
+/**
+ * Convert a canvas to a JPEG Blob.
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} quality - JPEG quality 0–1
+ * @returns {Promise<Blob>}
+ */
+function canvasToJpegBlob(canvas, quality) {
+    return new Promise(function (resolve, reject) {
+        canvas.toBlob(function (blob) {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas toBlob returned null'));
+        }, 'image/jpeg', quality);
+    });
+}
+
+/**
  * Draw a rounded rectangle path.
  */
 function _roundRect(ctx, x, y, w, h, r) {
