@@ -11,7 +11,7 @@
  *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 25;
+var CACHE_VERSION = 26;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
@@ -107,8 +107,9 @@ self.addEventListener('fetch', function (e) {
 
     if (isLocal && isMutable(e.request.url)) {
         // Network-first for app code — always fetch fresh when online
+        // cache:'no-cache' bypasses the browser HTTP cache so we truly hit the server
         e.respondWith(
-            fetch(e.request).then(function (response) {
+            fetch(e.request, { cache: 'no-cache' }).then(function (response) {
                 if (response && response.status === 200) {
                     var clone = response.clone();
                     caches.open(CACHE_NAME).then(function (cache) {
