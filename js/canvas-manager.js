@@ -436,7 +436,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     var padding = 14 * sf;
     var lineHeight = 18 * sf;
     var fontSize = 11 * sf;
-    var titleFontSize = 14 * sf;
+    var titleFontSize = 16 * sf;
     var heroFontSize = 26 * sf;
     var smallFontSize = 9 * sf;
     var GREEN = '#4CAF50';
@@ -458,7 +458,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
         { font: Math.round(smallFontSize) + 'px sans-serif', text: atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"   ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"' }
     ];
     if (results.rifleName) {
-        textItems.push({ font: Math.round(smallFontSize) + 'px sans-serif', text: results.rifleName });
+        textItems.push({ font: 'bold ' + Math.round(smallFontSize) + 'px sans-serif', text: results.rifleName });
     }
     var maxWidth = 0;
     for (var ti = 0; ti < textItems.length; ti++) {
@@ -479,7 +479,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     totalHeight += dividerGap * 2 + 1 * sf; // divider with gaps
     totalHeight += lineHeight;          // ATZ
     if (results.rifleName) {
-        totalHeight += lineHeight * 0.3;
+        totalHeight += lineHeight * 0.6;
         totalHeight += lineHeight;      // rifle name
     }
 
@@ -573,7 +573,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
         var wmAspect = this._overlayLogoCanvas.width / this._overlayLogoCanvas.height;
         var wmW = wmH * wmAspect;
         var wmX = cardX + (cardW - wmW) / 2;
-        var wmY = cardY + (cardH - wmH) / 2;
+        var wmY = cardY + (cardH - wmH) / 2 + cardH * 0.08;
         ctx.globalAlpha = 0.10;
         _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
         ctx.clip();
@@ -655,10 +655,10 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     ctx.fillText(atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"   ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', centerX, curY);
     curY += lineHeight;
 
-    // 6) Rifle name — GREEN, small caps with letter spacing
+    // 6) Rifle name — GREEN, bold, small caps with letter spacing
     if (results.rifleName) {
-        curY += lineHeight * 0.3;
-        ctx.font = Math.round(smallFontSize) + 'px sans-serif';
+        curY += lineHeight * 0.6;
+        ctx.font = 'bold ' + Math.round(smallFontSize) + 'px sans-serif';
         ctx.fillStyle = GREEN;
         // Simulate letter-spacing by drawing char-by-char
         var nameUpper = results.rifleName.toUpperCase();
