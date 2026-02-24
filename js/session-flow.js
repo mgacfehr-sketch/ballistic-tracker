@@ -729,6 +729,7 @@ SessionFlow.prototype._calculate = function () {
     // Show draggable results overlay on canvas
     this.canvas.overlayResults = this.results;
     this.canvas.overlayPos = null; // will auto-place near group on first render
+    this.canvas.overlayScale = 1.0;
     this.canvas.render();
 
     this._renderResults();
@@ -1063,7 +1064,8 @@ SessionFlow.prototype._getExportCanvas = function () {
         null, // no calibration line in export
         this.canvas.bulletDiameterPx,
         this.results,
-        this.canvas.overlayPos
+        this.canvas.overlayPos,
+        this.canvas.overlayScale
     );
 };
 

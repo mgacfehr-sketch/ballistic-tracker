@@ -40,13 +40,26 @@ function CanvasManager(canvasEl, hintEl, zoomIndicatorEl) {
     this._lastPanX = 0;
     this._lastPanY = 0;
 
-    // Results overlay (draggable)
+    // Results overlay (draggable + resizable)
     this.overlayResults = null;      // results object — when set, overlay is drawn
     this.overlayPos = null;          // {x, y} in image coords (top-left of card)
+    this.overlayScale = 1.0;         // user resize factor for the overlay card
     this._overlayScreenRect = null;  // {x, y, w, h} in CSS coords for hit-testing
+    this._overlayGripRect = null;    // {x, y, w, h} in CSS coords for resize handle
     this._overlayDragging = false;
+    this._overlayResizing = false;
+    this._overlayResizeStartDist = 0;
+    this._overlayResizeStartScale = 1;
     this._overlayDragOffsetX = 0;
     this._overlayDragOffsetY = 0;
+
+    // Pre-load logo for overlay watermark
+    this._overlayLogoImg = null;
+    var self = this;
+    var logoImg = new Image();
+    logoImg.onload = function () { self._overlayLogoImg = logoImg; };
+    logoImg.onerror = function () { self._overlayLogoImg = null; };
+    logoImg.src = 'assets/logo.png';
 
     // Callback
     this.onTap = null;         // function({x, y}) in IMAGE coordinates
@@ -74,7 +87,9 @@ CanvasManager.prototype.clearImage = function () {
     this.bulletDiameterPx = 0;
     this.overlayResults = null;
     this.overlayPos = null;
+    this.overlayScale = 1.0;
     this._overlayScreenRect = null;
+    this._overlayGripRect = null;
     this.zoomLevel = 1;
     this.offsetX = 0;
     this.offsetY = 0;
@@ -400,14 +415,16 @@ CanvasManager.prototype._drawLiveOverlay = function () {
 
     var ctx = this.ctx;
     var dpr = window.devicePixelRatio || 1;
-    var sf = dpr;
-    var padding = 12 * sf;
-    var lineHeight = 17 * sf;
+    var os = this.overlayScale;  // user resize factor
+    var sf = dpr * os;
+    var padding = 14 * sf;
+    var lineHeight = 18 * sf;
     var fontSize = 11 * sf;
-    var titleFontSize = 13 * sf;
-    var heroFontSize = 22 * sf;
+    var titleFontSize = 14 * sf;
+    var heroFontSize = 26 * sf;
     var smallFontSize = 9 * sf;
     var GREEN = '#4CAF50';
+    var dividerGap = 6 * sf;
 
     var results = this.overlayResults;
     var atzElevInches = Math.abs(results.elevationOffsetInches || 0);
@@ -415,50 +432,42 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     var atzElevAbbr = (results.atzElevationDir || '')[0] || '';
     var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
 
-    // Line layout per spec:
-    // 1) yorT logo+text (green)
-    // 2) Distance & shot count (white)
-    // 3) MOA hero (green, big bold)
-    // 4) Group size inches (white, smaller)
-    // 5) ATZ inches only (white, smaller)
-    // 6) Rifle name (green, small)
-    var lines = [];
-    lines.push({ text: 'yorT', bold: true, size: titleFontSize, color: GREEN });
-    lines.push({ text: '', gap: 0.3 });
-    lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group', bold: false, size: smallFontSize, color: '#ffffff' });
-    lines.push({ text: '', gap: 0.3 });
-    lines.push({ text: formatFixed(results.groupSizeMOA, 2) + ' MOA', bold: true, size: heroFontSize, color: GREEN, hero: true });
-    lines.push({ text: '', gap: 0.15 });
-    lines.push({ text: formatFixed(results.groupSizeInches, 3) + '"', bold: false, size: fontSize, color: '#ffffff' });
-    lines.push({ text: '', gap: 0.3 });
-    lines.push({ text: 'ATZ: ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', bold: false, size: smallFontSize, color: '#ffffff' });
+    // Measure all text widths to determine card width (centered layout)
+    var heroLineHeight = heroFontSize * 1.3;
+    var textItems = [
+        { font: 'bold ' + Math.round(titleFontSize) + 'px sans-serif', text: 'yorT' },
+        { font: Math.round(smallFontSize) + 'px sans-serif', text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group' },
+        { font: 'bold ' + Math.round(heroFontSize) + 'px sans-serif', text: formatFixed(results.groupSizeMOA, 2) + ' MOA' },
+        { font: Math.round(fontSize) + 'px sans-serif', text: formatFixed(results.groupSizeInches, 3) + '"' },
+        { font: Math.round(smallFontSize) + 'px sans-serif', text: atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"   ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"' }
+    ];
     if (results.rifleName) {
-        lines.push({ text: '', gap: 0.3 });
-        lines.push({ text: results.rifleName, bold: false, size: smallFontSize, color: GREEN });
+        textItems.push({ font: Math.round(smallFontSize) + 'px sans-serif', text: results.rifleName });
     }
-
-    // Measure card dimensions
     var maxWidth = 0;
-    for (var i = 0; i < lines.length; i++) {
-        if (!lines[i].text) continue;
-        ctx.font = (lines[i].bold ? 'bold ' : '') + Math.round(lines[i].size || fontSize) + 'px sans-serif';
-        var w = ctx.measureText(lines[i].text).width;
-        if (w > maxWidth) maxWidth = w;
+    for (var ti = 0; ti < textItems.length; ti++) {
+        ctx.font = textItems[ti].font;
+        var tw = ctx.measureText(textItems[ti].text).width;
+        if (tw > maxWidth) maxWidth = tw;
     }
 
-    var heroLineHeight = heroFontSize * 1.2;
+    // Calculate total height
     var totalHeight = padding * 2;
-    for (var k = 0; k < lines.length; k++) {
-        if (!lines[k].text) {
-            totalHeight += lineHeight * (lines[k].gap || 0.3);
-        } else if (lines[k].hero) {
-            totalHeight += heroLineHeight;
-        } else {
-            totalHeight += lineHeight;
-        }
+    totalHeight += lineHeight;          // yorT title
+    totalHeight += lineHeight * 0.2;    // gap
+    totalHeight += lineHeight;          // distance/shots
+    totalHeight += dividerGap * 2 + 1 * sf; // divider with gaps
+    totalHeight += heroLineHeight;      // MOA hero
+    totalHeight += lineHeight * 0.1;    // tiny gap
+    totalHeight += lineHeight;          // inches
+    totalHeight += dividerGap * 2 + 1 * sf; // divider with gaps
+    totalHeight += lineHeight;          // ATZ
+    if (results.rifleName) {
+        totalHeight += lineHeight * 0.3;
+        totalHeight += lineHeight;      // rifle name
     }
 
-    var cardW = maxWidth + padding * 2;
+    var cardW = maxWidth + padding * 2.5;
     var cardH = totalHeight;
 
     // Smart initial position: near the shot group but not covering markers
@@ -534,52 +543,160 @@ CanvasManager.prototype._drawLiveOverlay = function () {
         h: cardH / dpr
     };
 
+    var cornerR = 8 * sf;
+
     // Card background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';
-    _roundRect(ctx, cardX, cardY, cardW, cardH, 6 * sf);
+    ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
+    _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
     ctx.fill();
 
-    // Card border
-    ctx.strokeStyle = 'rgba(76, 175, 80, 0.7)';
-    ctx.lineWidth = 1.5 * sf;
-    _roundRect(ctx, cardX, cardY, cardW, cardH, 6 * sf);
-    ctx.stroke();
-
-    // Draw text
-    var textX = cardX + padding;
-    var textY = cardY + padding;
-
-    for (var j = 0; j < lines.length; j++) {
-        var line = lines[j];
-        if (!line.text) {
-            textY += lineHeight * (line.gap || 0.3);
-            continue;
-        }
-        ctx.font = (line.bold ? 'bold ' : '') + Math.round(line.size || fontSize) + 'px sans-serif';
-        ctx.fillStyle = line.color || '#e0e0e0';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(line.text, textX, textY);
-        textY += (line.hero ? heroLineHeight : lineHeight);
+    // Logo watermark behind content
+    if (this._overlayLogoImg) {
+        ctx.save();
+        var wmSize = Math.min(cardW, cardH) * 0.6;
+        var wmAspect = this._overlayLogoImg.naturalHeight / this._overlayLogoImg.naturalWidth;
+        var wmW = wmSize;
+        var wmH = wmSize * wmAspect;
+        var wmX = cardX + (cardW - wmW) / 2;
+        var wmY = cardY + (cardH - wmH) / 2;
+        ctx.globalAlpha = 0.09;
+        // Clip to card bounds
+        _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
+        ctx.clip();
+        ctx.filter = 'invert(1)';
+        ctx.drawImage(this._overlayLogoImg, wmX, wmY, wmW, wmH);
+        ctx.restore();
     }
 
-    // Drag handle dots (top-right corner of card)
-    var gripX = cardX + cardW - padding;
-    var gripY = cardY + 6 * sf;
+    // Card border — subtle green
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.35)';
+    ctx.lineWidth = 1 * sf;
+    _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
+    ctx.stroke();
+
+    // ── Draw centered content ──
+    var centerX = cardX + cardW / 2;
+    var curY = cardY + padding;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    // 1) "yorT" — "yor" white, "T" green
+    ctx.font = 'bold ' + Math.round(titleFontSize) + 'px sans-serif';
+    var yorW = ctx.measureText('yor').width;
+    var tW = ctx.measureText('T').width;
+    var brandTotalW = yorW + tW;
+    var brandStartX = centerX - brandTotalW / 2;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('yor', brandStartX, curY);
+    ctx.fillStyle = GREEN;
+    ctx.fillText('T', brandStartX + yorW, curY);
+    curY += lineHeight;
+
+    // 2) Distance & shots
+    curY += lineHeight * 0.2;
+    ctx.textAlign = 'center';
+    ctx.font = Math.round(smallFontSize) + 'px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group', centerX, curY);
+    curY += lineHeight;
+
+    // Divider line
+    curY += dividerGap;
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.3)';
+    ctx.lineWidth = 1 * sf;
+    ctx.beginPath();
+    ctx.moveTo(cardX + padding, curY);
+    ctx.lineTo(cardX + cardW - padding, curY);
+    ctx.stroke();
+    curY += dividerGap + 1 * sf;
+
+    // 3) MOA hero — GREEN, big bold
+    ctx.font = 'bold ' + Math.round(heroFontSize) + 'px sans-serif';
+    ctx.fillStyle = GREEN;
+    ctx.textAlign = 'center';
+    ctx.fillText(formatFixed(results.groupSizeMOA, 2) + ' MOA', centerX, curY);
+    curY += heroLineHeight;
+
+    // 4) Group size inches
+    curY += lineHeight * 0.1;
+    ctx.font = Math.round(fontSize) + 'px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(formatFixed(results.groupSizeInches, 3) + '"', centerX, curY);
+    curY += lineHeight;
+
+    // Divider line
+    curY += dividerGap;
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.3)';
+    ctx.lineWidth = 1 * sf;
+    ctx.beginPath();
+    ctx.moveTo(cardX + padding, curY);
+    ctx.lineTo(cardX + cardW - padding, curY);
+    ctx.stroke();
+    curY += dividerGap + 1 * sf;
+
+    // 5) ATZ in inches
+    ctx.font = Math.round(smallFontSize) + 'px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"   ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', centerX, curY);
+    curY += lineHeight;
+
+    // 6) Rifle name — GREEN, small caps with letter spacing
+    if (results.rifleName) {
+        curY += lineHeight * 0.3;
+        ctx.font = Math.round(smallFontSize) + 'px sans-serif';
+        ctx.fillStyle = GREEN;
+        // Simulate letter-spacing by drawing char-by-char
+        var nameUpper = results.rifleName.toUpperCase();
+        var spacing = 2 * sf;
+        var nameW = 0;
+        for (var ci = 0; ci < nameUpper.length; ci++) {
+            nameW += ctx.measureText(nameUpper[ci]).width + (ci < nameUpper.length - 1 ? spacing : 0);
+        }
+        var nx = centerX - nameW / 2;
+        ctx.textAlign = 'left';
+        for (var cj = 0; cj < nameUpper.length; cj++) {
+            ctx.fillText(nameUpper[cj], nx, curY);
+            nx += ctx.measureText(nameUpper[cj]).width + spacing;
+        }
+    }
+
+    // Resize handle dots (bottom-right corner of card)
+    var gripPad = 8 * sf;
+    var gripX = cardX + cardW - gripPad;
+    var gripY = cardY + cardH - gripPad;
     var dotSize = 1.5 * sf;
+    var dotSpacing = 4.5 * sf;
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     for (var row = 0; row < 3; row++) {
-        for (var col = 0; col < 2; col++) {
+        for (var col = 0; col <= row; col++) {
             ctx.beginPath();
-            ctx.arc(gripX - col * 5 * sf, gripY + row * 5 * sf, dotSize, 0, Math.PI * 2);
+            ctx.arc(gripX - col * dotSpacing, gripY - row * dotSpacing, dotSize, 0, Math.PI * 2);
             ctx.fill();
         }
     }
+
+    // Save grip rect for resize hit-testing (CSS coords)
+    var gripHitSize = 22 * os; // generous touch target
+    this._overlayGripRect = {
+        x: (cardX + cardW - gripHitSize * dpr) / dpr,
+        y: (cardY + cardH - gripHitSize * dpr) / dpr,
+        w: gripHitSize,
+        h: gripHitSize
+    };
 };
 
 CanvasManager.prototype._isPointInOverlay = function (cssX, cssY) {
     if (!this._overlayScreenRect) return false;
     var r = this._overlayScreenRect;
+    return cssX >= r.x && cssX <= r.x + r.w &&
+           cssY >= r.y && cssY <= r.y + r.h;
+};
+
+CanvasManager.prototype._isPointInOverlayGrip = function (cssX, cssY) {
+    if (!this._overlayGripRect) return false;
+    var r = this._overlayGripRect;
     return cssX >= r.x && cssX <= r.x + r.w &&
            cssY >= r.y && cssY <= r.y + r.h;
 };
@@ -643,6 +760,18 @@ CanvasManager.prototype._onTouchStart = function (e) {
     if (touches.length === 1) {
         var pos = this._getTouchPos(touches[0]);
 
+        // Check resize grip first (takes priority over drag)
+        if (this.overlayResults && this._isPointInOverlayGrip(pos.x, pos.y)) {
+            this._overlayResizing = true;
+            this._overlayResizeStartDist = dist(pos, {
+                x: this._overlayScreenRect.x,
+                y: this._overlayScreenRect.y
+            });
+            this._overlayResizeStartScale = this.overlayScale;
+            this._tapStart = null;
+            return;
+        }
+
         // Check if touching the overlay card
         if (this.overlayResults && this._isPointInOverlay(pos.x, pos.y)) {
             this._overlayDragging = true;
@@ -658,8 +787,9 @@ CanvasManager.prototype._onTouchStart = function (e) {
         this._lastPanY = pos.y;
     }
     else if (touches.length === 2) {
-        // Start pinch — cancel overlay drag
+        // Start pinch — cancel overlay drag/resize
         this._overlayDragging = false;
+        this._overlayResizing = false;
         this._tapStart = null; // cancel tap
         var p1 = this._getTouchPos(touches[0]);
         var p2 = this._getTouchPos(touches[1]);
@@ -673,6 +803,20 @@ CanvasManager.prototype._onTouchStart = function (e) {
 CanvasManager.prototype._onTouchMove = function (e) {
     e.preventDefault();
     var touches = e.touches;
+
+    if (touches.length === 1 && this._overlayResizing) {
+        var pos = this._getTouchPos(touches[0]);
+        var curDist = dist(pos, {
+            x: this._overlayScreenRect.x,
+            y: this._overlayScreenRect.y
+        });
+        if (this._overlayResizeStartDist > 0) {
+            var ratio = curDist / this._overlayResizeStartDist;
+            this.overlayScale = clamp(this._overlayResizeStartScale * ratio, 0.5, 3.0);
+            this.render();
+        }
+        return;
+    }
 
     if (touches.length === 1 && this._overlayDragging) {
         var pos = this._getTouchPos(touches[0]);
@@ -729,6 +873,11 @@ CanvasManager.prototype._onTouchMove = function (e) {
 CanvasManager.prototype._onTouchEnd = function (e) {
     e.preventDefault();
 
+    if (this._overlayResizing && e.touches.length === 0) {
+        this._overlayResizing = false;
+        return;
+    }
+
     if (this._overlayDragging && e.touches.length === 0) {
         this._overlayDragging = false;
         return;
@@ -752,6 +901,17 @@ CanvasManager.prototype._onMouseDown = function (e) {
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
 
+    // Check resize grip first
+    if (this.overlayResults && this._isPointInOverlayGrip(x, y)) {
+        this._overlayResizing = true;
+        this._overlayResizeStartDist = dist({ x: x, y: y }, {
+            x: this._overlayScreenRect.x,
+            y: this._overlayScreenRect.y
+        });
+        this._overlayResizeStartScale = this.overlayScale;
+        return;
+    }
+
     // Check if clicking the overlay card
     if (this.overlayResults && this._isPointInOverlay(x, y)) {
         this._overlayDragging = true;
@@ -770,6 +930,19 @@ CanvasManager.prototype._onMouseMove = function (e) {
     var rect = this.canvas.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
+
+    if (this._overlayResizing) {
+        var curDist = dist({ x: x, y: y }, {
+            x: this._overlayScreenRect.x,
+            y: this._overlayScreenRect.y
+        });
+        if (this._overlayResizeStartDist > 0) {
+            var ratio = curDist / this._overlayResizeStartDist;
+            this.overlayScale = clamp(this._overlayResizeStartScale * ratio, 0.5, 3.0);
+            this.render();
+        }
+        return;
+    }
 
     if (this._overlayDragging) {
         this.overlayPos = this.screenToImage(
@@ -797,6 +970,10 @@ CanvasManager.prototype._onMouseMove = function (e) {
 };
 
 CanvasManager.prototype._onMouseUp = function (e) {
+    if (this._overlayResizing) {
+        this._overlayResizing = false;
+        return;
+    }
     if (this._overlayDragging) {
         this._overlayDragging = false;
         return;

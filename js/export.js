@@ -24,7 +24,7 @@ var _exportLogoImg = null;
  * @param {object} results - Results from calculateSession
  * @returns {HTMLCanvasElement} The rendered canvas
  */
-function renderAnnotatedImage(image, markers, calibrationLine, bulletDiameterPx, results, overlayPos) {
+function renderAnnotatedImage(image, markers, calibrationLine, bulletDiameterPx, results, overlayPos, overlayScale) {
     var w = image.naturalWidth || image.width;
     var h = image.naturalHeight || image.height;
 
@@ -53,7 +53,7 @@ function renderAnnotatedImage(image, markers, calibrationLine, bulletDiameterPx,
 
     // Draw results overlay card
     if (results) {
-        _drawResultsOverlay(ctx, w, h, results, sf, overlayPos);
+        _drawResultsOverlay(ctx, w, h, results, sf, overlayPos, overlayScale || 1.0);
     }
 
     return canvas;
@@ -154,83 +154,59 @@ function _drawExportMarker(ctx, marker, bulletDiameterPx, sf) {
     }
 }
 
-function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
-    var padding = 18 * sf;
-    var lineHeight = 22 * sf;
-    var fontSize = 14 * sf;
-    var titleFontSize = 18 * sf;
-    var heroFontSize = 32 * sf;
-    var smallFontSize = 12 * sf;
+function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos, os) {
+    os = os || 1.0;
+    var s = sf * os;  // combined scale: image resolution * user resize
+    var padding = 18 * s;
+    var lineHeight = 22 * s;
+    var fontSize = 14 * s;
+    var titleFontSize = 18 * s;
+    var heroFontSize = 32 * s;
+    var smallFontSize = 12 * s;
     var GREEN = '#4CAF50';
+    var dividerGap = 8 * s;
 
-    // Logo dimensions for overlay card
-    var logoW = 0;
-    var logoH = 0;
-    var logoGap = 6 * sf;
-    if (_exportLogoImg) {
-        logoW = 28 * sf;
-        logoH = (_exportLogoImg.naturalHeight / _exportLogoImg.naturalWidth) * logoW;
-    }
-
-    // ATZ in inches only
     var atzElevInches = Math.abs(results.elevationOffsetInches || 0);
     var atzWindInches = Math.abs(results.windageOffsetInches || 0);
     var atzElevAbbr = (results.atzElevationDir || '')[0] || '';
     var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
 
-    // Build text lines per spec:
-    // 1) yorT logo+text (green)
-    // 2) Distance & shot count (white)
-    // 3) MOA hero (green, big bold)
-    // 4) Group size inches (white, smaller)
-    // 5) ATZ inches only (white, smaller)
-    // 6) Rifle name (green, small)
-    var lines = [];
-    lines.push({ text: 'yorT', bold: true, size: titleFontSize, color: GREEN });
-    lines.push({ text: '', gap: 0.3 });
-    lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group', bold: false, size: smallFontSize, color: '#ffffff' });
-    lines.push({ text: '', gap: 0.4 });
-    lines.push({ text: formatFixed(results.groupSizeMOA, 2) + ' MOA', bold: true, size: heroFontSize, color: GREEN, hero: true });
-    lines.push({ text: '', gap: 0.15 });
-    lines.push({ text: formatFixed(results.groupSizeInches, 3) + '"', bold: false, size: fontSize, color: '#ffffff' });
-    lines.push({ text: '', gap: 0.4 });
-    lines.push({ text: 'ATZ: ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', bold: false, size: smallFontSize, color: '#ffffff' });
+    // Measure all text widths to determine card width (centered layout)
+    var heroLineHeight = heroFontSize * 1.3;
+    var textItems = [
+        { font: 'bold ' + Math.round(titleFontSize) + 'px sans-serif', text: 'yorT' },
+        { font: Math.round(smallFontSize) + 'px sans-serif', text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group' },
+        { font: 'bold ' + Math.round(heroFontSize) + 'px sans-serif', text: formatFixed(results.groupSizeMOA, 2) + ' MOA' },
+        { font: Math.round(fontSize) + 'px sans-serif', text: formatFixed(results.groupSizeInches, 3) + '"' },
+        { font: Math.round(smallFontSize) + 'px sans-serif', text: atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"   ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"' }
+    ];
     if (results.rifleName) {
-        lines.push({ text: '', gap: 0.3 });
-        lines.push({ text: results.rifleName, bold: false, size: smallFontSize, color: GREEN });
+        textItems.push({ font: Math.round(smallFontSize) + 'px sans-serif', text: results.rifleName });
     }
-
-    // Measure card dimensions
-    var heroLineHeight = heroFontSize * 1.2;
     var maxWidth = 0;
-    for (var i = 0; i < lines.length; i++) {
-        if (!lines[i].text) continue;
-        var f = (lines[i].bold ? 'bold ' : '') + Math.round(lines[i].size || fontSize) + 'px sans-serif';
-        ctx.font = f;
-        var w = ctx.measureText(lines[i].text).width;
-        // Account for logo width on title line
-        if (i === 0 && logoW > 0) w += logoW + logoGap;
-        if (w > maxWidth) maxWidth = w;
+    for (var ti = 0; ti < textItems.length; ti++) {
+        ctx.font = textItems[ti].font;
+        var tw = ctx.measureText(textItems[ti].text).width;
+        if (tw > maxWidth) maxWidth = tw;
     }
 
     // Calculate total height
     var totalHeight = padding * 2;
-    for (var k = 0; k < lines.length; k++) {
-        if (!lines[k].text) {
-            totalHeight += lineHeight * (lines[k].gap || 0.4);
-        } else if (lines[k].hero) {
-            totalHeight += heroLineHeight;
-        } else {
-            totalHeight += lineHeight;
-        }
+    totalHeight += lineHeight;          // yorT title
+    totalHeight += lineHeight * 0.2;    // gap
+    totalHeight += lineHeight;          // distance/shots
+    totalHeight += dividerGap * 2 + 1 * s; // divider with gaps
+    totalHeight += heroLineHeight;      // MOA hero
+    totalHeight += lineHeight * 0.1;    // tiny gap
+    totalHeight += lineHeight;          // inches
+    totalHeight += dividerGap * 2 + 1 * s; // divider with gaps
+    totalHeight += lineHeight;          // ATZ
+    if (results.rifleName) {
+        totalHeight += lineHeight * 0.3;
+        totalHeight += lineHeight;      // rifle name
     }
 
-    // If logo is taller than one line, add extra height
-    if (logoH > lineHeight) {
-        totalHeight += (logoH - lineHeight);
-    }
-
-    var cardW = maxWidth + padding * 2;
+    var cardW = maxWidth + padding * 2.5;
     var cardH = totalHeight;
     var cardX, cardY;
     if (overlayPos) {
@@ -241,46 +217,121 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
         cardY = canvasH - cardH - padding;
     }
 
-    // Draw card background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';
-    _roundRect(ctx, cardX, cardY, cardW, cardH, 8 * sf);
+    var cornerR = 8 * s;
+
+    // Card background
+    ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
+    _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
     ctx.fill();
 
-    // Draw card border
-    ctx.strokeStyle = 'rgba(76, 175, 80, 0.7)';
-    ctx.lineWidth = 2 * sf;
-    _roundRect(ctx, cardX, cardY, cardW, cardH, 8 * sf);
-    ctx.stroke();
-
-    // Draw content
-    var textX = cardX + padding;
-    var textY = cardY + padding;
-
-    // Draw logo next to title
-    if (_exportLogoImg && logoW > 0) {
-        var logoY = textY + (titleFontSize - logoH) / 2;
+    // Logo watermark behind content
+    if (_exportLogoImg) {
         ctx.save();
+        var wmSize = Math.min(cardW, cardH) * 0.6;
+        var wmAspect = _exportLogoImg.naturalHeight / _exportLogoImg.naturalWidth;
+        var wmW = wmSize;
+        var wmH = wmSize * wmAspect;
+        var wmX = cardX + (cardW - wmW) / 2;
+        var wmY = cardY + (cardH - wmH) / 2;
+        ctx.globalAlpha = 0.09;
+        _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
+        ctx.clip();
         ctx.filter = 'invert(1)';
-        ctx.drawImage(_exportLogoImg, textX, logoY, logoW, logoH);
+        ctx.drawImage(_exportLogoImg, wmX, wmY, wmW, wmH);
         ctx.restore();
     }
 
-    // Draw all lines
-    for (var j = 0; j < lines.length; j++) {
-        var line = lines[j];
-        if (!line.text) {
-            textY += lineHeight * (line.gap || 0.4);
-            continue;
+    // Card border — subtle green
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.35)';
+    ctx.lineWidth = 1 * s;
+    _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
+    ctx.stroke();
+
+    // ── Draw centered content ──
+    var centerX = cardX + cardW / 2;
+    var curY = cardY + padding;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    // 1) "yorT" — "yor" white, "T" green
+    ctx.font = 'bold ' + Math.round(titleFontSize) + 'px sans-serif';
+    var yorW = ctx.measureText('yor').width;
+    var tW = ctx.measureText('T').width;
+    var brandTotalW = yorW + tW;
+    var brandStartX = centerX - brandTotalW / 2;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('yor', brandStartX, curY);
+    ctx.fillStyle = GREEN;
+    ctx.fillText('T', brandStartX + yorW, curY);
+    curY += lineHeight;
+
+    // 2) Distance & shots
+    curY += lineHeight * 0.2;
+    ctx.textAlign = 'center';
+    ctx.font = Math.round(smallFontSize) + 'px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group', centerX, curY);
+    curY += lineHeight;
+
+    // Divider line
+    curY += dividerGap;
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.3)';
+    ctx.lineWidth = 1 * s;
+    ctx.beginPath();
+    ctx.moveTo(cardX + padding, curY);
+    ctx.lineTo(cardX + cardW - padding, curY);
+    ctx.stroke();
+    curY += dividerGap + 1 * s;
+
+    // 3) MOA hero — GREEN, big bold
+    ctx.font = 'bold ' + Math.round(heroFontSize) + 'px sans-serif';
+    ctx.fillStyle = GREEN;
+    ctx.textAlign = 'center';
+    ctx.fillText(formatFixed(results.groupSizeMOA, 2) + ' MOA', centerX, curY);
+    curY += heroLineHeight;
+
+    // 4) Group size inches
+    curY += lineHeight * 0.1;
+    ctx.font = Math.round(fontSize) + 'px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(formatFixed(results.groupSizeInches, 3) + '"', centerX, curY);
+    curY += lineHeight;
+
+    // Divider line
+    curY += dividerGap;
+    ctx.strokeStyle = 'rgba(76, 175, 80, 0.3)';
+    ctx.lineWidth = 1 * s;
+    ctx.beginPath();
+    ctx.moveTo(cardX + padding, curY);
+    ctx.lineTo(cardX + cardW - padding, curY);
+    ctx.stroke();
+    curY += dividerGap + 1 * s;
+
+    // 5) ATZ in inches
+    ctx.font = Math.round(smallFontSize) + 'px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"   ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', centerX, curY);
+    curY += lineHeight;
+
+    // 6) Rifle name — GREEN, small caps with letter spacing
+    if (results.rifleName) {
+        curY += lineHeight * 0.3;
+        ctx.font = Math.round(smallFontSize) + 'px sans-serif';
+        ctx.fillStyle = GREEN;
+        var nameUpper = results.rifleName.toUpperCase();
+        var spacing = 2 * s;
+        var nameW = 0;
+        for (var ci = 0; ci < nameUpper.length; ci++) {
+            nameW += ctx.measureText(nameUpper[ci]).width + (ci < nameUpper.length - 1 ? spacing : 0);
         }
-        var font = (line.bold ? 'bold ' : '') + Math.round(line.size || fontSize) + 'px sans-serif';
-        ctx.font = font;
-        ctx.fillStyle = line.color || '#e0e0e0';
+        var nx = centerX - nameW / 2;
         ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        // Offset title text for logo
-        var xOff = (j === 0 && logoW > 0) ? logoW + logoGap : 0;
-        ctx.fillText(line.text, textX + xOff, textY);
-        textY += (line.hero ? heroLineHeight : lineHeight);
+        for (var cj = 0; cj < nameUpper.length; cj++) {
+            ctx.fillText(nameUpper[cj], nx, curY);
+            nx += ctx.measureText(nameUpper[cj]).width + spacing;
+        }
     }
 }
 
