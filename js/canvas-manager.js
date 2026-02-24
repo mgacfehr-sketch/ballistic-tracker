@@ -377,14 +377,65 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     var cardW = maxWidth + padding * 2;
     var cardH = totalHeight;
 
-    // Default position: bottom-right of the image
+    // Smart initial position: near the shot group but not covering markers
     if (!this.overlayPos) {
         var cardWImg = cardW / this.scale;
         var cardHImg = cardH / this.scale;
-        this.overlayPos = {
-            x: this.imageWidth - cardWImg - (10 * dpr / this.scale),
-            y: this.imageHeight - cardHImg - (10 * dpr / this.scale)
-        };
+        var gap = 15 * dpr / this.scale; // gap between group bbox and card
+
+        // Compute bounding box of impacts + POA in image coords
+        var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (var mi = 0; mi < this.markers.length; mi++) {
+            var m = this.markers[mi];
+            if (m.type === 'impact' || m.type === 'poa' || m.type === 'centroid') {
+                if (m.point.x < minX) minX = m.point.x;
+                if (m.point.y < minY) minY = m.point.y;
+                if (m.point.x > maxX) maxX = m.point.x;
+                if (m.point.y > maxY) maxY = m.point.y;
+            }
+        }
+
+        var placed = false;
+        if (minX !== Infinity) {
+            // Add marker radius padding to bbox
+            var mPad = 25 * dpr / this.scale;
+            var bx1 = minX - mPad, by1 = minY - mPad;
+            var bx2 = maxX + mPad, by2 = maxY + mPad;
+            var imgW = this.imageWidth, imgH = this.imageHeight;
+
+            // Try right of group
+            if (bx2 + gap + cardWImg <= imgW) {
+                var ry = clamp((by1 + by2) / 2 - cardHImg / 2, 0, imgH - cardHImg);
+                this.overlayPos = { x: bx2 + gap, y: ry };
+                placed = true;
+            }
+            // Try below group
+            if (!placed && by2 + gap + cardHImg <= imgH) {
+                var bx = clamp((bx1 + bx2) / 2 - cardWImg / 2, 0, imgW - cardWImg);
+                this.overlayPos = { x: bx, y: by2 + gap };
+                placed = true;
+            }
+            // Try left of group
+            if (!placed && bx1 - gap - cardWImg >= 0) {
+                var ly = clamp((by1 + by2) / 2 - cardHImg / 2, 0, imgH - cardHImg);
+                this.overlayPos = { x: bx1 - gap - cardWImg, y: ly };
+                placed = true;
+            }
+            // Try above group
+            if (!placed && by1 - gap - cardHImg >= 0) {
+                var ax = clamp((bx1 + bx2) / 2 - cardWImg / 2, 0, imgW - cardWImg);
+                this.overlayPos = { x: ax, y: by1 - gap - cardHImg };
+                placed = true;
+            }
+        }
+
+        // Fallback: bottom-right of image
+        if (!placed) {
+            this.overlayPos = {
+                x: this.imageWidth - cardWImg - (10 * dpr / this.scale),
+                y: this.imageHeight - cardHImg - (10 * dpr / this.scale)
+            };
+        }
     }
 
     var sp = this.imageToScreen(this.overlayPos.x, this.overlayPos.y);
