@@ -257,7 +257,6 @@ SessionFlow.prototype._loadProfilePicker = function () {
         if (rifles.length === 0) {
             picker.innerHTML =
                 '<div class="empty-state" style="padding:16px 0;">' +
-                '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">' +
                 '<p class="empty-state-text">No rifles configured</p>' +
                 '<p class="empty-state-sub" style="margin-bottom:12px;">Create a rifle and load profile to track your data, or use Quick Mode below.</p>' +
                 '<button class="btn btn-primary btn-sm" id="btn-go-profiles">Go to Profiles</button>' +
