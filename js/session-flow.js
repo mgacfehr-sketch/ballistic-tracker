@@ -40,6 +40,7 @@ function SessionFlow(canvasManager, db) {
 
     // Crop mode
     this.cropMode = false;
+    this.croppedCanvas = null;
 
     // DOM references (set in init)
     this.els = {};
@@ -141,6 +142,7 @@ SessionFlow.prototype.reset = function () {
 
     // Reset crop mode
     this.cropMode = false;
+    this.croppedCanvas = null;
     if (this.els.btnCropImage) {
         this.els.btnCropImage.classList.remove('active');
         this.els.btnCropImage.textContent = 'Crop Image';
@@ -219,6 +221,9 @@ SessionFlow.prototype._showStep = function (index) {
 
     // Set canvas hints per step
     this._updateHint();
+
+    // Auto-scroll panel so action buttons are visible
+    this._scrollPanelToBottom();
 };
 
 SessionFlow.prototype._nextStep = function () {
@@ -628,6 +633,7 @@ SessionFlow.prototype._placePOA = function (point) {
     this._showEl(this.els.btnRedoPoa);
     this._showEl(this.els.btnNextPoa);
     this.canvas.setHint('');
+    this._scrollPanelToBottom();
 };
 
 // ── Step 6: Impacts ────────────────────────────────────────────
@@ -705,6 +711,10 @@ SessionFlow.prototype._calculate = function () {
         alert('Calculation error: ' + err.message);
         return;
     }
+
+    // Remove calibration markers and line — they served their purpose
+    this._removeMarkersOfType('calibration');
+    this.canvas.calibrationLine = null;
 
     // Add centroid marker
     this._removeMarkersOfType('centroid');
@@ -994,6 +1004,7 @@ SessionFlow.prototype._onCalibrationTap = function (point) {
         this._showEl(this.els.btnRedoCalibration);
         this._showEl(this.els.btnNextCalibration);
         this.canvas.setHint('');
+        this._scrollPanelToBottom();
     }
 };
 
@@ -1005,6 +1016,8 @@ SessionFlow.prototype._toggleCropMode = function () {
     var container = document.getElementById('canvas-container');
 
     if (this.cropMode) {
+        // Entering crop mode — clear any previous capture
+        this.croppedCanvas = null;
         if (btn) {
             btn.classList.add('active');
             btn.textContent = 'Done Cropping';
@@ -1012,6 +1025,8 @@ SessionFlow.prototype._toggleCropMode = function () {
         if (container) container.classList.add('crop-mode');
         this.canvas.setHint('Zoom & pan to frame your image');
     } else {
+        // Exiting crop mode — capture the viewport NOW before UI changes
+        this.croppedCanvas = this.canvas.captureViewport();
         if (btn) {
             btn.classList.remove('active');
             btn.textContent = 'Crop Image';
@@ -1026,13 +1041,23 @@ SessionFlow.prototype._toggleCropMode = function () {
  * otherwise the full annotated image render.
  */
 SessionFlow.prototype._getExportCanvas = function () {
+    // If user cropped, use the captured viewport snapshot
+    if (this.croppedCanvas) {
+        return this.croppedCanvas;
+    }
+    // If actively in crop mode (hasn't hit Done yet), capture live viewport
     if (this.cropMode) {
         return this.canvas.captureViewport();
     }
+    // Full annotated image — filter out calibration markers (already removed
+    // in _calculate, but guard against any stragglers)
+    var markers = this.canvas.markers.filter(function (m) {
+        return m.type !== 'calibration';
+    });
     return renderAnnotatedImage(
         this.image,
-        this.canvas.markers,
-        this.canvas.calibrationLine,
+        markers,
+        null, // no calibration line in export
         this.canvas.bulletDiameterPx,
         this.results,
         this.canvas.overlayPos
@@ -1088,6 +1113,15 @@ SessionFlow.prototype._shareImage = function () {
 };
 
 // ── Helpers ────────────────────────────────────────────────────
+
+SessionFlow.prototype._scrollPanelToBottom = function () {
+    var panel = document.getElementById('step-panel');
+    if (panel) {
+        setTimeout(function () {
+            panel.scrollTop = panel.scrollHeight;
+        }, 50);
+    }
+};
 
 SessionFlow.prototype._removeMarkersOfType = function (type) {
     this.canvas.markers = this.canvas.markers.filter(function (m) {

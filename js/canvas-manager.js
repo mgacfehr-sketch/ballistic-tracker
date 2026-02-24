@@ -99,12 +99,12 @@ CanvasManager.prototype._fitImage = function () {
 CanvasManager.prototype._refitPreservingCenter = function () {
     if (!this.image) return;
 
-    // Capture the image point at canvas center BEFORE resize
+    // Capture current state BEFORE resize
     var oldCW = this.canvas.width;
     var oldCH = this.canvas.height;
     var centerImgX = (oldCW / 2 - this.offsetX) / this.scale;
     var centerImgY = (oldCH / 2 - this.offsetY) / this.scale;
-    var savedZoom = this.zoomLevel;
+    var savedScale = this.scale;
 
     // Resize canvas to match current container
     this._resize();
@@ -116,9 +116,14 @@ CanvasManager.prototype._refitPreservingCenter = function () {
     var scaleY = ch / this.imageHeight;
     this.fitScale = Math.min(scaleX, scaleY);
 
-    // Reapply saved zoom on new fitScale
-    this.zoomLevel = savedZoom;
-    this.scale = this.fitScale * this.zoomLevel;
+    // Restore the EXACT pixel scale — derive zoomLevel from it
+    // This prevents zoom changes when fitScale shifts due to panel resize
+    this.scale = savedScale;
+    this.zoomLevel = this.scale / this.fitScale;
+    if (this.zoomLevel < 1) {
+        this.zoomLevel = 1;
+        this.scale = this.fitScale;
+    }
 
     // Place the same image point back at canvas center
     this.offsetX = cw / 2 - centerImgX * this.scale;
