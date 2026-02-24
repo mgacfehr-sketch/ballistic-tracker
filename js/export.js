@@ -161,6 +161,7 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     var titleFontSize = 18 * sf;
     var heroFontSize = 32 * sf;
     var smallFontSize = 12 * sf;
+    var GREEN = '#4CAF50';
 
     // Logo dimensions for overlay card
     var logoW = 0;
@@ -171,25 +172,33 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
         logoH = (_exportLogoImg.naturalHeight / _exportLogoImg.naturalWidth) * logoW;
     }
 
-    // ATZ in inches: absolute value of POA offsets (ATZ negates the offset direction)
+    // ATZ in inches only
     var atzElevInches = Math.abs(results.elevationOffsetInches || 0);
     var atzWindInches = Math.abs(results.windageOffsetInches || 0);
-    // Abbreviate direction: Down→D, Up→U, Left→L, Right→R
     var atzElevAbbr = (results.atzElevationDir || '')[0] || '';
     var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
 
-    // Build text lines — MOA is the hero
+    // Build text lines per spec:
+    // 1) yorT logo+text (green)
+    // 2) Distance & shot count (white)
+    // 3) MOA hero (green, big bold)
+    // 4) Group size inches (white, smaller)
+    // 5) ATZ inches only (white, smaller)
+    // 6) Rifle name (green, small)
     var lines = [];
-    lines.push({ text: 'yorT', bold: true, size: titleFontSize, color: '#4caf50' });
+    lines.push({ text: 'yorT', bold: true, size: titleFontSize, color: GREEN });
     lines.push({ text: '', gap: 0.3 });
-    lines.push({ text: results.distanceYards + ' yds / ' + results.shotCount + ' shots', bold: false, size: smallFontSize, color: '#aaaaaa' });
+    lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group', bold: false, size: smallFontSize, color: '#ffffff' });
     lines.push({ text: '', gap: 0.4 });
-    lines.push({ text: formatFixed(results.groupSizeMOA, 2) + ' MOA', bold: true, size: heroFontSize, color: '#ffffff', hero: true });
+    lines.push({ text: formatFixed(results.groupSizeMOA, 2) + ' MOA', bold: true, size: heroFontSize, color: GREEN, hero: true });
     lines.push({ text: '', gap: 0.15 });
-    lines.push({ text: formatFixed(results.groupSizeInches, 3) + '" group', bold: false, size: fontSize, color: '#bbbbbb' });
+    lines.push({ text: formatFixed(results.groupSizeInches, 3) + '"', bold: false, size: fontSize, color: '#ffffff' });
     lines.push({ text: '', gap: 0.4 });
-    lines.push({ text: 'ATZ  ' + atzElevAbbr + ': ' + formatFixed(results.atzElevationMOA, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(results.atzWindageMOA, 2) + ' MOA', bold: true, size: fontSize, color: '#4caf50' });
-    lines.push({ text: 'ATZ  ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', bold: false, size: smallFontSize, color: '#888888' });
+    lines.push({ text: 'ATZ: ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', bold: false, size: smallFontSize, color: '#ffffff' });
+    if (results.rifleName) {
+        lines.push({ text: '', gap: 0.3 });
+        lines.push({ text: results.rifleName, bold: false, size: smallFontSize, color: GREEN });
+    }
 
     // Measure card dimensions
     var heroLineHeight = heroFontSize * 1.2;

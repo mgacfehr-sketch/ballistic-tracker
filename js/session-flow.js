@@ -723,6 +723,9 @@ SessionFlow.prototype._calculate = function () {
         point: { x: this.results.centroid.x, y: this.results.centroid.y }
     });
 
+    // Attach rifle name to results for overlay display
+    this.results.rifleName = this.selectedRifle ? this.selectedRifle.name : null;
+
     // Show draggable results overlay on canvas
     this.canvas.overlayResults = this.results;
     this.canvas.overlayPos = null; // will auto-place near group on first render
