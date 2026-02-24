@@ -159,6 +159,7 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     var lineHeight = 22 * sf;
     var fontSize = 14 * sf;
     var titleFontSize = 18 * sf;
+    var heroFontSize = 32 * sf;
     var smallFontSize = 12 * sf;
 
     // Logo dimensions for overlay card
@@ -177,18 +178,21 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     var atzElevAbbr = (results.atzElevationDir || '')[0] || '';
     var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
 
-    // Build text lines
+    // Build text lines — MOA is the hero
     var lines = [];
     lines.push({ text: 'yorT', bold: true, size: titleFontSize, color: '#4caf50' });
-    lines.push({ text: '', gap: 0.5 }); // spacer
-    lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot Group', bold: false, size: fontSize, color: '#e0e0e0' });
     lines.push({ text: '', gap: 0.3 });
-    lines.push({ text: 'Group: ' + formatFixed(results.groupSizeInches, 3) + '" (' + formatFixed(results.groupSizeMOA, 2) + ' MOA)', bold: true, size: fontSize, color: '#ffffff' });
-    lines.push({ text: '', gap: 0.3 });
-    lines.push({ text: 'ATZ(INCH): ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2), bold: true, size: fontSize, color: '#4caf50' });
-    lines.push({ text: 'ATZ(MOA):  ' + atzElevAbbr + ': ' + formatFixed(results.atzElevationMOA, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(results.atzWindageMOA, 2), bold: false, size: smallFontSize, color: '#aaaaaa' });
+    lines.push({ text: results.distanceYards + ' yds / ' + results.shotCount + ' shots', bold: false, size: smallFontSize, color: '#aaaaaa' });
+    lines.push({ text: '', gap: 0.4 });
+    lines.push({ text: formatFixed(results.groupSizeMOA, 2) + ' MOA', bold: true, size: heroFontSize, color: '#ffffff', hero: true });
+    lines.push({ text: '', gap: 0.15 });
+    lines.push({ text: formatFixed(results.groupSizeInches, 3) + '" group', bold: false, size: fontSize, color: '#bbbbbb' });
+    lines.push({ text: '', gap: 0.4 });
+    lines.push({ text: 'ATZ  ' + atzElevAbbr + ': ' + formatFixed(results.atzElevationMOA, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(results.atzWindageMOA, 2) + ' MOA', bold: true, size: fontSize, color: '#4caf50' });
+    lines.push({ text: 'ATZ  ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', bold: false, size: smallFontSize, color: '#888888' });
 
     // Measure card dimensions
+    var heroLineHeight = heroFontSize * 1.2;
     var maxWidth = 0;
     for (var i = 0; i < lines.length; i++) {
         if (!lines[i].text) continue;
@@ -205,6 +209,8 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     for (var k = 0; k < lines.length; k++) {
         if (!lines[k].text) {
             totalHeight += lineHeight * (lines[k].gap || 0.4);
+        } else if (lines[k].hero) {
+            totalHeight += heroLineHeight;
         } else {
             totalHeight += lineHeight;
         }
@@ -237,9 +243,9 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     _roundRect(ctx, cardX, cardY, cardW, cardH, 8 * sf);
     ctx.stroke();
 
-    // Draw accent line under title
+    // Draw content
     var textX = cardX + padding;
-    var textY = cardY + padding + titleFontSize;
+    var textY = cardY + padding;
 
     // Draw logo next to title
     if (_exportLogoImg && logoW > 0) {
@@ -250,24 +256,8 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
         ctx.restore();
     }
 
-    // Draw title
-    ctx.font = 'bold ' + Math.round(titleFontSize) + 'px sans-serif';
-    ctx.fillStyle = lines[0].color;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(lines[0].text, textX + (logoW > 0 ? logoW + logoGap : 0), textY);
-    textY += lineHeight;
-
-    // Accent line under title
-    ctx.strokeStyle = 'rgba(76, 175, 80, 0.5)';
-    ctx.lineWidth = 1 * sf;
-    ctx.beginPath();
-    ctx.moveTo(textX, textY);
-    ctx.lineTo(textX + maxWidth, textY);
-    ctx.stroke();
-
-    // Draw remaining lines
-    for (var j = 1; j < lines.length; j++) {
+    // Draw all lines
+    for (var j = 0; j < lines.length; j++) {
         var line = lines[j];
         if (!line.text) {
             textY += lineHeight * (line.gap || 0.4);
@@ -278,8 +268,10 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
         ctx.fillStyle = line.color || '#e0e0e0';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(line.text, textX, textY);
-        textY += lineHeight;
+        // Offset title text for logo
+        var xOff = (j === 0 && logoW > 0) ? logoW + logoGap : 0;
+        ctx.fillText(line.text, textX + xOff, textY);
+        textY += (line.hero ? heroLineHeight : lineHeight);
     }
 }
 
@@ -317,19 +309,4 @@ function canvasToJpegBlob(canvas, quality) {
     });
 }
 
-/**
- * Draw a rounded rectangle path.
- */
-function _roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-}
+// _roundRect is defined in utils.js (loaded before export.js)

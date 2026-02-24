@@ -327,6 +327,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     var lineHeight = 17 * sf;
     var fontSize = 11 * sf;
     var titleFontSize = 13 * sf;
+    var heroFontSize = 22 * sf;
     var smallFontSize = 9 * sf;
 
     var results = this.overlayResults;
@@ -335,15 +336,18 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     var atzElevAbbr = (results.atzElevationDir || '')[0] || '';
     var atzWindAbbr = (results.atzWindageDir || '')[0] || '';
 
+    // Line layout: title, context, hero MOA, supporting details, ATZ
     var lines = [];
     lines.push({ text: 'yorT', bold: true, size: titleFontSize, color: '#4caf50' });
-    lines.push({ text: '', gap: 0.4 });
-    lines.push({ text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot Group', bold: false, size: fontSize, color: '#e0e0e0' });
-    lines.push({ text: '', gap: 0.2 });
-    lines.push({ text: 'Group: ' + formatFixed(results.groupSizeInches, 3) + '" (' + formatFixed(results.groupSizeMOA, 2) + ' MOA)', bold: true, size: fontSize, color: '#ffffff' });
-    lines.push({ text: '', gap: 0.2 });
-    lines.push({ text: 'ATZ(INCH): ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2), bold: true, size: fontSize, color: '#4caf50' });
-    lines.push({ text: 'ATZ(MOA):  ' + atzElevAbbr + ': ' + formatFixed(results.atzElevationMOA, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(results.atzWindageMOA, 2), bold: false, size: smallFontSize, color: '#aaaaaa' });
+    lines.push({ text: '', gap: 0.3 });
+    lines.push({ text: results.distanceYards + ' yds / ' + results.shotCount + ' shots', bold: false, size: smallFontSize, color: '#aaaaaa' });
+    lines.push({ text: '', gap: 0.3 });
+    lines.push({ text: formatFixed(results.groupSizeMOA, 2) + ' MOA', bold: true, size: heroFontSize, color: '#ffffff', hero: true });
+    lines.push({ text: '', gap: 0.15 });
+    lines.push({ text: formatFixed(results.groupSizeInches, 3) + '" group', bold: false, size: fontSize, color: '#bbbbbb' });
+    lines.push({ text: '', gap: 0.3 });
+    lines.push({ text: 'ATZ  ' + atzElevAbbr + ': ' + formatFixed(results.atzElevationMOA, 2) + '  ' + atzWindAbbr + ': ' + formatFixed(results.atzWindageMOA, 2) + ' MOA', bold: true, size: fontSize, color: '#4caf50' });
+    lines.push({ text: 'ATZ  ' + atzElevAbbr + ': ' + formatFixed(atzElevInches, 2) + '"  ' + atzWindAbbr + ': ' + formatFixed(atzWindInches, 2) + '"', bold: false, size: smallFontSize, color: '#888888' });
 
     // Measure card dimensions
     var maxWidth = 0;
@@ -354,10 +358,13 @@ CanvasManager.prototype._drawLiveOverlay = function () {
         if (w > maxWidth) maxWidth = w;
     }
 
+    var heroLineHeight = heroFontSize * 1.2;
     var totalHeight = padding * 2;
     for (var k = 0; k < lines.length; k++) {
         if (!lines[k].text) {
             totalHeight += lineHeight * (lines[k].gap || 0.3);
+        } else if (lines[k].hero) {
+            totalHeight += heroLineHeight;
         } else {
             totalHeight += lineHeight;
         }
@@ -414,7 +421,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.fillText(line.text, textX, textY);
-        textY += lineHeight;
+        textY += (line.hero ? heroLineHeight : lineHeight);
     }
 
     // Drag handle dots (top-right corner of card)
