@@ -217,7 +217,7 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos, os)
     totalHeight += dividerGap * 2 + 1 * s; // divider with gaps
     totalHeight += lineHeight;          // ATZ
     if (results.rifleName) {
-        totalHeight += lineHeight * 0.6;
+        totalHeight += lineHeight * 1.0;
         totalHeight += lineHeight;      // rifle name
     }
 
@@ -242,11 +242,18 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos, os)
     // Logo watermark behind content (white silhouette, no background rectangle)
     if (_exportLogoCanvas) {
         ctx.save();
-        var wmH = cardH * 0.75;
         var wmAspect = _exportLogoCanvas.width / _exportLogoCanvas.height;
-        var wmW = wmH * wmAspect;
+        // Fit within 85% of card width or 75% of card height, whichever is smaller
+        var wmByH = cardH * 0.75;
+        var wmByW = cardW * 0.85;
+        var wmW, wmH;
+        if (wmByH * wmAspect <= wmByW) {
+            wmH = wmByH; wmW = wmH * wmAspect;
+        } else {
+            wmW = wmByW; wmH = wmW / wmAspect;
+        }
         var wmX = cardX + (cardW - wmW) / 2;
-        var wmY = cardY + (cardH - wmH) / 2 + cardH * 0.08;
+        var wmY = cardY + (cardH - wmH) / 2 + cardH * 0.12;
         ctx.globalAlpha = 0.10;
         _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
         ctx.clip();
@@ -330,7 +337,7 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos, os)
 
     // 6) Rifle name — GREEN, bold, small caps with letter spacing
     if (results.rifleName) {
-        curY += lineHeight * 0.6;
+        curY += lineHeight * 1.0;
         ctx.font = 'bold ' + Math.round(smallFontSize) + 'px sans-serif';
         ctx.fillStyle = GREEN;
         var nameUpper = results.rifleName.toUpperCase();
