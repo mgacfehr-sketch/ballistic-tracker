@@ -200,7 +200,13 @@ CanvasManager.prototype.render = function () {
 
     // Draw draggable results overlay
     if (this.overlayResults) {
-        this._drawLiveOverlay();
+        console.log('[Overlay] render() calling _drawLiveOverlay, _roundRect exists:', typeof _roundRect);
+        try {
+            this._drawLiveOverlay();
+            console.log('[Overlay] _drawLiveOverlay completed OK');
+        } catch (e) {
+            console.error('[Overlay] _drawLiveOverlay FAILED:', e.message, e.stack);
+        }
     }
 };
 
@@ -386,6 +392,10 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     var sp = this.imageToScreen(this.overlayPos.x, this.overlayPos.y);
     var cardX = sp.x;
     var cardY = sp.y;
+
+    console.log('[Overlay] Drawing overlay card at position', Math.round(cardX), ',', Math.round(cardY), 'size', Math.round(cardW), 'x', Math.round(cardH));
+    console.log('[Overlay] overlayPos (image coords):', JSON.stringify(this.overlayPos));
+    console.log('[Overlay] scale:', this.scale, 'imageWidth:', this.imageWidth, 'imageHeight:', this.imageHeight);
 
     // Save screen rect for hit-testing (CSS pixel coords)
     this._overlayScreenRect = {

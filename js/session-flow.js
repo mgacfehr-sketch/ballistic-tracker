@@ -698,11 +698,29 @@ SessionFlow.prototype._calculate = function () {
     // Show draggable results overlay on canvas
     this.canvas.overlayResults = this.results;
     this.canvas.overlayPos = null; // will default to bottom-right on first render
+    console.log('[Overlay] overlayResults set:', !!this.canvas.overlayResults);
+    console.log('[Overlay] Canvas context exists:', !!this.canvas.ctx);
+    console.log('[Overlay] Canvas dimensions:', this.canvas.canvas.width, 'x', this.canvas.canvas.height);
+    console.log('[Overlay] Image loaded:', !!this.canvas.image, 'scale:', this.canvas.scale);
     this.canvas.render();
 
     this._renderResults();
     this._nextStep();
     this.canvas.setHint('');
+
+    // Re-render after step transition to ensure overlay draws on visible canvas
+    // Step panel content change can resize the canvas container
+    var self = this;
+    setTimeout(function () {
+        self.canvas._resize();
+        self.canvas._fitImage();
+        self.canvas._clampOffset();
+        console.log('[Overlay] Post-step canvas dimensions:', self.canvas.canvas.width, 'x', self.canvas.canvas.height);
+        console.log('[Overlay] overlayResults still set:', !!self.canvas.overlayResults);
+        console.log('[Overlay] Canvas container rect:', JSON.stringify(self.canvas.canvas.parentElement.getBoundingClientRect()));
+        self.canvas.overlayPos = null; // recalculate position for new canvas size
+        self.canvas.render();
+    }, 150);
 };
 
 SessionFlow.prototype._renderResults = function () {
