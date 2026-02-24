@@ -399,6 +399,8 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
             if (confirm('Delete this barrel?')) {
                 self.db.deleteBarrel(activeBarrel.id).then(function () {
                     self.showRifleDetail(rifle.id);
+                }).catch(function (err) {
+                    alert('Failed to delete barrel: ' + (err.message || err));
                 });
             }
         });
@@ -575,12 +577,16 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
             barrel.notes = data.notes;
             self.db.updateBarrel(barrel).then(function () {
                 self.showRifleDetail(rifleId);
+            }).catch(function (err) {
+                alert('Failed to update barrel: ' + (err.message || err));
             });
         } else {
             self.db.addBarrel(data).then(function (newBarrel) {
                 return self.db.setActiveBarrel(newBarrel.id, rifleId);
             }).then(function () {
                 self.showRifleDetail(rifleId);
+            }).catch(function (err) {
+                alert('Failed to add barrel: ' + (err.message || err));
             });
         }
     });

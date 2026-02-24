@@ -173,7 +173,8 @@ BallisticDB.prototype.addBarrel = function (data) {
         installDate: data.installDate || new Date().toISOString().split('T')[0],
         isActive: data.isActive !== undefined ? data.isActive : true,
         totalRounds: data.totalRounds || 0,
-        notes: data.notes || ''
+        notes: data.notes || '',
+        createdAt: new Date().toISOString()
     };
     var row = _jsToRow(barrel, self.userId);
     return self.supabase.from('barrels').insert(row).select().single()
