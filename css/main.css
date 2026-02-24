@@ -77,6 +77,7 @@ html, body {
     height: 36px;
     width: auto;
     filter: invert(1);
+    mix-blend-mode: screen;
 }
 
 #app-header h1 {
@@ -180,6 +181,7 @@ html, body {
     width: 280px;
     height: auto;
     filter: invert(1);
+    mix-blend-mode: screen;
     opacity: 0.17;
     pointer-events: none;
     z-index: 2;
@@ -759,6 +761,7 @@ html, body {
     width: 200px;
     height: auto;
     filter: invert(1);
+    mix-blend-mode: screen;
     opacity: 0.15;
     margin-bottom: 16px;
 }
@@ -1436,6 +1439,7 @@ html, body {
     height: auto;
     margin: 0 auto 8px;
     filter: invert(1);
+    mix-blend-mode: screen;
 }
 
 .auth-logo {
