@@ -96,7 +96,8 @@ SessionFlow.prototype.init = function () {
         btnShare: document.getElementById('btn-share'),
         btnNewFromResults: document.getElementById('btn-new-from-results'),
         // Global
-        btnNewSession: document.getElementById('btn-new-session')
+        btnNewSession: document.getElementById('btn-new-session'),
+        canvasWatermark: document.querySelector('.canvas-watermark')
     };
 
     // Cache step sections
@@ -136,6 +137,7 @@ SessionFlow.prototype.reset = function () {
 
     this.canvas.clearImage();
     this.canvas.setHint('');
+    if (this.els.canvasWatermark) this.els.canvasWatermark.style.display = '';
 
     // Reset inputs
     if (this.els.inputDistance) this.els.inputDistance.value = '';
@@ -496,6 +498,7 @@ SessionFlow.prototype._onImageSelected = function (e) {
     loadImageFromFile(file).then(function (img) {
         self.image = img;
         self.canvas.loadImage(img);
+        if (self.els.canvasWatermark) self.els.canvasWatermark.style.display = 'none';
         self._startCalibration();
         self._nextStep();
     }).catch(function (err) {
