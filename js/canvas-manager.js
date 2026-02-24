@@ -96,6 +96,32 @@ CanvasManager.prototype._fitImage = function () {
     this.offsetY = (ch - this.imageHeight * this.scale) / 2;
 };
 
+CanvasManager.prototype._refitPreservingCenter = function () {
+    if (!this.image) return;
+    var cw = this.canvas.width;
+    var ch = this.canvas.height;
+
+    // What image point is currently at canvas center?
+    var centerImgX = (cw / 2 - this.offsetX) / this.scale;
+    var centerImgY = (ch / 2 - this.offsetY) / this.scale;
+
+    // Recalculate fitScale for (possibly new) canvas dimensions
+    var scaleX = cw / this.imageWidth;
+    var scaleY = ch / this.imageHeight;
+    this.fitScale = Math.min(scaleX, scaleY);
+
+    // Reapply zoom on new fitScale
+    this.scale = this.fitScale * this.zoomLevel;
+
+    // Place the same image point back at canvas center
+    this.offsetX = cw / 2 - centerImgX * this.scale;
+    this.offsetY = ch / 2 - centerImgY * this.scale;
+
+    this._clampOffset();
+    this._updateZoomIndicator();
+    this.render();
+};
+
 CanvasManager.prototype._updateTransform = function () {
     this.scale = this.fitScale * this.zoomLevel;
 };
@@ -211,6 +237,42 @@ CanvasManager.prototype.render = function () {
 CanvasManager.prototype._clearCanvas = function () {
     this.ctx.fillStyle = '#0a0a0a';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+};
+
+/**
+ * Capture the visible image region from the live canvas (includes markers + overlay).
+ * Returns a new canvas containing just the image-covered portion of the viewport.
+ */
+CanvasManager.prototype.captureViewport = function () {
+    var cw = this.canvas.width;
+    var ch = this.canvas.height;
+
+    // Image bounds in canvas pixels
+    var imgLeft = this.offsetX;
+    var imgTop = this.offsetY;
+    var imgRight = this.offsetX + this.imageWidth * this.scale;
+    var imgBottom = this.offsetY + this.imageHeight * this.scale;
+
+    // Intersect with canvas bounds to get visible image region
+    var sx = Math.max(0, imgLeft);
+    var sy = Math.max(0, imgTop);
+    var sx2 = Math.min(cw, imgRight);
+    var sy2 = Math.min(ch, imgBottom);
+
+    var cropW = Math.round(sx2 - sx);
+    var cropH = Math.round(sy2 - sy);
+
+    if (cropW <= 0 || cropH <= 0) {
+        // Fallback: return full canvas
+        return this.canvas;
+    }
+
+    var out = document.createElement('canvas');
+    out.width = cropW;
+    out.height = cropH;
+    var outCtx = out.getContext('2d');
+    outCtx.drawImage(this.canvas, Math.round(sx), Math.round(sy), cropW, cropH, 0, 0, cropW, cropH);
+    return out;
 };
 
 CanvasManager.prototype._drawMarker = function (marker) {
@@ -517,12 +579,10 @@ CanvasManager.prototype._bindEvents = function () {
     window.addEventListener('resize', function () {
         self._resize();
         if (self.image) {
-            self._fitImage();
-            self.zoomLevel = clamp(self.zoomLevel, 1, 15);
-            self._updateTransform();
-            self._clampOffset();
+            self._refitPreservingCenter();
+        } else {
+            self.render();
         }
-        self.render();
     });
 
     // Touch events

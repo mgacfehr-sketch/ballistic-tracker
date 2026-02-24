@@ -38,6 +38,9 @@ function SessionFlow(canvasManager, db) {
     this.weather = null;
     this.savedSessionId = null;
 
+    // Crop mode
+    this.cropMode = false;
+
     // DOM references (set in init)
     this.els = {};
 
@@ -95,6 +98,7 @@ SessionFlow.prototype.init = function () {
         btnSaveImage: document.getElementById('btn-save-image'),
         btnShare: document.getElementById('btn-share'),
         btnNewFromResults: document.getElementById('btn-new-from-results'),
+        btnCropImage: document.getElementById('btn-crop-image'),
         // Global
         btnNewSession: document.getElementById('btn-new-session'),
         canvasWatermark: document.querySelector('.canvas-watermark')
@@ -134,6 +138,15 @@ SessionFlow.prototype.reset = function () {
     this.measuredVelocity = null;
     this.weather = null;
     this.savedSessionId = null;
+
+    // Reset crop mode
+    this.cropMode = false;
+    if (this.els.btnCropImage) {
+        this.els.btnCropImage.classList.remove('active');
+        this.els.btnCropImage.textContent = 'Crop Image';
+    }
+    var canvasContainer = document.getElementById('canvas-container');
+    if (canvasContainer) canvasContainer.classList.remove('crop-mode');
 
     this.canvas.clearImage();
     this.canvas.setHint('');
@@ -480,6 +493,11 @@ SessionFlow.prototype._bindUI = function () {
     this.els.btnNewFromResults.addEventListener('click', function () {
         self.reset();
     });
+    if (this.els.btnCropImage) {
+        this.els.btnCropImage.addEventListener('click', function () {
+            self._toggleCropMode();
+        });
+    }
 
     // Global new session
     this.els.btnNewSession.addEventListener('click', function () {
@@ -697,7 +715,7 @@ SessionFlow.prototype._calculate = function () {
 
     // Show draggable results overlay on canvas
     this.canvas.overlayResults = this.results;
-    this.canvas.overlayPos = null; // will default to bottom-right on first render
+    this.canvas.overlayPos = null; // will auto-place near group on first render
     this.canvas.render();
 
     this._renderResults();
@@ -709,10 +727,7 @@ SessionFlow.prototype._calculate = function () {
     var self = this;
     setTimeout(function () {
         self.canvas._resize();
-        self.canvas._fitImage();
-        self.canvas._clampOffset();
-        self.canvas.overlayPos = null; // recalculate position for new canvas size
-        self.canvas.render();
+        self.canvas._refitPreservingCenter();
     }, 150);
 };
 
@@ -903,14 +918,7 @@ SessionFlow.prototype._storeAnnotatedImage = function (sessionId) {
     }
 
     try {
-        var exportCanvas = renderAnnotatedImage(
-            this.image,
-            this.canvas.markers,
-            this.canvas.calibrationLine,
-            this.canvas.bulletDiameterPx,
-            this.results,
-            this.canvas.overlayPos
-        );
+        var exportCanvas = this._getExportCanvas();
         console.log('[Session] Export canvas rendered — size:', exportCanvas.width, 'x', exportCanvas.height);
 
         var thumbCanvas = generateThumbnail(exportCanvas, 400);
@@ -990,12 +998,39 @@ SessionFlow.prototype._onCalibrationTap = function (point) {
     }
 };
 
-// ── Export Actions ──────────────────────────────────────────────
+// ── Crop Mode ──────────────────────────────────────────────────
 
-SessionFlow.prototype._saveImage = function () {
-    if (!this.results) return;
+SessionFlow.prototype._toggleCropMode = function () {
+    this.cropMode = !this.cropMode;
+    var btn = this.els.btnCropImage;
+    var container = document.getElementById('canvas-container');
 
-    var exportCanvas = renderAnnotatedImage(
+    if (this.cropMode) {
+        if (btn) {
+            btn.classList.add('active');
+            btn.textContent = 'Done Cropping';
+        }
+        if (container) container.classList.add('crop-mode');
+        this.canvas.setHint('Zoom & pan to frame your image');
+    } else {
+        if (btn) {
+            btn.classList.remove('active');
+            btn.textContent = 'Crop Image';
+        }
+        if (container) container.classList.remove('crop-mode');
+        this.canvas.setHint('');
+    }
+};
+
+/**
+ * Returns the export canvas — cropped viewport if crop mode is on,
+ * otherwise the full annotated image render.
+ */
+SessionFlow.prototype._getExportCanvas = function () {
+    if (this.cropMode) {
+        return this.canvas.captureViewport();
+    }
+    return renderAnnotatedImage(
         this.image,
         this.canvas.markers,
         this.canvas.calibrationLine,
@@ -1003,6 +1038,14 @@ SessionFlow.prototype._saveImage = function () {
         this.results,
         this.canvas.overlayPos
     );
+};
+
+// ── Export Actions ──────────────────────────────────────────────
+
+SessionFlow.prototype._saveImage = function () {
+    if (!this.results) return;
+
+    var exportCanvas = this._getExportCanvas();
 
     exportCanvas.toBlob(function (blob) {
         if (!blob) return;
@@ -1020,14 +1063,7 @@ SessionFlow.prototype._saveImage = function () {
 SessionFlow.prototype._shareImage = function () {
     if (!this.results) return;
 
-    var exportCanvas = renderAnnotatedImage(
-        this.image,
-        this.canvas.markers,
-        this.canvas.calibrationLine,
-        this.canvas.bulletDiameterPx,
-        this.results,
-        this.canvas.overlayPos
-    );
+    var exportCanvas = this._getExportCanvas();
 
     exportCanvas.toBlob(function (blob) {
         if (!blob) return;

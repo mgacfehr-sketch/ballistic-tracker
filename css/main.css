@@ -228,6 +228,18 @@ html, body {
     z-index: 5;
 }
 
+/* ── Crop Mode ─────────────────────────────────────────────── */
+
+#canvas-container.crop-mode {
+    box-shadow: inset 0 0 0 3px var(--primary);
+}
+
+#btn-crop-image.active {
+    background: var(--primary-dark);
+    color: #fff;
+    border-color: var(--primary);
+}
+
 /* ── Step Panel ─────────────────────────────────────────────── */
 
 #step-panel {
