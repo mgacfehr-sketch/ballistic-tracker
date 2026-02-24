@@ -6,6 +6,15 @@
  * Returns the canvas for saving/sharing.
  */
 
+// Pre-load logo for overlay card
+var _exportLogoImg = null;
+(function() {
+    var img = new Image();
+    img.onload = function() { _exportLogoImg = img; };
+    img.onerror = function() { _exportLogoImg = null; };
+    img.src = 'assets/logo.png';
+})();
+
 /**
  * Render the annotated image to an offscreen canvas.
  * @param {HTMLImageElement} image - The original target photo
@@ -152,6 +161,15 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     var titleFontSize = 18 * sf;
     var smallFontSize = 12 * sf;
 
+    // Logo dimensions for overlay card
+    var logoW = 0;
+    var logoH = 0;
+    var logoGap = 6 * sf;
+    if (_exportLogoImg) {
+        logoW = 28 * sf;
+        logoH = (_exportLogoImg.naturalHeight / _exportLogoImg.naturalWidth) * logoW;
+    }
+
     // ATZ in inches: absolute value of POA offsets (ATZ negates the offset direction)
     var atzElevInches = Math.abs(results.elevationOffsetInches || 0);
     var atzWindInches = Math.abs(results.windageOffsetInches || 0);
@@ -177,6 +195,8 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
         var f = (lines[i].bold ? 'bold ' : '') + Math.round(lines[i].size || fontSize) + 'px sans-serif';
         ctx.font = f;
         var w = ctx.measureText(lines[i].text).width;
+        // Account for logo width on title line
+        if (i === 0 && logoW > 0) w += logoW + logoGap;
         if (w > maxWidth) maxWidth = w;
     }
 
@@ -188,6 +208,11 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
         } else {
             totalHeight += lineHeight;
         }
+    }
+
+    // If logo is taller than one line, add extra height
+    if (logoH > lineHeight) {
+        totalHeight += (logoH - lineHeight);
     }
 
     var cardW = maxWidth + padding * 2;
@@ -216,12 +241,21 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos) {
     var textX = cardX + padding;
     var textY = cardY + padding + titleFontSize;
 
+    // Draw logo next to title
+    if (_exportLogoImg && logoW > 0) {
+        var logoY = textY + (titleFontSize - logoH) / 2;
+        ctx.save();
+        ctx.filter = 'invert(1)';
+        ctx.drawImage(_exportLogoImg, textX, logoY, logoW, logoH);
+        ctx.restore();
+    }
+
     // Draw title
     ctx.font = 'bold ' + Math.round(titleFontSize) + 'px sans-serif';
     ctx.fillStyle = lines[0].color;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(lines[0].text, textX, textY);
+    ctx.fillText(lines[0].text, textX + (logoW > 0 ? logoW + logoGap : 0), textY);
     textY += lineHeight;
 
     // Accent line under title

@@ -46,6 +46,7 @@ HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
 
     if (sessions.length === 0) {
         html += '<div class="empty-state">';
+        html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
         html += '<p class="empty-state-text">No sessions yet</p>';
         html += '<p class="empty-state-sub">Complete a session and tap "Save Session" to log it here</p>';
         html += '</div>';
@@ -592,6 +593,7 @@ HistoryManager.prototype._renderMiscSessionList = function (sessions) {
 
     if (sessions.length === 0) {
         html += '<div class="empty-state">';
+        html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
         html += '<p class="empty-state-text">No misc sessions</p>';
         html += '<p class="empty-state-sub">Sessions saved without a rifle profile appear here</p>';
         html += '</div>';

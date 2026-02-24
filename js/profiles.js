@@ -44,6 +44,7 @@ ProfileManager.prototype._renderRifleList = function (rifles) {
 
     if (rifles.length === 0) {
         html += '<div class="empty-state">';
+        html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
         html += '<p class="empty-state-text">No rifles yet</p>';
         html += '<p class="empty-state-sub">Tap "+ Add Rifle" to create your first profile</p>';
         html += '</div>';
