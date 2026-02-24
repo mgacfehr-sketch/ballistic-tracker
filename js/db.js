@@ -611,6 +611,64 @@ BallisticDB.prototype.deleteCleaningLog = function (id) {
         });
 };
 
+// ── AI Conversations CRUD ─────────────────────────────────────
+
+BallisticDB.prototype.addConversation = function (data) {
+    var self = this;
+    var conv = {
+        id: generateUUID(),
+        rifleId: data.rifleId || null,
+        title: data.title || 'New Conversation',
+        messages: data.messages || [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    var row = _jsToRow(conv, self.userId);
+    return self.supabase.from('ai_conversations').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.updateConversation = function (conv) {
+    var self = this;
+    conv.updatedAt = new Date().toISOString();
+    var row = _jsToRow(conv, self.userId);
+    return self.supabase.from('ai_conversations').update(row)
+        .eq('id', conv.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getConversationsByRifle = function (rifleId) {
+    var self = this;
+    var query = self.supabase.from('ai_conversations').select()
+        .eq('user_id', self.userId);
+    if (rifleId) {
+        query = query.eq('rifle_id', rifleId);
+    } else {
+        query = query.is('rifle_id', null);
+    }
+    return query.order('updated_at', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.deleteConversation = function (id) {
+    var self = this;
+    return self.supabase.from('ai_conversations').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};
+
 // ── Settings (localStorage fallback) ──────────────────────────
 
 BallisticDB.prototype.setSetting = function (key, value) {

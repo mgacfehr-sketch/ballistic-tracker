@@ -11,6 +11,8 @@ function AIAssistantManager(db) {
     this.messages = [];
     this.selectedRifleId = null;
     this.isLoading = false;
+    this.conversationId = null;
+    this.conversationTitle = null;
 }
 
 /**
@@ -61,6 +63,20 @@ AIAssistantManager.prototype._renderChat = function () {
         html += '<button class="btn btn-secondary btn-sm" id="ai-weather-btn" title="Get current weather">Weather</button>';
         html += '</div>';
 
+        // Conversation toolbar
+        html += '<div class="ai-conv-toolbar">';
+        html += '<button class="btn btn-secondary btn-sm" id="ai-new-chat-btn">New Chat</button>';
+        html += '<button class="btn btn-secondary btn-sm" id="ai-history-btn">History</button>';
+        if (self.conversationTitle) {
+            html += '<span class="ai-conv-title">' + self._escapeHtml(self.conversationTitle) + '</span>';
+        }
+        html += '</div>';
+
+        // Conversation history panel (hidden by default)
+        html += '<div class="ai-conv-history" id="ai-conv-history" style="display:none;">';
+        html += '<div class="ai-conv-history-loading">Loading...</div>';
+        html += '</div>';
+
         // Messages area
         html += '<div class="ai-messages" id="ai-messages">';
         if (self.messages.length === 0) {
@@ -75,10 +91,11 @@ AIAssistantManager.prototype._renderChat = function () {
         } else {
             for (var j = 0; j < self.messages.length; j++) {
                 var msg = self.messages[j];
+                var displayContent = self._stripActionBlocks(msg.content);
                 if (msg.role === 'user') {
-                    html += '<div class="ai-message ai-message-user">' + self._escapeHtml(msg.content) + '</div>';
+                    html += '<div class="ai-message ai-message-user">' + self._escapeHtml(displayContent) + '</div>';
                 } else {
-                    html += '<div class="ai-message ai-message-assistant">' + self._escapeHtml(msg.content) + '</div>';
+                    html += '<div class="ai-message ai-message-assistant">' + self._escapeHtml(displayContent) + '</div>';
                 }
             }
         }
@@ -139,6 +156,8 @@ AIAssistantManager.prototype._bindChatEvents = function () {
             if (newId !== self.selectedRifleId) {
                 self.selectedRifleId = newId;
                 self.messages = [];
+                self.conversationId = null;
+                self.conversationTitle = null;
                 self._renderChat();
             }
         });
@@ -148,6 +167,32 @@ AIAssistantManager.prototype._bindChatEvents = function () {
     if (weatherBtn) {
         weatherBtn.addEventListener('click', function () {
             self._fetchAndInsertWeather();
+        });
+    }
+
+    // New Chat button
+    var newChatBtn = document.getElementById('ai-new-chat-btn');
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', function () {
+            self.messages = [];
+            self.conversationId = null;
+            self.conversationTitle = null;
+            self._renderChat();
+        });
+    }
+
+    // History button
+    var historyBtn = document.getElementById('ai-history-btn');
+    if (historyBtn) {
+        historyBtn.addEventListener('click', function () {
+            var panel = document.getElementById('ai-conv-history');
+            if (!panel) return;
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                self._loadConversationHistory();
+            } else {
+                panel.style.display = 'none';
+            }
         });
     }
 };
@@ -244,6 +289,35 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
         self.messages.push({ role: 'assistant', content: responseText });
         self._showLoading(false);
         self._appendMessage('assistant', responseText);
+
+        // Auto-title from first user message
+        if (!self.conversationTitle) {
+            self.conversationTitle = userText.substring(0, 60);
+            if (userText.length > 60) self.conversationTitle += '...';
+        }
+
+        // Save or update conversation
+        var convData = {
+            rifleId: self.selectedRifleId || null,
+            title: self.conversationTitle,
+            messages: self.messages
+        };
+
+        if (self.conversationId) {
+            convData.id = self.conversationId;
+            self.db.updateConversation(convData).catch(function (e) {
+                console.warn('[AI] Failed to update conversation:', e);
+            });
+        } else {
+            self.db.addConversation(convData).then(function (saved) {
+                self.conversationId = saved.id;
+            }).catch(function (e) {
+                console.warn('[AI] Failed to save conversation:', e);
+            });
+        }
+
+        // Parse and execute any action blocks
+        self._parseAndExecuteActions(responseText);
     }).catch(function (err) {
         self._showLoading(false);
         self._appendError(err.message || 'An error occurred');
@@ -283,7 +357,8 @@ AIAssistantManager.prototype._gatherContext = function (selectedRifleId) {
                 self.db.getSessionsByRifle(selectedRifleId),
                 self.db.getCleaningLogsByRifle(selectedRifleId),
                 self.db.getScopeAdjustmentsByRifle(selectedRifleId),
-                self.db.getZeroRecordsByRifle(selectedRifleId)
+                self.db.getZeroRecordsByRifle(selectedRifleId),
+                self.db.getConversationsByRifle(selectedRifleId)
             ]).then(function (results) {
                 ctx.rifle = results[0];
                 ctx.loads = ctx.allLoadsMap[selectedRifleId] || [];
@@ -298,11 +373,17 @@ AIAssistantManager.prototype._gatherContext = function (selectedRifleId) {
                 ctx.cleaningLogs = results[3] || [];
                 ctx.scopeAdjustments = results[4] || [];
                 ctx.zeroRecords = results[5] || [];
+                ctx.pastConversations = results[6] || [];
 
                 return ctx;
             });
         }
-        return ctx;
+
+        // For General (no rifle), still fetch past conversations
+        return self.db.getConversationsByRifle(null).then(function (convs) {
+            ctx.pastConversations = convs || [];
+            return ctx;
+        });
     }).then(function (ctx) {
         // Always compute standard atmosphere trajectories first
         ctx.trajectories = self._computeTrajectories(ctx.allRifles, ctx.allLoadsMap, {});
@@ -667,6 +748,66 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
         }
     }
 
+    // Past conversation summaries
+    if (context.pastConversations && context.pastConversations.length > 0) {
+        var currentId = self.conversationId;
+        var pastConvs = context.pastConversations.filter(function (c) {
+            return c.id !== currentId;
+        }).slice(0, 5);
+
+        if (pastConvs.length > 0) {
+            lines.push('=== PAST CONVERSATION SUMMARIES ===');
+            for (var pc = 0; pc < pastConvs.length; pc++) {
+                var conv = pastConvs[pc];
+                var msgs = conv.messages || [];
+                lines.push('--- "' + (conv.title || 'Untitled') + '" (' + (conv.updatedAt ? conv.updatedAt.split('T')[0] : '?') + ') ---');
+                var userCount = 0;
+                var assistantCount = 0;
+                for (var m = 0; m < msgs.length; m++) {
+                    if (msgs[m].role === 'user' && userCount < 2) {
+                        lines.push('User: ' + (msgs[m].content || '').substring(0, 150));
+                        userCount++;
+                    } else if (msgs[m].role === 'assistant' && assistantCount < 1) {
+                        lines.push('Assistant: ' + self._stripActionBlocks(msgs[m].content || '').substring(0, 200));
+                        assistantCount++;
+                    }
+                    if (userCount >= 2 && assistantCount >= 1) break;
+                }
+            }
+            lines.push('');
+        }
+    }
+
+    // Database tools instructions
+    lines.push('=== DATABASE TOOLS ===');
+    lines.push('You can write to the user\'s database by including action blocks in your response.');
+    lines.push('Format: |||ACTION:{"type":"...","rifleId":"...","...":"..."}|||');
+    lines.push('');
+    lines.push('Available actions (ONLY use when the user explicitly asks you to log/record/save something):');
+    lines.push('');
+    lines.push('1. scope_adjustment — Log a scope adjustment');
+    lines.push('   {"type":"scope_adjustment","rifleId":"<id>","elevation":<MOA>,"windage":<MOA>,"reason":"<text>"}');
+    lines.push('');
+    lines.push('2. rifle_note — Add a note to a rifle\'s notes field');
+    lines.push('   {"type":"rifle_note","rifleId":"<id>","note":"<text>"}');
+    lines.push('');
+    lines.push('3. cleaning_log — Log a barrel cleaning');
+    lines.push('   {"type":"cleaning_log","rifleId":"<id>","roundCount":<optional_number>,"notes":"<text>"}');
+    lines.push('');
+    lines.push('4. update_rounds — Update the active barrel\'s round count');
+    lines.push('   {"type":"update_rounds","rifleId":"<id>","totalRounds":<number>}');
+    lines.push('');
+    lines.push('5. session_note — Add a note to a session');
+    lines.push('   {"type":"session_note","sessionId":"<id>","note":"<text>"}');
+    lines.push('');
+    lines.push('IMPORTANT:');
+    lines.push('- ONLY use actions when the user explicitly asks you to record/log/save something');
+    lines.push('- NEVER use actions proactively or without the user\'s request');
+    lines.push('- Always confirm what you\'re about to save before including the action block');
+    lines.push('- Use the rifleId from the selected rifle context above');
+    lines.push('- The action block can appear anywhere in your response text');
+    lines.push('');
+
     return lines.join('\n');
 };
 
@@ -734,7 +875,8 @@ AIAssistantManager.prototype._appendMessage = function (role, content) {
 
     var div = document.createElement('div');
     div.className = 'ai-message ai-message-' + role;
-    div.textContent = content;
+    var displayContent = this._stripActionBlocks(content);
+    div.textContent = displayContent;
     messagesEl.appendChild(div);
     this._scrollToBottom();
 };
@@ -799,4 +941,207 @@ AIAssistantManager.prototype._escapeHtml = function (str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+};
+
+/**
+ * Strip |||ACTION:...|||  blocks from text for display.
+ */
+AIAssistantManager.prototype._stripActionBlocks = function (text) {
+    if (!text) return '';
+    return text.replace(/\|\|\|ACTION:[\s\S]*?\|\|\|/g, '').trim();
+};
+
+/**
+ * Load conversation history for the current rifle and render into the panel.
+ */
+AIAssistantManager.prototype._loadConversationHistory = function () {
+    var self = this;
+    var panel = document.getElementById('ai-conv-history');
+    if (!panel) return;
+
+    self.db.getConversationsByRifle(self.selectedRifleId).then(function (convs) {
+        if (!convs || convs.length === 0) {
+            panel.innerHTML = '<div class="ai-conv-history-empty">No past conversations.</div>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < convs.length; i++) {
+            var c = convs[i];
+            var isActive = c.id === self.conversationId ? ' ai-conv-item-active' : '';
+            var dateStr = c.updatedAt ? c.updatedAt.split('T')[0] : '';
+            html += '<div class="ai-conv-item' + isActive + '" data-conv-id="' + c.id + '">';
+            html += '<div class="ai-conv-item-title">' + self._escapeHtml(c.title || 'Untitled') + '</div>';
+            html += '<div class="ai-conv-item-date">' + dateStr + '</div>';
+            html += '</div>';
+        }
+        panel.innerHTML = html;
+
+        // Bind click events on conversation items
+        var items = panel.querySelectorAll('.ai-conv-item');
+        for (var j = 0; j < items.length; j++) {
+            items[j].addEventListener('click', function () {
+                var convId = this.getAttribute('data-conv-id');
+                self._loadConversation(convId);
+            });
+        }
+    }).catch(function (e) {
+        console.warn('[AI] Failed to load conversation history:', e);
+        panel.innerHTML = '<div class="ai-conv-history-empty">Failed to load history.</div>';
+    });
+};
+
+/**
+ * Load a specific conversation by ID and render it.
+ */
+AIAssistantManager.prototype._loadConversation = function (convId) {
+    var self = this;
+
+    // Find the conversation from the list (already fetched)
+    self.db.getConversationsByRifle(self.selectedRifleId).then(function (convs) {
+        var conv = null;
+        for (var i = 0; i < convs.length; i++) {
+            if (convs[i].id === convId) {
+                conv = convs[i];
+                break;
+            }
+        }
+        if (!conv) return;
+
+        self.conversationId = conv.id;
+        self.conversationTitle = conv.title;
+        self.messages = conv.messages || [];
+        self._renderChat();
+    }).catch(function (e) {
+        console.warn('[AI] Failed to load conversation:', e);
+    });
+};
+
+/**
+ * Parse AI response for |||ACTION:{...}||| blocks and execute them.
+ */
+AIAssistantManager.prototype._parseAndExecuteActions = function (text) {
+    var self = this;
+    var regex = /\|\|\|ACTION:([\s\S]*?)\|\|\|/g;
+    var match;
+    while ((match = regex.exec(text)) !== null) {
+        try {
+            var action = JSON.parse(match[1]);
+            self._executeAction(action);
+        } catch (e) {
+            console.warn('[AI] Failed to parse action:', e);
+        }
+    }
+};
+
+/**
+ * Execute a single database action from the AI response.
+ */
+AIAssistantManager.prototype._executeAction = function (action) {
+    var self = this;
+    if (!action || !action.type) return;
+
+    switch (action.type) {
+        case 'scope_adjustment':
+            if (!action.rifleId) return;
+            self.db.addScopeAdjustment({
+                rifleId: action.rifleId,
+                elevationChange: action.elevation || 0,
+                windageChange: action.windage || 0,
+                reason: action.reason || ''
+            }).then(function () {
+                self._appendActionStatus('Saved scope adjustment.');
+            }).catch(function (e) {
+                console.warn('[AI] Failed to save scope adjustment:', e);
+                self._appendActionStatus('Failed to save scope adjustment.');
+            });
+            break;
+
+        case 'rifle_note':
+            if (!action.rifleId || !action.note) return;
+            self.db.getRifle(action.rifleId).then(function (rifle) {
+                if (!rifle) throw new Error('Rifle not found');
+                var existingNotes = rifle.notes || '';
+                rifle.notes = existingNotes ? existingNotes + '\n' + action.note : action.note;
+                return self.db.updateRifle(rifle);
+            }).then(function () {
+                self._appendActionStatus('Added note to rifle.');
+            }).catch(function (e) {
+                console.warn('[AI] Failed to add rifle note:', e);
+                self._appendActionStatus('Failed to add rifle note.');
+            });
+            break;
+
+        case 'cleaning_log':
+            if (!action.rifleId) return;
+            self.db.getBarrelsByRifle(action.rifleId).then(function (barrels) {
+                var activeBarrel = null;
+                for (var i = 0; i < barrels.length; i++) {
+                    if (barrels[i].isActive) { activeBarrel = barrels[i]; break; }
+                }
+                if (!activeBarrel) throw new Error('No active barrel found');
+                return self.db.addCleaningLog({
+                    rifleId: action.rifleId,
+                    barrelId: activeBarrel.id,
+                    roundCountAtCleaning: action.roundCount || activeBarrel.totalRounds || 0,
+                    notes: action.notes || ''
+                });
+            }).then(function () {
+                self._appendActionStatus('Logged barrel cleaning.');
+            }).catch(function (e) {
+                console.warn('[AI] Failed to log cleaning:', e);
+                self._appendActionStatus('Failed to log barrel cleaning.');
+            });
+            break;
+
+        case 'update_rounds':
+            if (!action.rifleId || action.totalRounds === undefined) return;
+            self.db.getBarrelsByRifle(action.rifleId).then(function (barrels) {
+                var activeBarrel = null;
+                for (var i = 0; i < barrels.length; i++) {
+                    if (barrels[i].isActive) { activeBarrel = barrels[i]; break; }
+                }
+                if (!activeBarrel) throw new Error('No active barrel found');
+                activeBarrel.totalRounds = action.totalRounds;
+                return self.db.updateBarrel(activeBarrel);
+            }).then(function () {
+                self._appendActionStatus('Updated round count to ' + action.totalRounds + '.');
+            }).catch(function (e) {
+                console.warn('[AI] Failed to update round count:', e);
+                self._appendActionStatus('Failed to update round count.');
+            });
+            break;
+
+        case 'session_note':
+            if (!action.sessionId || !action.note) return;
+            self.db.getSession(action.sessionId).then(function (session) {
+                if (!session) throw new Error('Session not found');
+                var existing = session.sightInComments || '';
+                session.sightInComments = existing ? existing + '\n' + action.note : action.note;
+                return self.db.updateSession(session);
+            }).then(function () {
+                self._appendActionStatus('Added session note.');
+            }).catch(function (e) {
+                console.warn('[AI] Failed to add session note:', e);
+                self._appendActionStatus('Failed to add session note.');
+            });
+            break;
+
+        default:
+            console.warn('[AI] Unknown action type:', action.type);
+    }
+};
+
+/**
+ * Append a small status message to the chat (for action confirmations).
+ */
+AIAssistantManager.prototype._appendActionStatus = function (text) {
+    var messagesEl = document.getElementById('ai-messages');
+    if (!messagesEl) return;
+
+    var div = document.createElement('div');
+    div.className = 'ai-action-status';
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    this._scrollToBottom();
 };
