@@ -70,6 +70,7 @@ SessionFlow.prototype.init = function () {
         inputDistance: document.getElementById('input-distance'),
         inputBulletDia: document.getElementById('input-bullet-dia'),
         btnNextData: document.getElementById('btn-next-data'),
+        dataValidationHint: document.getElementById('data-validation-hint'),
         inputRoundsFired: document.getElementById('input-rounds-fired'),
         inputVelocity: document.getElementById('input-velocity'),
         inputTemp: document.getElementById('input-temp'),
@@ -86,6 +87,7 @@ SessionFlow.prototype.init = function () {
         // Step 6: Impacts
         impactStatus: document.getElementById('impact-status'),
         btnUndoImpact: document.getElementById('btn-undo-impact'),
+        btnClearImpacts: document.getElementById('btn-clear-impacts'),
         btnCalculate: document.getElementById('btn-calculate'),
         // Step 7: Results
         resultsCard: document.getElementById('results-card'),
@@ -157,6 +159,7 @@ SessionFlow.prototype.reset = function () {
     this._hideEl(this.els.btnNextPoa);
     if (this.els.btnNextData) this.els.btnNextData.disabled = true;
     if (this.els.btnUndoImpact) this.els.btnUndoImpact.disabled = true;
+    if (this.els.btnClearImpacts) this.els.btnClearImpacts.disabled = true;
     if (this.els.btnCalculate) this.els.btnCalculate.disabled = true;
     if (this.els.btnSaveSession) {
         this.els.btnSaveSession.disabled = false;
@@ -452,6 +455,11 @@ SessionFlow.prototype._bindUI = function () {
     this.els.btnUndoImpact.addEventListener('click', function () {
         self._undoLastImpact();
     });
+    if (this.els.btnClearImpacts) {
+        this.els.btnClearImpacts.addEventListener('click', function () {
+            self._clearAllImpacts();
+        });
+    }
     this.els.btnCalculate.addEventListener('click', function () {
         self._calculate();
     });
@@ -517,8 +525,23 @@ SessionFlow.prototype._startCalibration = function () {
 SessionFlow.prototype._validateDataInputs = function () {
     var d = parseFloat(this.els.inputDistance.value);
     var b = parseFloat(this.els.inputBulletDia.value);
-    var valid = d > 0 && d <= 1500 && b > 0 && b <= 1.0;
+    var validD = d > 0 && d <= 1500;
+    var validB = b > 0 && b <= 1.0;
+    var valid = validD && validB;
     this.els.btnNextData.disabled = !valid;
+
+    // Show hint about what's missing
+    var hint = this.els.dataValidationHint;
+    if (hint) {
+        if (valid) {
+            hint.textContent = '';
+        } else {
+            var missing = [];
+            if (!validD) missing.push('distance (1–1500 yds)');
+            if (!validB) missing.push('bullet diameter');
+            hint.textContent = 'Enter ' + missing.join(' and ') + ' to continue';
+        }
+    }
 };
 
 SessionFlow.prototype._updatePresetHighlight = function () {
@@ -620,10 +643,22 @@ SessionFlow.prototype._undoLastImpact = function () {
     this._updateImpactUI();
 };
 
+SessionFlow.prototype._clearAllImpacts = function () {
+    if (this.impacts.length === 0) return;
+    this.impacts = [];
+    // Remove all impact markers
+    this.canvas.markers = this.canvas.markers.filter(function (m) {
+        return m.type !== 'impact';
+    });
+    this.canvas.render();
+    this._updateImpactUI();
+};
+
 SessionFlow.prototype._updateImpactUI = function () {
     var count = this.impacts.length;
     this.els.impactStatus.textContent = 'Tap each bullet hole (' + count + '/' + MAX_IMPACTS + ')';
     this.els.btnUndoImpact.disabled = count === 0;
+    if (this.els.btnClearImpacts) this.els.btnClearImpacts.disabled = count === 0;
     this.els.btnCalculate.disabled = count < 2;
 
     if (count >= MAX_IMPACTS) {
@@ -831,7 +866,7 @@ SessionFlow.prototype._saveSession = function () {
 
     this.db.addSession(sessionData).then(function (saved) {
         self.savedSessionId = saved.id;
-        btn.textContent = 'Saved';
+        btn.textContent = 'Saved to History';
         self._storeAnnotatedImage(saved.id);
     }).catch(function (err) {
         btn.disabled = false;

@@ -690,6 +690,14 @@ BallisticSolverManager.prototype._render = function () {
 
     // Calculate button
     var canCalc = this.selectedLoad && this.selectedLoad.bulletBC && this.selectedLoad.muzzleVelocity;
+    if (!canCalc && this.selectedLoad) {
+        var solverMissing = [];
+        if (!this.selectedLoad.bulletBC) solverMissing.push('BC');
+        if (!this.selectedLoad.muzzleVelocity) solverMissing.push('Muzzle Velocity');
+        html += '<p class="validation-hint">Load is missing ' + solverMissing.join(' and ') + ' — edit it in Profiles</p>';
+    } else if (!this.selectedLoad) {
+        html += '<p class="validation-hint">Select a rifle and load to calculate</p>';
+    }
     html += '<div class="btn-row">';
     html += '<button class="btn btn-primary" id="solver-calculate"' + (canCalc ? '' : ' disabled') + '>Calculate</button>';
     html += '</div>';
