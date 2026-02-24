@@ -6,12 +6,27 @@
  * Returns the canvas for saving/sharing.
  */
 
-// Pre-load logo for overlay card
-var _exportLogoImg = null;
+// Pre-load and process logo into white-silhouette-on-transparent for watermark
+var _exportLogoCanvas = null;
 (function() {
     var img = new Image();
-    img.onload = function() { _exportLogoImg = img; };
-    img.onerror = function() { _exportLogoImg = null; };
+    img.onload = function() {
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var tc = document.createElement('canvas');
+        tc.width = w; tc.height = h;
+        var tctx = tc.getContext('2d');
+        tctx.drawImage(img, 0, 0, w, h);
+        var id = tctx.getImageData(0, 0, w, h);
+        var d = id.data;
+        for (var i = 0; i < d.length; i += 4) {
+            var lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+            var alpha = lum < 180 ? Math.round(255 * (1 - lum / 180)) : 0;
+            d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; d[i + 3] = alpha;
+        }
+        tctx.putImageData(id, 0, 0);
+        _exportLogoCanvas = tc;
+    };
+    img.onerror = function() { _exportLogoCanvas = null; };
     img.src = 'assets/logo.png';
 })();
 
@@ -224,20 +239,18 @@ function _drawResultsOverlay(ctx, canvasW, canvasH, results, sf, overlayPos, os)
     _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
     ctx.fill();
 
-    // Logo watermark behind content
-    if (_exportLogoImg) {
+    // Logo watermark behind content (white silhouette, no background rectangle)
+    if (_exportLogoCanvas) {
         ctx.save();
-        var wmSize = Math.min(cardW, cardH) * 0.6;
-        var wmAspect = _exportLogoImg.naturalHeight / _exportLogoImg.naturalWidth;
-        var wmW = wmSize;
-        var wmH = wmSize * wmAspect;
+        var wmH = cardH * 0.75;
+        var wmAspect = _exportLogoCanvas.width / _exportLogoCanvas.height;
+        var wmW = wmH * wmAspect;
         var wmX = cardX + (cardW - wmW) / 2;
         var wmY = cardY + (cardH - wmH) / 2;
-        ctx.globalAlpha = 0.09;
+        ctx.globalAlpha = 0.10;
         _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
         ctx.clip();
-        ctx.filter = 'invert(1)';
-        ctx.drawImage(_exportLogoImg, wmX, wmY, wmW, wmH);
+        ctx.drawImage(_exportLogoCanvas, wmX, wmY, wmW, wmH);
         ctx.restore();
     }
 

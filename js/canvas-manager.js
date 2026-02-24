@@ -53,12 +53,28 @@ function CanvasManager(canvasEl, hintEl, zoomIndicatorEl) {
     this._overlayDragOffsetX = 0;
     this._overlayDragOffsetY = 0;
 
-    // Pre-load logo for overlay watermark
-    this._overlayLogoImg = null;
+    // Pre-load and process logo into white-silhouette-on-transparent for watermark
+    this._overlayLogoCanvas = null;
     var self = this;
     var logoImg = new Image();
-    logoImg.onload = function () { self._overlayLogoImg = logoImg; };
-    logoImg.onerror = function () { self._overlayLogoImg = null; };
+    logoImg.onload = function () {
+        var w = logoImg.naturalWidth, h = logoImg.naturalHeight;
+        var tc = document.createElement('canvas');
+        tc.width = w; tc.height = h;
+        var tctx = tc.getContext('2d');
+        tctx.drawImage(logoImg, 0, 0, w, h);
+        var id = tctx.getImageData(0, 0, w, h);
+        var d = id.data;
+        for (var i = 0; i < d.length; i += 4) {
+            // Luminance: dark pixels → opaque white, light pixels → transparent
+            var lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+            var alpha = lum < 180 ? Math.round(255 * (1 - lum / 180)) : 0;
+            d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; d[i + 3] = alpha;
+        }
+        tctx.putImageData(id, 0, 0);
+        self._overlayLogoCanvas = tc;
+    };
+    logoImg.onerror = function () { self._overlayLogoCanvas = null; };
     logoImg.src = 'assets/logo.png';
 
     // Callback
@@ -550,21 +566,18 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
     ctx.fill();
 
-    // Logo watermark behind content
-    if (this._overlayLogoImg) {
+    // Logo watermark behind content (white silhouette, no background rectangle)
+    if (this._overlayLogoCanvas) {
         ctx.save();
-        var wmSize = Math.min(cardW, cardH) * 0.6;
-        var wmAspect = this._overlayLogoImg.naturalHeight / this._overlayLogoImg.naturalWidth;
-        var wmW = wmSize;
-        var wmH = wmSize * wmAspect;
+        var wmH = cardH * 0.75;
+        var wmAspect = this._overlayLogoCanvas.width / this._overlayLogoCanvas.height;
+        var wmW = wmH * wmAspect;
         var wmX = cardX + (cardW - wmW) / 2;
         var wmY = cardY + (cardH - wmH) / 2;
-        ctx.globalAlpha = 0.09;
-        // Clip to card bounds
+        ctx.globalAlpha = 0.10;
         _roundRect(ctx, cardX, cardY, cardW, cardH, cornerR);
         ctx.clip();
-        ctx.filter = 'invert(1)';
-        ctx.drawImage(this._overlayLogoImg, wmX, wmY, wmW, wmH);
+        ctx.drawImage(this._overlayLogoCanvas, wmX, wmY, wmW, wmH);
         ctx.restore();
     }
 
