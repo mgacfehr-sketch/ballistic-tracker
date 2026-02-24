@@ -726,8 +726,7 @@ SessionFlow.prototype._calculate = function () {
     // Step panel content change can resize the canvas container
     var self = this;
     setTimeout(function () {
-        self.canvas._resize();
-        self.canvas._refitPreservingCenter();
+        self.canvas._refitPreservingCenter(); // calls _resize() internally
     }, 150);
 };
 

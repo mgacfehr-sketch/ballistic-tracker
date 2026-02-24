@@ -98,19 +98,26 @@ CanvasManager.prototype._fitImage = function () {
 
 CanvasManager.prototype._refitPreservingCenter = function () {
     if (!this.image) return;
+
+    // Capture the image point at canvas center BEFORE resize
+    var oldCW = this.canvas.width;
+    var oldCH = this.canvas.height;
+    var centerImgX = (oldCW / 2 - this.offsetX) / this.scale;
+    var centerImgY = (oldCH / 2 - this.offsetY) / this.scale;
+    var savedZoom = this.zoomLevel;
+
+    // Resize canvas to match current container
+    this._resize();
+
+    // Recalculate fitScale for new canvas dimensions
     var cw = this.canvas.width;
     var ch = this.canvas.height;
-
-    // What image point is currently at canvas center?
-    var centerImgX = (cw / 2 - this.offsetX) / this.scale;
-    var centerImgY = (ch / 2 - this.offsetY) / this.scale;
-
-    // Recalculate fitScale for (possibly new) canvas dimensions
     var scaleX = cw / this.imageWidth;
     var scaleY = ch / this.imageHeight;
     this.fitScale = Math.min(scaleX, scaleY);
 
-    // Reapply zoom on new fitScale
+    // Reapply saved zoom on new fitScale
+    this.zoomLevel = savedZoom;
     this.scale = this.fitScale * this.zoomLevel;
 
     // Place the same image point back at canvas center
@@ -577,10 +584,10 @@ CanvasManager.prototype._bindEvents = function () {
 
     // Resize
     window.addEventListener('resize', function () {
-        self._resize();
         if (self.image) {
-            self._refitPreservingCenter();
+            self._refitPreservingCenter(); // calls _resize() internally
         } else {
+            self._resize();
             self.render();
         }
     });
