@@ -1436,6 +1436,136 @@ html, body {
     margin: 4px 0;
 }
 
+/* ── Admin View ───────────────────────────────────────────────── */
+
+#view-admin {
+    background: var(--bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+.admin-page {
+    padding: 16px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.admin-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 16px;
+}
+
+.admin-loading {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 32px;
+}
+
+.admin-error {
+    color: var(--danger);
+    padding: 16px;
+    text-align: center;
+}
+
+.admin-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-section:last-child {
+    border-bottom: none;
+}
+
+.admin-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0 0 12px;
+}
+
+.admin-subsection-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin: 16px 0 8px;
+}
+
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.admin-stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+
+.admin-stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.admin-stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.admin-table-wrap {
+    overflow-x: auto;
+    margin-top: 8px;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.admin-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.admin-table td {
+    color: var(--text);
+}
+
+.admin-table tbody tr:hover {
+    background: var(--surface);
+}
+
+.admin-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 12px;
+}
+
+.admin-empty {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
 /* ── Solver View ──────────────────────────────────────────────── */
 
 #view-solver {

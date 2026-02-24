@@ -285,10 +285,29 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
     this._gatherContext(this.selectedRifleId).then(function (context) {
         var systemPrompt = self._buildSystemPrompt(context);
         return self._callAPI(systemPrompt);
-    }).then(function (responseText) {
+    }).then(function (response) {
+        var responseText = response.text;
+        var usage = response.usage;
+
         self.messages.push({ role: 'assistant', content: responseText });
         self._showLoading(false);
         self._appendMessage('assistant', responseText);
+
+        // Log AI usage
+        if (usage) {
+            var inputTokens = usage.input_tokens || 0;
+            var outputTokens = usage.output_tokens || 0;
+            var estimatedCost = (inputTokens * 3 / 1000000) + (outputTokens * 15 / 1000000);
+            self.db.addUsageLog({
+                rifleId: self.selectedRifleId || null,
+                questionPreview: userText.substring(0, 100),
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                estimatedCost: parseFloat(estimatedCost.toFixed(6))
+            }).catch(function (e) {
+                console.warn('[AI] Failed to log usage:', e);
+            });
+        }
 
         // Auto-title from first user message
         if (!self.conversationTitle) {
@@ -848,7 +867,10 @@ AIAssistantManager.prototype._callAPI = function (systemPrompt) {
             });
         }).then(function (data) {
             if (data.content && data.content.length > 0 && data.content[0].text) {
-                resolve(data.content[0].text);
+                resolve({
+                    text: data.content[0].text,
+                    usage: data.usage || null
+                });
             } else {
                 reject(new Error('Unexpected API response format'));
             }

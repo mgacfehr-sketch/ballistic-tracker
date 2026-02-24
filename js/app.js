@@ -39,12 +39,24 @@
             authScreen.classList.add('hidden');
             appEl.classList.remove('hidden');
 
+            // Inject admin tab if this is the admin user
+            if (user.id === ADMIN_USER_ID) {
+                var nav = document.getElementById('app-nav');
+                if (nav && !nav.querySelector('[data-view="admin"]')) {
+                    var adminTab = document.createElement('button');
+                    adminTab.className = 'nav-tab';
+                    adminTab.setAttribute('data-view', 'admin');
+                    adminTab.textContent = 'Admin';
+                    nav.appendChild(adminTab);
+                }
+            }
+
             var db = new BallisticDB(client, user.id);
             db.open().then(function () {
-                initApp(db);
+                initApp(db, user);
             }).catch(function (err) {
                 console.error('Failed to initialize:', err);
-                initApp(null);
+                initApp(null, user);
             });
         }
 
@@ -125,7 +137,7 @@
     });
 
     // ── App initialization (unchanged from original) ──────────
-    function initApp(db) {
+    function initApp(db, user) {
         // ── Canvas & Session ───────────────────────────────
         var canvasEl = document.getElementById('main-canvas');
         var hintEl = document.getElementById('canvas-hint');
@@ -140,6 +152,7 @@
         var historyManager = null;
         var aiAssistant = null;
         var solverManager = null;
+        var adminManager = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
@@ -149,6 +162,11 @@
             aiAssistant.init();
             solverManager = new BallisticSolverManager(db);
             solverManager.init();
+
+            if (user && user.id === ADMIN_USER_ID) {
+                adminManager = new AdminManager(db);
+                adminManager.init();
+            }
         } else {
             var profilesContainer = document.getElementById('view-profiles');
             if (profilesContainer) {
@@ -166,7 +184,8 @@
             session: document.getElementById('view-session'),
             profiles: document.getElementById('view-profiles'),
             ai: document.getElementById('view-ai'),
-            solver: document.getElementById('view-solver')
+            solver: document.getElementById('view-solver'),
+            admin: document.getElementById('view-admin')
         };
         var btnNewSession = document.getElementById('btn-new-session');
 
@@ -209,6 +228,11 @@
                 solverManager.show();
             }
 
+            // Show admin when switching to admin tab
+            if (viewName === 'admin' && adminManager) {
+                adminManager.show();
+            }
+
             // Refresh profile picker and resize canvas when switching back to session
             if (viewName === 'session') {
                 if (sessionFlow && sessionFlow.currentStep === 0) {
@@ -228,7 +252,8 @@
         document.getElementById('app').addEventListener('touchmove', function (e) {
             // Allow scrolling inside the step panel, profiles, AI, and solver views
             if (e.target.closest('#step-panel') || e.target.closest('#view-profiles') ||
-                e.target.closest('#view-ai') || e.target.closest('#view-solver')) return;
+                e.target.closest('#view-ai') || e.target.closest('#view-solver') ||
+                e.target.closest('#view-admin')) return;
             e.preventDefault();
         }, { passive: false });
 

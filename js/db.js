@@ -669,6 +669,57 @@ BallisticDB.prototype.deleteConversation = function (id) {
         });
 };
 
+// ── AI Usage Logging ──────────────────────────────────────────
+
+BallisticDB.prototype.addUsageLog = function (data) {
+    var self = this;
+    var log = {
+        id: generateUUID(),
+        rifleId: data.rifleId || null,
+        questionPreview: data.questionPreview || '',
+        inputTokens: data.inputTokens || 0,
+        outputTokens: data.outputTokens || 0,
+        estimatedCost: data.estimatedCost || 0,
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(log, self.userId);
+    return self.supabase.from('ai_usage_logs').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+// ── Admin RPC Methods (admin-only, bypass RLS) ────────────────
+
+BallisticDB.prototype.adminGetStats = function () {
+    return this.supabase.rpc('admin_get_stats').then(function (res) {
+        if (res.error) throw res.error;
+        return res.data;
+    });
+};
+
+BallisticDB.prototype.adminGetUsers = function () {
+    return this.supabase.rpc('admin_get_users').then(function (res) {
+        if (res.error) throw res.error;
+        return res.data || [];
+    });
+};
+
+BallisticDB.prototype.adminGetUsageSummary = function () {
+    return this.supabase.rpc('admin_get_usage_summary').then(function (res) {
+        if (res.error) throw res.error;
+        return res.data;
+    });
+};
+
+BallisticDB.prototype.adminExportAll = function () {
+    return this.supabase.rpc('admin_export_all').then(function (res) {
+        if (res.error) throw res.error;
+        return res.data;
+    });
+};
+
 // ── Settings (localStorage fallback) ──────────────────────────
 
 BallisticDB.prototype.setSetting = function (key, value) {
