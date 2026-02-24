@@ -163,6 +163,32 @@ BallisticDB.prototype.deleteRifle = function (id) {
 
 // ── Barrel CRUD ────────────────────────────────────────────────
 
+/**
+ * Normalize barrel round count fields.
+ * The DB has both round_count and total_rounds columns.
+ * We standardize on totalRounds in JS (total_rounds in DB).
+ * On read: prefer totalRounds, fall back to roundCount.
+ * On write: sync both columns so they stay consistent.
+ */
+function _normalizeBarrel(barrel) {
+    if (!barrel) return barrel;
+    // Read: if totalRounds is missing/zero but roundCount has a value, use it
+    if (!barrel.totalRounds && barrel.roundCount) {
+        barrel.totalRounds = barrel.roundCount;
+    }
+    // Clean up the legacy field so downstream code only sees totalRounds
+    delete barrel.roundCount;
+    return barrel;
+}
+
+function _barrelRowForWrite(row) {
+    // Sync round_count from total_rounds so both columns match
+    if (row.total_rounds !== undefined) {
+        row.round_count = row.total_rounds;
+    }
+    return row;
+}
+
 BallisticDB.prototype.addBarrel = function (data) {
     var self = this;
     var barrel = {
@@ -176,23 +202,23 @@ BallisticDB.prototype.addBarrel = function (data) {
         notes: data.notes || '',
         createdAt: new Date().toISOString()
     };
-    var row = _jsToRow(barrel, self.userId);
+    var row = _barrelRowForWrite(_jsToRow(barrel, self.userId));
     return self.supabase.from('barrels').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            return _normalizeBarrel(_rowToJs(res.data));
         });
 };
 
 BallisticDB.prototype.updateBarrel = function (barrel) {
     var self = this;
-    var row = _jsToRow(barrel, self.userId);
+    var row = _barrelRowForWrite(_jsToRow(barrel, self.userId));
     return self.supabase.from('barrels').update(row)
         .eq('id', barrel.id).eq('user_id', self.userId)
         .select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            return _normalizeBarrel(_rowToJs(res.data));
         });
 };
 
@@ -203,7 +229,7 @@ BallisticDB.prototype.getBarrel = function (id) {
         .maybeSingle()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            return _normalizeBarrel(_rowToJs(res.data));
         });
 };
 
@@ -213,7 +239,9 @@ BallisticDB.prototype.getBarrelsByRifle = function (rifleId) {
         .eq('user_id', self.userId).eq('rifle_id', rifleId)
         .then(function (res) {
             if (res.error) throw res.error;
-            return (res.data || []).map(_rowToJs);
+            return (res.data || []).map(function (r) {
+                return _normalizeBarrel(_rowToJs(r));
+            });
         });
 };
 
