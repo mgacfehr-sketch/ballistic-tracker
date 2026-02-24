@@ -15,7 +15,7 @@
     <!-- Auth Screen (shown before login) -->
     <div id="view-auth" class="auth-screen hidden">
         <div class="auth-container">
-            <h1 class="auth-logo">yorT</h1>
+            <h1 class="auth-logo"><span class="brand-yor">yor</span><span class="brand-t">T</span></h1>
             <div class="form-group">
                 <label for="auth-email">Email</label>
                 <input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com">
@@ -32,7 +32,10 @@
 
     <div id="app" class="hidden">
         <header id="app-header">
-            <h1>yorT</h1>
+            <div class="header-brand">
+                <img src="assets/logo.png" alt="" class="header-logo" onerror="this.style.display='none'">
+                <h1><span class="brand-yor">yor</span><span class="brand-t">T</span></h1>
+            </div>
             <nav id="app-nav">
                 <button class="nav-tab active" data-view="session">Session</button>
                 <button class="nav-tab" data-view="profiles">Profiles</button>
@@ -93,6 +96,7 @@
                     <div class="step-header">
                         <span class="step-badge">3</span>
                         <span class="step-title">Set 1&quot; Calibration</span>
+                        <button class="help-btn" onclick="showHelp('calibration')" title="What is calibration?">?</button>
                     </div>
                     <div class="step-body">
                         <p id="calibration-status" class="step-instruction">Zoom into a known 1-inch reference, then tap Point A</p>
@@ -115,7 +119,7 @@
                             <input type="number" id="input-distance" min="1" max="1500" step="1" inputmode="numeric" placeholder="100">
                         </div>
                         <div class="input-group">
-                            <label for="input-bullet-dia">Bullet Diameter (in)</label>
+                            <label for="input-bullet-dia">Bullet Diameter (in) <button class="help-btn" onclick="showHelp('bulletDiameter')" title="What is bullet diameter?">?</button></label>
                             <div class="input-with-presets">
                                 <input type="number" id="input-bullet-dia" min="0.1" max="1.0" step="0.001" inputmode="decimal" placeholder="0.308">
                                 <div class="presets">
@@ -185,6 +189,7 @@
                     <div class="step-header">
                         <span class="step-badge">5</span>
                         <span class="step-title">Mark Point of Aim</span>
+                        <button class="help-btn" onclick="showHelp('poa')" title="What is Point of Aim?">?</button>
                     </div>
                     <div class="step-body">
                         <p id="poa-status" class="step-instruction">Tap your point of aim on the target</p>
@@ -240,6 +245,14 @@
         <!-- Solver View -->
         <div id="view-solver" class="app-view"></div>
 
+    </div>
+
+    <!-- Help Overlay -->
+    <div id="help-overlay" class="help-overlay hidden" onclick="closeHelp()">
+        <div class="help-popup" onclick="event.stopPropagation()">
+            <div id="help-popup-text" class="help-popup-text"></div>
+            <button class="btn btn-secondary btn-sm help-popup-close" onclick="closeHelp()">Got it</button>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>

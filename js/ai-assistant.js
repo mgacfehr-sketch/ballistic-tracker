@@ -58,13 +58,20 @@ AIAssistantManager.prototype._renderChat = function () {
                 '</option>';
         }
         html += '</select>';
+        html += '<button class="btn btn-secondary btn-sm" id="ai-weather-btn" title="Get current weather">Weather</button>';
         html += '</div>';
 
         // Messages area
         html += '<div class="ai-messages" id="ai-messages">';
         if (self.messages.length === 0) {
-            html += '<div class="ai-welcome">Ask questions about your rifle, loads, or shooting performance. ' +
-                'Select a rifle above for personalized analysis based on your session history.</div>';
+            html += '<div class="ai-welcome">' +
+                'I can help with:<br>' +
+                '\u2022 Dial-ups and come-ups for any range<br>' +
+                '\u2022 Group analysis and performance trends<br>' +
+                '\u2022 Load comparisons across your profiles<br>' +
+                '\u2022 General ballistics questions<br><br>' +
+                'Select a rifle above for personalized data. ' +
+                'Tap <b>Weather</b> to auto-fill current conditions.</div>';
         } else {
             for (var j = 0; j < self.messages.length; j++) {
                 var msg = self.messages[j];
@@ -136,6 +143,71 @@ AIAssistantManager.prototype._bindChatEvents = function () {
             }
         });
     }
+
+    var weatherBtn = document.getElementById('ai-weather-btn');
+    if (weatherBtn) {
+        weatherBtn.addEventListener('click', function () {
+            self._fetchAndInsertWeather();
+        });
+    }
+};
+
+/**
+ * Fetch current weather via geolocation + Open-Meteo and prefill chat input.
+ */
+AIAssistantManager.prototype._fetchAndInsertWeather = function () {
+    var btn = document.getElementById('ai-weather-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Locating...'; }
+
+    if (!navigator.geolocation) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
+        alert('Geolocation is not supported by your browser.');
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function (position) {
+            var lat = position.coords.latitude.toFixed(4);
+            var lon = position.coords.longitude.toFixed(4);
+            if (btn) btn.textContent = 'Fetching...';
+
+            fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+                '&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m' +
+                '&temperature_unit=fahrenheit&wind_speed_unit=mph')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data && data.current) {
+                    var c = data.current;
+                    var tempF = c.temperature_2m != null ? Math.round(c.temperature_2m) : '?';
+                    var humidity = c.relative_humidity_2m != null ? Math.round(c.relative_humidity_2m) : '?';
+                    var pressureInHg = c.surface_pressure != null ? (c.surface_pressure * 0.02953).toFixed(2) : '?';
+                    var windMph = c.wind_speed_10m != null ? Math.round(c.wind_speed_10m) : '?';
+
+                    var text = 'Current conditions: ' + tempF + ' degrees F, ' +
+                        humidity + '% humidity, ' + pressureInHg + ' inHg, ' +
+                        windMph + ' mph wind';
+
+                    var input = document.getElementById('ai-input');
+                    if (input) {
+                        input.value = text;
+                        input.style.height = 'auto';
+                        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+                        input.focus();
+                    }
+                }
+                if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
+            })
+            .catch(function () {
+                if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
+                alert('Failed to fetch weather data.');
+            });
+        },
+        function () {
+            if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
+            alert('Location access denied. Enable location to fetch weather.');
+        },
+        { timeout: 10000 }
+    );
 };
 
 /**

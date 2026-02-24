@@ -144,11 +144,11 @@ ProfileManager.prototype._renderRifleForm = function (rifle) {
 
     html += '<div class="form-row">';
     html += '<div class="form-group form-group-half">';
-    html += '<label for="rf-scope-height">Scope Height (in)</label>';
+    html += '<label for="rf-scope-height">Scope Height (in) <button class="help-btn" onclick="showHelp(\'scopeHeight\')" title="What is scope height?">?</button></label>';
     html += '<input type="number" id="rf-scope-height" min="0" max="5" step="0.01" inputmode="decimal" placeholder="1.5" value="' + (rifle && rifle.scopeHeight ? rifle.scopeHeight : '') + '">';
     html += '</div>';
     html += '<div class="form-group form-group-half">';
-    html += '<label for="rf-zero-range">Zero Range (yds)</label>';
+    html += '<label for="rf-zero-range">Zero Range (yds) <button class="help-btn" onclick="showHelp(\'zeroRange\')" title="What is zero range?">?</button></label>';
     html += '<input type="number" id="rf-zero-range" min="0" max="1500" step="1" inputmode="numeric" placeholder="100" value="' + (rifle && rifle.zeroRange ? rifle.zeroRange : '') + '">';
     html += '</div>';
     html += '</div>';
@@ -511,7 +511,7 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
 
     html += '<div class="form-row">';
     html += '<div class="form-group form-group-half">';
-    html += '<label for="br-twist-rate">Twist Rate</label>';
+    html += '<label for="br-twist-rate">Twist Rate <button class="help-btn" onclick="showHelp(\'twistRate\')" title="What is twist rate?">?</button></label>';
     html += '<input type="text" id="br-twist-rate" maxlength="20" placeholder="e.g., 1:10" value="' + escapeAttr(barrel ? barrel.twistRate : '') + '">';
     html += '</div>';
     html += '<div class="form-group form-group-half">';
@@ -634,11 +634,11 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
 
     html += '<div class="form-row">';
     html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-bullet-bc">BC</label>';
+    html += '<label for="ld-bullet-bc">BC <button class="help-btn" onclick="showHelp(\'bc\')" title="What is BC?">?</button></label>';
     html += '<input type="number" id="ld-bullet-bc" min="0" max="2" step="0.001" inputmode="decimal" placeholder="0.462" value="' + (load && load.bulletBC ? load.bulletBC : '') + '">';
     html += '</div>';
     html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-drag-model">Drag Model</label>';
+    html += '<label for="ld-drag-model">Drag Model <button class="help-btn" onclick="showHelp(\'dragModel\')" title="What is drag model?">?</button></label>';
     html += '<select id="ld-drag-model">';
     html += '<option value="G1"' + (load && load.dragModel === 'G1' ? ' selected' : '') + '>G1</option>';
     html += '<option value="G7"' + (load && load.dragModel === 'G7' ? ' selected' : '') + '>G7</option>';

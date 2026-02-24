@@ -11,7 +11,7 @@
  *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 14;
+var CACHE_VERSION = 15;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
@@ -33,6 +33,7 @@ var APP_SHELL = [
     './manifest.json',
     './icons/icon-192.png',
     './icons/icon-512.png',
+    './assets/logo.png',
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js'
 ];
 

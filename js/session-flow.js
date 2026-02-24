@@ -250,7 +250,19 @@ SessionFlow.prototype._loadProfilePicker = function () {
     var self = this;
     this.db.getAllRifles().then(function (rifles) {
         if (rifles.length === 0) {
-            picker.innerHTML = '<p class="empty-state-sub">No rifles configured. Create one in Profiles tab, or use Quick Mode.</p>';
+            picker.innerHTML =
+                '<div class="empty-state" style="padding:16px 0;">' +
+                '<p class="empty-state-text">No rifles configured</p>' +
+                '<p class="empty-state-sub" style="margin-bottom:12px;">Create a rifle and load profile to track your data, or use Quick Mode below.</p>' +
+                '<button class="btn btn-primary btn-sm" id="btn-go-profiles">Go to Profiles</button>' +
+                '</div>';
+            var goBtn = document.getElementById('btn-go-profiles');
+            if (goBtn) {
+                goBtn.addEventListener('click', function () {
+                    var profilesTab = document.querySelector('.nav-tab[data-view="profiles"]');
+                    if (profilesTab) profilesTab.click();
+                });
+            }
             return;
         }
 
@@ -664,11 +676,11 @@ SessionFlow.prototype._renderResults = function () {
     // Group size
     html += '<div class="result-section-title">Group Size</div>';
     html += '<div class="result-row highlight">';
-    html += '<span class="result-label">Extreme Spread</span>';
+    html += '<span class="result-label">Extreme Spread <button class="help-btn" onclick="showHelp(\'moa\')" title="What is MOA?">?</button></span>';
     html += '<span class="result-value">' + formatFixed(r.groupSizeInches, 3) + '&quot; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span>';
     html += '</div>';
     html += '<div class="result-row">';
-    html += '<span class="result-label">Mean Radius</span>';
+    html += '<span class="result-label">Mean Radius <button class="help-btn" onclick="showHelp(\'meanRadius\')" title="What is Mean Radius?">?</button></span>';
     html += '<span class="result-value">' + formatFixed(r.meanRadiusInches, 3) + '&quot; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span>';
     html += '</div>';
 
@@ -703,7 +715,7 @@ SessionFlow.prototype._renderResults = function () {
     html += '<div class="result-divider"></div>';
 
     // ATZ
-    html += '<div class="result-section-title">Adjust to Zero</div>';
+    html += '<div class="result-section-title">Adjust to Zero <button class="help-btn" onclick="showHelp(\'atz\')" title="What is ATZ?">?</button></div>';
     html += '<div class="atz-row">';
     html += '<div class="atz-item">';
     html += '<span class="atz-direction">' + r.atzElevationDir + '</span>';
@@ -731,7 +743,7 @@ SessionFlow.prototype._renderResults = function () {
         html += '<div class="session-details-body">';
 
         html += '<div class="result-row">';
-        html += '<span class="result-label">CEP (50%)</span>';
+        html += '<span class="result-label">CEP (50%) <button class="help-btn" onclick="showHelp(\'cep\')" title="What is CEP?">?</button></span>';
         html += '<span class="result-value">' + formatFixed(r.cepInches, 3) + '&quot; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span>';
         html += '</div>';
 

@@ -90,3 +90,42 @@ function dist(a, b) {
     const dy = b.y - a.y;
     return Math.sqrt(dx * dx + dy * dy);
 }
+
+// ── Help Tooltip System ───────────────────────────────────────
+
+var HELP_TEXTS = {
+    calibration: 'Tap two points exactly 1 inch apart on your target to set the scale for accurate measurements.',
+    bulletDiameter: 'The diameter of your bullet in inches (e.g., .308 for 7.62mm). Used for center-to-center group size.',
+    bc: 'Ballistic Coefficient \u2014 how well the bullet resists drag. Higher = less drop/drift. Found on the bullet box.',
+    dragModel: 'G1 is traditional for flat-base bullets. G7 is more accurate for modern boat-tail bullets.',
+    scopeHeight: 'Distance from center of bore to center of scope, in inches. Typically 1.5" to 2.0".',
+    zeroRange: 'The distance at which your rifle is zeroed \u2014 where impact matches point of aim.',
+    twistRate: 'Barrel rifling twist, e.g., 1:10 means one rotation per 10 inches. Faster twist stabilizes heavier bullets.',
+    moa: 'Minute of Angle \u2014 1 MOA equals ~1.047 inches at 100 yards. Standard unit for scope adjustments.',
+    atz: 'Adjust to Zero \u2014 scope correction to move your group center onto your point of aim.',
+    poa: 'Point of Aim \u2014 the exact spot where your crosshairs were placed on the target.',
+    meanRadius: 'Average distance of all shots from the group center. More reliable than extreme spread.',
+    cep: 'Circular Error Probable \u2014 radius of a circle containing 50% of shots. A practical precision measure.'
+};
+
+/**
+ * Show the help overlay with text for the given key.
+ * @param {string} key - Key into HELP_TEXTS
+ */
+function showHelp(key) {
+    var text = HELP_TEXTS[key];
+    if (!text) return;
+    var overlay = document.getElementById('help-overlay');
+    var popup = document.getElementById('help-popup-text');
+    if (!overlay || !popup) return;
+    popup.textContent = text;
+    overlay.classList.remove('hidden');
+}
+
+/**
+ * Close the help overlay.
+ */
+function closeHelp() {
+    var overlay = document.getElementById('help-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}

@@ -17,7 +17,7 @@
     --danger: #f44336;
     --radius: 8px;
     --panel-height: 180px;
-    --header-height: 44px;
+    --header-height: 48px;
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */
@@ -63,12 +63,33 @@ html, body {
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     z-index: 10;
+    position: relative;
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.header-logo {
+    height: 32px;
+    width: auto;
 }
 
 #app-header h1 {
-    font-size: 16px;
+    font-size: 20px;
     font-weight: 600;
     letter-spacing: 0.5px;
+}
+
+.brand-yor {
+    color: var(--primary);
+}
+
+.brand-t {
+    color: #fff;
 }
 
 .header-btn {
@@ -93,14 +114,17 @@ html, body {
 
 #app-nav {
     display: flex;
-    gap: 2px;
+    gap: 4px;
     background: var(--bg);
     border-radius: 6px;
     padding: 2px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .nav-tab {
-    padding: 5px 8px;
+    padding: 8px 12px;
     border: none;
     border-radius: 5px;
     background: transparent;
@@ -108,14 +132,16 @@ html, body {
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     -webkit-user-select: none;
     user-select: none;
+    min-height: 36px;
 }
 
 .nav-tab.active {
     background: var(--surface-raised);
     color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .nav-tab:active {
@@ -464,6 +490,70 @@ html, body {
 .atz-unit {
     font-size: 11px;
     color: var(--text-dim);
+}
+
+/* ── Help Tooltips ──────────────────────────────────────────── */
+
+.help-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--text-dim);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    vertical-align: middle;
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+
+.help-btn:active {
+    background: var(--surface-raised);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 24px;
+}
+
+.help-popup {
+    max-width: 320px;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.help-popup-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+}
+
+.help-popup-close {
+    align-self: flex-end;
 }
 
 /* ── Utility ────────────────────────────────────────────────── */
@@ -1315,7 +1405,6 @@ html, body {
     font-size: 32px;
     font-weight: 700;
     text-align: center;
-    color: var(--primary);
     letter-spacing: 1px;
 }
 
@@ -1352,10 +1441,13 @@ html, body {
 
 @media (orientation: landscape) and (max-height: 500px) {
     :root {
-        --header-height: 36px;
+        --header-height: 40px;
     }
     #app-header h1 {
-        font-size: 14px;
+        font-size: 16px;
+    }
+    .header-logo {
+        height: 24px;
     }
     .step {
         padding: 8px 16px;
