@@ -904,6 +904,18 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
     lines.push('Be specific and practical. Shooters want to know what to DO, not just what they see.');
     lines.push('');
 
+    // Session comparison instructions
+    lines.push('=== SESSION COMPARISON ===');
+    lines.push('When the user asks to compare sessions (e.g., "compare my last two sessions", "how have I improved"):');
+    lines.push('1. Present key stats side by side: group size (inches and MOA), mean radius, ES/SD if available');
+    lines.push('2. Note improvements or regressions in precision (group size) and accuracy (POA offset)');
+    lines.push('3. Compare conditions: distance, weather, ammo if different');
+    lines.push('4. Look for trends: is the shooter getting tighter groups? Is POI shifting consistently?');
+    lines.push('5. If target images are attached, compare visual patterns between the two');
+    lines.push('6. Give specific, actionable advice based on the comparison');
+    lines.push('Format the comparison as a clear table or side-by-side layout when possible.');
+    lines.push('');
+
     // Database tools instructions
     lines.push('=== DATABASE TOOLS ===');
     lines.push('You can write to the user\'s database by including action blocks in your response.');

@@ -39,6 +39,11 @@
             authScreen.classList.add('hidden');
             appEl.classList.remove('hidden');
 
+            // Initialize beta feature flags
+            if (typeof initBetaFeatures === 'function') {
+                initBetaFeatures(user.id);
+            }
+
             // Inject admin tab if this is the admin user
             if (user.id === ADMIN_USER_ID) {
                 var nav = document.getElementById('app-nav');
@@ -49,6 +54,30 @@
                     adminTab.textContent = 'Admin';
                     nav.appendChild(adminTab);
                 }
+            }
+
+            // Inject Wind Call tab if beta enabled
+            if (typeof isBetaEnabled === 'function' && isBetaEnabled('windCall')) {
+                var nav2 = document.getElementById('app-nav');
+                if (nav2 && !nav2.querySelector('[data-view="wind"]')) {
+                    var windTab = document.createElement('button');
+                    windTab.className = 'nav-tab';
+                    windTab.setAttribute('data-view', 'wind');
+                    windTab.textContent = 'Wind';
+                    // Insert before admin tab if it exists, otherwise append
+                    var adminTab2 = nav2.querySelector('[data-view="admin"]');
+                    if (adminTab2) {
+                        nav2.insertBefore(windTab, adminTab2);
+                    } else {
+                        nav2.appendChild(windTab);
+                    }
+                }
+            }
+
+            // Show sunlight mode button if beta enabled
+            if (typeof isBetaEnabled === 'function' && isBetaEnabled('highContrast')) {
+                var sunBtn = document.getElementById('btn-sunlight-mode');
+                if (sunBtn) sunBtn.classList.remove('hidden');
             }
 
             var db = new BallisticDB(client, user.id);
@@ -153,6 +182,7 @@
         var aiAssistant = null;
         var solverManager = null;
         var adminManager = null;
+        var windCallManager = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
@@ -166,6 +196,17 @@
             if (user && user.id === ADMIN_USER_ID) {
                 adminManager = new AdminManager(db);
                 adminManager.init();
+            }
+
+            // Beta: Wind Call Helper
+            if (typeof isBetaEnabled === 'function' && isBetaEnabled('windCall') && typeof WindCallManager !== 'undefined') {
+                windCallManager = new WindCallManager(db);
+                windCallManager.init();
+            }
+
+            // Beta: Offline Mode
+            if (typeof isBetaEnabled === 'function' && isBetaEnabled('offlineMode') && typeof OfflineCache !== 'undefined') {
+                OfflineCache.init(db);
             }
         } else {
             var profilesContainer = document.getElementById('view-profiles');
@@ -185,6 +226,7 @@
             profiles: document.getElementById('view-profiles'),
             ai: document.getElementById('view-ai'),
             solver: document.getElementById('view-solver'),
+            wind: document.getElementById('view-wind'),
             admin: document.getElementById('view-admin')
         };
         var btnNewSession = document.getElementById('btn-new-session');
@@ -228,6 +270,16 @@
                 solverManager.show();
             }
 
+            // Show wind call when switching to wind tab
+            if (viewName === 'wind' && windCallManager) {
+                windCallManager.show();
+            }
+
+            // Cleanup wind call when leaving wind tab
+            if (viewName !== 'wind' && windCallManager) {
+                windCallManager.cleanup();
+            }
+
             // Show admin when switching to admin tab
             if (viewName === 'admin' && adminManager) {
                 adminManager.show();
@@ -250,10 +302,10 @@
 
         // ── Touch Prevention ───────────────────────────────
         document.getElementById('app').addEventListener('touchmove', function (e) {
-            // Allow scrolling inside the step panel, profiles, AI, and solver views
+            // Allow scrolling inside the step panel, profiles, AI, solver, and wind views
             if (e.target.closest('#step-panel') || e.target.closest('#view-profiles') ||
                 e.target.closest('#view-ai') || e.target.closest('#view-solver') ||
-                e.target.closest('#view-admin')) return;
+                e.target.closest('#view-wind') || e.target.closest('#view-admin')) return;
             e.preventDefault();
         }, { passive: false });
 
@@ -266,5 +318,24 @@
             }
             lastTouchEnd = now;
         }, false);
+
+        // Beta: Sunlight / High Contrast mode toggle
+        var sunlightBtn = document.getElementById('btn-sunlight-mode');
+        if (sunlightBtn) {
+            sunlightBtn.addEventListener('click', function () {
+                document.body.classList.toggle('high-contrast');
+                // Persist preference
+                try {
+                    var isOn = document.body.classList.contains('high-contrast');
+                    localStorage.setItem('yort_high_contrast', isOn ? '1' : '0');
+                } catch (e) { /* ignore */ }
+            });
+            // Restore saved preference
+            try {
+                if (localStorage.getItem('yort_high_contrast') === '1') {
+                    document.body.classList.add('high-contrast');
+                }
+            } catch (e) { /* ignore */ }
+        }
     }
 })();

@@ -362,10 +362,32 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     html += '</div>';
     html += '</div>';
 
-    html += '</div>';
+    // Beta feature sections (DOPE Log, Cold Bore) — placeholders injected here, populated after render
+    html += '<div id="beta-dope-section"></div>';
+    html += '<div id="beta-cold-bore-section"></div>';
+
+    html += '</div>'; // close .profile-screen
 
     this.container.innerHTML = html;
     this._bindRifleDetailEvents(rifle, activeBarrel);
+
+    // Render beta feature sections if enabled
+    if (typeof isBetaEnabled === 'function') {
+        if (isBetaEnabled('dopeLog') && typeof DopeLogManager !== 'undefined') {
+            var dopeContainer = document.getElementById('beta-dope-section');
+            if (dopeContainer) {
+                var dopeManager = new DopeLogManager(this.db);
+                dopeManager.renderSection(dopeContainer, rifle.id, loads);
+            }
+        }
+        if (isBetaEnabled('coldBore') && typeof ColdBoreManager !== 'undefined') {
+            var cbContainer = document.getElementById('beta-cold-bore-section');
+            if (cbContainer) {
+                var cbManager = new ColdBoreManager(this.db);
+                cbManager.renderSection(cbContainer, rifle.id);
+            }
+        }
+    }
 };
 
 ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel) {

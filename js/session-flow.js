@@ -311,7 +311,26 @@ SessionFlow.prototype._loadProfilePicker = function () {
 
 SessionFlow.prototype._renderProfilePicker = function (groups) {
     var picker = this.els.profilePicker;
+    var self = this;
     var html = '';
+
+    // Quick Start buttons (beta feature)
+    if (typeof isBetaEnabled === 'function' && isBetaEnabled('quickStart') && groups.length > 0) {
+        html += '<div class="quick-start-section">';
+        html += '<div class="quick-start-label">Quick Start</div>';
+        for (var q = 0; q < groups.length; q++) {
+            var qr = groups[q].rifle;
+            var qloads = groups[q].loads;
+            if (qloads.length === 0) continue;
+            // Use first load as default
+            var ql = qloads[0];
+            html += '<button class="quick-start-btn" data-rifle-id="' + escapeAttr(qr.id) + '" data-load-id="' + escapeAttr(ql.id) + '">';
+            html += '<span class="quick-start-btn-name">' + escapeHtml(qr.name) + '</span>';
+            html += '<span class="quick-start-btn-sub">' + escapeHtml(qr.caliber) + ' &middot; ' + escapeHtml(ql.name) + '</span>';
+            html += '</button>';
+        }
+        html += '</div>';
+    }
 
     for (var g = 0; g < groups.length; g++) {
         var rifle = groups[g].rifle;
@@ -341,13 +360,28 @@ SessionFlow.prototype._renderProfilePicker = function (groups) {
     picker.innerHTML = html;
 
     // Bind load buttons
-    var self = this;
     var btns = picker.querySelectorAll('.picker-load-btn');
     for (var i = 0; i < btns.length; i++) {
         btns[i].addEventListener('click', function () {
             var rId = this.getAttribute('data-rifle-id');
             var lId = this.getAttribute('data-load-id');
             self._selectProfile(rId, lId);
+        });
+    }
+
+    // Bind quick-start buttons
+    var qsBtns = picker.querySelectorAll('.quick-start-btn');
+    for (var qi = 0; qi < qsBtns.length; qi++) {
+        qsBtns[qi].addEventListener('click', function () {
+            var rId = this.getAttribute('data-rifle-id');
+            var lId = this.getAttribute('data-load-id');
+            self._selectProfile(rId, lId);
+            // Auto-fetch weather after profile select
+            setTimeout(function () {
+                if (self.els.btnFetchWeather && typeof self._fetchWeather === 'function') {
+                    self._fetchWeather();
+                }
+            }, 300);
         });
     }
 };

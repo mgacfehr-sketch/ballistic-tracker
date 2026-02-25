@@ -118,6 +118,25 @@ AdminManager.prototype._render = function (stats, users, usage) {
     }
     html += '</section>';
 
+    // ── Beta Features Section ─────────────────────────────────
+    html += '<section class="admin-section">';
+    html += '<h3 class="admin-section-title">Beta Features</h3>';
+    html += '<p class="admin-desc">Toggle features on to release them to all users. You always have access as admin.</p>';
+    html += '<div class="admin-beta-toggles">';
+    for (var fk in BETA_FEATURES) {
+        var feat = BETA_FEATURES[fk];
+        var checked = getBetaFlag(fk) ? ' checked' : '';
+        html += '<label class="admin-beta-toggle">';
+        html += '<input type="checkbox" data-feature="' + fk + '"' + checked + '>';
+        html += '<span class="admin-beta-toggle-text">';
+        html += '<span class="admin-beta-toggle-label">' + self._esc(feat.label) + '</span>';
+        html += '<span class="admin-beta-toggle-desc">' + self._esc(feat.desc) + '</span>';
+        html += '</span>';
+        html += '</label>';
+    }
+    html += '</div>';
+    html += '</section>';
+
     // ── Export Button ─────────────────────────────────────────
     html += '<section class="admin-section">';
     html += '<h3 class="admin-section-title">Backup</h3>';
@@ -136,6 +155,14 @@ AdminManager.prototype._render = function (stats, users, usage) {
     if (exportBtn) {
         exportBtn.addEventListener('click', function () {
             self._exportAllData();
+        });
+    }
+
+    // Bind beta feature toggles
+    var toggles = document.querySelectorAll('.admin-beta-toggle input[type="checkbox"]');
+    for (var ti = 0; ti < toggles.length; ti++) {
+        toggles[ti].addEventListener('change', function () {
+            setBetaFlag(this.getAttribute('data-feature'), this.checked);
         });
     }
 };

@@ -1626,6 +1626,48 @@ html, body {
     font-size: 13px;
 }
 
+.admin-beta-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.admin-beta-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.admin-beta-toggle input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    flex-shrink: 0;
+    accent-color: var(--primary);
+}
+
+.admin-beta-toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.admin-beta-toggle-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.admin-beta-toggle-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
 /* ── Solver View ──────────────────────────────────────────────── */
 
 #view-solver {
@@ -1760,6 +1802,364 @@ html, body {
     gap: 6px;
     align-items: center;
     flex-shrink: 0;
+}
+
+/* ── Quick Start Buttons (Beta) ─────────────────────────────── */
+
+.quick-start-section {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.quick-start-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+}
+
+.quick-start-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    min-height: 56px;
+    padding: 12px 16px;
+    margin-bottom: 6px;
+    background: var(--primary-dark);
+    border: 2px solid var(--primary);
+    border-radius: var(--radius);
+    color: #fff;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.quick-start-btn:active {
+    background: var(--primary);
+}
+
+.quick-start-btn-name {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.quick-start-btn-sub {
+    font-size: 12px;
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+/* ── Wind Call Helper (Beta) ───────────────────────────────── */
+
+.wind-call-page {
+    padding: 12px 16px 24px;
+}
+
+.wind-call-selector {
+    margin-bottom: 12px;
+}
+
+.wind-select {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.wind-call-compass-status {
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.wind-clock-container {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+}
+
+.wind-call-inputs {
+    margin: 12px 0;
+}
+
+.wind-call-results {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+}
+
+.wind-call-result-header {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.wind-call-result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 0;
+}
+
+.wind-call-result-label {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.wind-call-result-value {
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.wind-call-result-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+}
+
+.wind-call-result-total {
+    font-size: 15px;
+}
+
+.wind-call-result-total .wind-call-result-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.wind-call-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 16px;
+    font-size: 14px;
+}
+
+.wind-call-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* ── DOPE Log (Beta) ───────────────────────────────────────── */
+
+.dope-load-group {
+    margin-bottom: 12px;
+}
+
+.dope-load-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.dope-bc-true {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--surface-raised);
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.dope-bc-up { color: var(--primary); font-weight: 600; }
+.dope-bc-down { color: var(--danger); font-weight: 600; }
+
+.dope-hit { color: var(--primary); font-weight: 600; }
+.dope-miss { color: var(--danger); }
+.dope-near { color: var(--calibration-color); }
+
+.dope-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+}
+
+/* ── Cold Bore (Beta) ──────────────────────────────────────── */
+
+.cb-stats {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.cb-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.cb-stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    font-family: monospace;
+    color: var(--primary);
+}
+
+.cb-stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 2px;
+}
+
+.cb-plot-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.cb-tutorial {
+    padding: 8px 0;
+}
+
+.cb-tutorial-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.cb-tutorial-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.cb-tutorial-list {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    padding-left: 20px;
+    margin-bottom: 8px;
+}
+
+/* ── High Contrast / Sunlight Mode (Beta) ──────────────────── */
+
+.high-contrast {
+    --bg: #ffffff;
+    --surface: #f0f0f0;
+    --surface-raised: #e0e0e0;
+    --border: #999;
+    --text: #000000;
+    --text-muted: #333333;
+    --text-dim: #555555;
+    --primary: #1a7a1e;
+    --primary-dark: #145c17;
+    --poa-color: #0d47a1;
+    --impact-color: #1a7a1e;
+    --calibration-color: #e65100;
+    --centroid-color: #c62828;
+    --danger: #c62828;
+}
+
+.high-contrast #app-header {
+    background: #e0e0e0;
+    border-color: #999;
+}
+
+.high-contrast .nav-tab {
+    color: #555;
+}
+
+.high-contrast .nav-tab.active {
+    background: #fff;
+    color: #000;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.high-contrast #canvas-container {
+    background: #ddd;
+}
+
+.high-contrast .header-btn {
+    background: #d0d0d0;
+    color: #000;
+}
+
+.high-contrast .header-logo {
+    filter: none;
+    mix-blend-mode: normal;
+}
+
+.high-contrast .canvas-watermark {
+    filter: none;
+    mix-blend-mode: normal;
+    opacity: 0.12;
+}
+
+.high-contrast .btn-primary {
+    background: #1a7a1e;
+    color: #fff;
+}
+
+.high-contrast .btn-secondary {
+    background: #d0d0d0;
+    color: #000;
+    border-color: #999;
+}
+
+.high-contrast .ai-message-user {
+    background: #1a7a1e;
+    color: #fff;
+}
+
+.high-contrast .ai-message-assistant {
+    background: #e8e8e8;
+    color: #000;
+    border-color: #999;
+}
+
+.high-contrast .form-group input,
+.high-contrast .form-group select,
+.high-contrast .form-group textarea {
+    background: #fff;
+    border-color: #999;
+    color: #000;
+}
+
+.high-contrast .preset-btn {
+    background: #d0d0d0;
+    color: #333;
+    border-color: #999;
+}
+
+.high-contrast .preset-btn.selected {
+    background: #1a7a1e;
+    color: #fff;
+}
+
+.high-contrast #canvas-hint {
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+}
+
+.high-contrast #btn-sunlight-mode {
+    background: #ffc107;
+    color: #000;
 }
 
 /* ── Landscape tweaks ───────────────────────────────────────── */

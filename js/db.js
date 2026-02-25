@@ -149,7 +149,9 @@ BallisticDB.prototype.deleteRifle = function (id) {
             self.supabase.from('sessions').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('zero_records').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('scope_adjustments').delete().eq('rifle_id', id).eq('user_id', self.userId),
-            self.supabase.from('cleaning_logs').delete().eq('rifle_id', id).eq('user_id', self.userId)
+            self.supabase.from('cleaning_logs').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('dope_entries').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('cold_bore_shots').delete().eq('rifle_id', id).eq('user_id', self.userId)
         ]);
     }).then(function (results) {
         for (var i = 0; i < results.length; i++) {
@@ -605,6 +607,93 @@ BallisticDB.prototype.getCleaningLogsByBarrel = function (barrelId) {
 BallisticDB.prototype.deleteCleaningLog = function (id) {
     var self = this;
     return self.supabase.from('cleaning_logs').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};
+
+// ── Dope Entry CRUD ───────────────────────────────────────────
+
+BallisticDB.prototype.addDopeEntry = function (data) {
+    var self = this;
+    var entry = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        loadId: data.loadId || null,
+        distanceYards: data.distanceYards || 0,
+        elevationMOA: data.elevationMOA || 0,
+        windageMOA: data.windageMOA || 0,
+        result: data.result || 'hit',
+        notes: data.notes || '',
+        date: data.date || new Date().toISOString(),
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(entry, self.userId);
+    return self.supabase.from('dope_entries').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getDopeEntries = function (rifleId) {
+    var self = this;
+    return self.supabase.from('dope_entries').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('created_at', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.deleteDopeEntry = function (id) {
+    var self = this;
+    return self.supabase.from('dope_entries').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};
+
+// ── Cold Bore Shot CRUD ───────────────────────────────────────
+
+BallisticDB.prototype.addColdBoreShot = function (data) {
+    var self = this;
+    var shot = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        distanceYards: data.distanceYards || 100,
+        condition: data.condition || 'clean_cold',
+        elevationOffsetMOA: data.elevationOffsetMOA || 0,
+        windageOffsetMOA: data.windageOffsetMOA || 0,
+        notes: data.notes || '',
+        date: data.date || new Date().toISOString(),
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(shot, self.userId);
+    return self.supabase.from('cold_bore_shots').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getColdBoreShots = function (rifleId) {
+    var self = this;
+    return self.supabase.from('cold_bore_shots').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('created_at', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.deleteColdBoreShot = function (id) {
+    var self = this;
+    return self.supabase.from('cold_bore_shots').delete()
         .eq('id', id).eq('user_id', self.userId)
         .then(function (res) {
             if (res.error) throw res.error;

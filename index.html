@@ -45,6 +45,7 @@
             </nav>
             <div class="header-actions">
                 <button id="btn-new-session" class="header-btn" title="New Session">+</button>
+                <button id="btn-sunlight-mode" class="header-btn hidden" title="Sunlight Mode">&#9788;</button>
                 <button id="btn-logout" class="header-btn" title="Log Out">&#x2192;</button>
             </div>
         </header>
@@ -253,6 +254,9 @@
         <!-- Solver View -->
         <div id="view-solver" class="app-view"></div>
 
+        <!-- Wind Call View (beta feature) -->
+        <div id="view-wind" class="app-view"></div>
+
         <!-- Admin View (admin-only, injected via JS) -->
         <div id="view-admin" class="app-view"></div>
 
@@ -279,6 +283,11 @@
     <script src="js/ballistic-solver.js"></script>
     <script src="js/ai-assistant.js"></script>
     <script src="js/admin.js"></script>
+    <script src="js/beta-features.js"></script>
+    <script src="js/wind-call.js"></script>
+    <script src="js/dope-log.js"></script>
+    <script src="js/cold-bore.js"></script>
+    <script src="js/offline-cache.js"></script>
     <script src="js/app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
