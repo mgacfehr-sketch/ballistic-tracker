@@ -914,6 +914,10 @@ SessionFlow.prototype._renderResults = function () {
 SessionFlow.prototype._saveSession = function () {
     if (!this.results || !this.db) return;
     if (this.savedSessionId) return; // already saved
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        alert('Session saving requires an internet connection.');
+        return;
+    }
 
     var roundsFired = this.roundsFired || this.impacts.length;
 

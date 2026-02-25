@@ -74,12 +74,6 @@
                 }
             }
 
-            // Show sunlight mode button if beta enabled
-            if (typeof isBetaEnabled === 'function' && isBetaEnabled('highContrast')) {
-                var sunBtn = document.getElementById('btn-sunlight-mode');
-                if (sunBtn) sunBtn.classList.remove('hidden');
-            }
-
             var db = new BallisticDB(client, user.id);
             db.open().then(function () {
                 initApp(db, user);
@@ -204,8 +198,8 @@
                 windCallManager.init();
             }
 
-            // Beta: Offline Mode
-            if (typeof isBetaEnabled === 'function' && isBetaEnabled('offlineMode') && typeof OfflineCache !== 'undefined') {
+            // Offline Mode
+            if (typeof OfflineCache !== 'undefined') {
                 OfflineCache.init(db);
             }
         } else {

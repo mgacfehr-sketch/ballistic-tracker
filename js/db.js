@@ -113,22 +113,36 @@ BallisticDB.prototype.updateRifle = function (rifle) {
 
 BallisticDB.prototype.getRifle = function (id) {
     var self = this;
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        return OfflineCache.getCachedRifle(id);
+    }
     return self.supabase.from('rifles').select()
         .eq('id', id).eq('user_id', self.userId)
         .maybeSingle()
         .then(function (res) {
             if (res.error) throw res.error;
             return _rowToJs(res.data);
+        })
+        .catch(function (err) {
+            console.warn('[DB] getRifle failed, trying cache:', err);
+            return OfflineCache.getCachedRifle(id);
         });
 };
 
 BallisticDB.prototype.getAllRifles = function () {
     var self = this;
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        return OfflineCache.getCachedRifles();
+    }
     return self.supabase.from('rifles').select()
         .eq('user_id', self.userId)
         .then(function (res) {
             if (res.error) throw res.error;
             return (res.data || []).map(_rowToJs);
+        })
+        .catch(function (err) {
+            console.warn('[DB] getAllRifles failed, trying cache:', err);
+            return OfflineCache.getCachedRifles();
         });
 };
 
@@ -237,6 +251,9 @@ BallisticDB.prototype.getBarrel = function (id) {
 
 BallisticDB.prototype.getBarrelsByRifle = function (rifleId) {
     var self = this;
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        return OfflineCache.getCachedBarrels(rifleId);
+    }
     return self.supabase.from('barrels').select()
         .eq('user_id', self.userId).eq('rifle_id', rifleId)
         .then(function (res) {
@@ -244,6 +261,10 @@ BallisticDB.prototype.getBarrelsByRifle = function (rifleId) {
             return (res.data || []).map(function (r) {
                 return _normalizeBarrel(_rowToJs(r));
             });
+        })
+        .catch(function (err) {
+            console.warn('[DB] getBarrelsByRifle failed, trying cache:', err);
+            return OfflineCache.getCachedBarrels(rifleId);
         });
 };
 
@@ -322,11 +343,18 @@ BallisticDB.prototype.getLoad = function (id) {
 
 BallisticDB.prototype.getLoadsByRifle = function (rifleId) {
     var self = this;
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        return OfflineCache.getCachedLoads(rifleId);
+    }
     return self.supabase.from('loads').select()
         .eq('user_id', self.userId).eq('rifle_id', rifleId)
         .then(function (res) {
             if (res.error) throw res.error;
             return (res.data || []).map(_rowToJs);
+        })
+        .catch(function (err) {
+            console.warn('[DB] getLoadsByRifle failed, trying cache:', err);
+            return OfflineCache.getCachedLoads(rifleId);
         });
 };
 

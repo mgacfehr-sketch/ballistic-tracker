@@ -1,127 +1,167 @@
 /**
  * offline-cache.js — Offline Mode support.
  *
- * Caches rifle profiles, loads, and solver data to localStorage
- * so the app works without cell service. Queues session data
- * for sync when connectivity returns.
- * Admin-only beta feature.
+ * Caches rifle profiles, barrels, and loads to IndexedDB
+ * so the app works without cell service (read-only).
  */
 
 var OfflineCache = {
-    CACHE_KEY: 'yort_offline_cache',
-    QUEUE_KEY: 'yort_offline_queue',
+    _db: null,
+    DB_NAME: 'yort_offline',
+    DB_VERSION: 1,
 
     /**
-     * Cache all rifle profiles and loads for offline access.
+     * Open the offline IndexedDB database.
      */
-    cacheProfiles: function (db) {
+    _openDB: function () {
+        if (OfflineCache._db) return Promise.resolve(OfflineCache._db);
+
+        return new Promise(function (resolve, reject) {
+            var req = indexedDB.open(OfflineCache.DB_NAME, OfflineCache.DB_VERSION);
+
+            req.onupgradeneeded = function (e) {
+                var db = e.target.result;
+                if (!db.objectStoreNames.contains('rifles')) {
+                    db.createObjectStore('rifles', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('barrels')) {
+                    var barrelStore = db.createObjectStore('barrels', { keyPath: 'id' });
+                    barrelStore.createIndex('rifleId', 'rifleId', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('loads')) {
+                    var loadStore = db.createObjectStore('loads', { keyPath: 'id' });
+                    loadStore.createIndex('rifleId', 'rifleId', { unique: false });
+                }
+            };
+
+            req.onsuccess = function (e) {
+                OfflineCache._db = e.target.result;
+                resolve(OfflineCache._db);
+            };
+
+            req.onerror = function (e) {
+                console.warn('[Offline] Failed to open IDB:', e.target.error);
+                reject(e.target.error);
+            };
+        });
+    },
+
+    /**
+     * Cache all rifles, barrels, and loads from Supabase into IndexedDB.
+     */
+    cacheAll: function (db) {
         if (!db) return Promise.resolve();
 
         return db.getAllRifles().then(function (rifles) {
             var promises = rifles.map(function (r) {
                 return Promise.all([
-                    db.getLoadsByRifle(r.id),
-                    db.getBarrelsByRifle(r.id)
+                    db.getBarrelsByRifle(r.id),
+                    db.getLoadsByRifle(r.id)
                 ]).then(function (results) {
-                    return { rifle: r, loads: results[0] || [], barrels: results[1] || [] };
+                    return { rifle: r, barrels: results[0] || [], loads: results[1] || [] };
                 });
             });
             return Promise.all(promises);
         }).then(function (profiles) {
-            try {
-                var cache = OfflineCache._getCache();
-                cache.profiles = profiles;
-                cache.cachedAt = new Date().toISOString();
-                localStorage.setItem(OfflineCache.CACHE_KEY, JSON.stringify(cache));
-                console.log('[Offline] Cached', profiles.length, 'rifle profiles');
-            } catch (e) {
-                console.warn('[Offline] Failed to cache profiles:', e);
-            }
-        });
-    },
+            return OfflineCache._openDB().then(function (idb) {
+                return new Promise(function (resolve, reject) {
+                    var tx = idb.transaction(['rifles', 'barrels', 'loads'], 'readwrite');
+                    var rifleStore = tx.objectStore('rifles');
+                    var barrelStore = tx.objectStore('barrels');
+                    var loadStore = tx.objectStore('loads');
 
-    /**
-     * Get cached profiles (for offline use).
-     */
-    getCachedProfiles: function () {
-        var cache = OfflineCache._getCache();
-        return cache.profiles || [];
-    },
+                    // Clear existing data
+                    rifleStore.clear();
+                    barrelStore.clear();
+                    loadStore.clear();
 
-    /**
-     * Check if we have cached data available.
-     */
-    hasCachedData: function () {
-        var cache = OfflineCache._getCache();
-        return !!(cache.profiles && cache.profiles.length > 0);
-    },
+                    // Write fresh data
+                    for (var i = 0; i < profiles.length; i++) {
+                        var p = profiles[i];
+                        rifleStore.put(p.rifle);
+                        for (var b = 0; b < p.barrels.length; b++) {
+                            var barrel = p.barrels[b];
+                            barrel.rifleId = barrel.rifleId || p.rifle.id;
+                            barrelStore.put(barrel);
+                        }
+                        for (var l = 0; l < p.loads.length; l++) {
+                            var load = p.loads[l];
+                            load.rifleId = load.rifleId || p.rifle.id;
+                            loadStore.put(load);
+                        }
+                    }
 
-    /**
-     * Get the timestamp of the last cache.
-     */
-    getCacheAge: function () {
-        var cache = OfflineCache._getCache();
-        return cache.cachedAt || null;
-    },
-
-    /**
-     * Queue a session for later sync.
-     */
-    queueSession: function (sessionData) {
-        try {
-            var queue = OfflineCache._getQueue();
-            sessionData._queuedAt = new Date().toISOString();
-            queue.push(sessionData);
-            localStorage.setItem(OfflineCache.QUEUE_KEY, JSON.stringify(queue));
-            console.log('[Offline] Queued session for sync');
-            return true;
-        } catch (e) {
-            console.warn('[Offline] Failed to queue session:', e);
-            return false;
-        }
-    },
-
-    /**
-     * Get all queued sessions.
-     */
-    getQueuedSessions: function () {
-        return OfflineCache._getQueue();
-    },
-
-    /**
-     * Sync all queued sessions to the database.
-     * Returns a promise that resolves with the count of synced sessions.
-     */
-    syncQueue: function (db) {
-        if (!db) return Promise.resolve(0);
-        var queue = OfflineCache._getQueue();
-        if (queue.length === 0) return Promise.resolve(0);
-
-        var synced = 0;
-        var remaining = [];
-
-        var chain = Promise.resolve();
-        for (var i = 0; i < queue.length; i++) {
-            (function (session) {
-                chain = chain.then(function () {
-                    // Remove queue metadata
-                    delete session._queuedAt;
-                    return db.addSession(session).then(function () {
-                        synced++;
-                    }).catch(function () {
-                        remaining.push(session);
-                    });
+                    tx.oncomplete = function () {
+                        console.log('[Offline] Cached', profiles.length, 'rifle profiles to IDB');
+                        resolve();
+                    };
+                    tx.onerror = function (e) {
+                        console.warn('[Offline] IDB cache write failed:', e.target.error);
+                        reject(e.target.error);
+                    };
                 });
-            })(queue[i]);
-        }
-
-        return chain.then(function () {
-            localStorage.setItem(OfflineCache.QUEUE_KEY, JSON.stringify(remaining));
-            if (synced > 0) {
-                console.log('[Offline] Synced', synced, 'sessions,', remaining.length, 'remaining');
-            }
-            return synced;
+            });
+        }).catch(function (err) {
+            console.warn('[Offline] Cache failed:', err);
         });
+    },
+
+    /**
+     * Get all cached rifles.
+     */
+    getCachedRifles: function () {
+        return OfflineCache._openDB().then(function (idb) {
+            return new Promise(function (resolve, reject) {
+                var tx = idb.transaction('rifles', 'readonly');
+                var req = tx.objectStore('rifles').getAll();
+                req.onsuccess = function () { resolve(req.result || []); };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).catch(function () { return []; });
+    },
+
+    /**
+     * Get a single cached rifle by ID.
+     */
+    getCachedRifle: function (id) {
+        return OfflineCache._openDB().then(function (idb) {
+            return new Promise(function (resolve, reject) {
+                var tx = idb.transaction('rifles', 'readonly');
+                var req = tx.objectStore('rifles').get(id);
+                req.onsuccess = function () { resolve(req.result || null); };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).catch(function () { return null; });
+    },
+
+    /**
+     * Get cached barrels for a rifle (via rifleId index).
+     */
+    getCachedBarrels: function (rifleId) {
+        return OfflineCache._openDB().then(function (idb) {
+            return new Promise(function (resolve, reject) {
+                var tx = idb.transaction('barrels', 'readonly');
+                var idx = tx.objectStore('barrels').index('rifleId');
+                var req = idx.getAll(rifleId);
+                req.onsuccess = function () { resolve(req.result || []); };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).catch(function () { return []; });
+    },
+
+    /**
+     * Get cached loads for a rifle (via rifleId index).
+     */
+    getCachedLoads: function (rifleId) {
+        return OfflineCache._openDB().then(function (idb) {
+            return new Promise(function (resolve, reject) {
+                var tx = idb.transaction('loads', 'readonly');
+                var idx = tx.objectStore('loads').index('rifleId');
+                var req = idx.getAll(rifleId);
+                req.onsuccess = function () { resolve(req.result || []); };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).catch(function () { return []; });
     },
 
     /**
@@ -132,48 +172,46 @@ var OfflineCache = {
     },
 
     /**
-     * Initialize offline mode: cache profiles and set up sync listeners.
+     * Update the connection status indicator dot.
+     */
+    _updateIndicator: function () {
+        var dot = document.getElementById('connection-status');
+        if (!dot) return;
+        var online = OfflineCache.isOnline();
+        dot.classList.toggle('online', online);
+        dot.classList.toggle('offline', !online);
+        dot.title = online ? 'Online' : 'Offline';
+    },
+
+    /**
+     * Initialize offline mode: open IDB, cache if online, listen for connectivity changes.
      */
     init: function (db) {
-        if (!db) return;
-
-        // Cache profiles on init
-        OfflineCache.cacheProfiles(db);
-
-        // Try to sync queued sessions when coming back online
-        window.addEventListener('online', function () {
-            console.log('[Offline] Back online — syncing queue');
-            OfflineCache.syncQueue(db).then(function (count) {
-                if (count > 0) {
-                    console.log('[Offline] Synced', count, 'queued sessions');
-                }
-            });
+        OfflineCache._openDB().then(function () {
+            if (OfflineCache.isOnline() && db) {
+                OfflineCache.cacheAll(db);
+            }
+        }).catch(function (err) {
+            console.warn('[Offline] Init failed:', err);
         });
 
-        // Re-cache when profiles might have changed
-        // (conservative: cache on each app focus)
+        OfflineCache._updateIndicator();
+
+        window.addEventListener('online', function () {
+            console.log('[Offline] Back online');
+            OfflineCache._updateIndicator();
+            if (db) OfflineCache.cacheAll(db);
+        });
+
+        window.addEventListener('offline', function () {
+            console.log('[Offline] Went offline');
+            OfflineCache._updateIndicator();
+        });
+
         document.addEventListener('visibilitychange', function () {
-            if (!document.hidden && OfflineCache.isOnline()) {
-                OfflineCache.cacheProfiles(db);
+            if (!document.hidden && OfflineCache.isOnline() && db) {
+                OfflineCache.cacheAll(db);
             }
         });
-    },
-
-    _getCache: function () {
-        try {
-            var raw = localStorage.getItem(OfflineCache.CACHE_KEY);
-            return raw ? JSON.parse(raw) : {};
-        } catch (e) {
-            return {};
-        }
-    },
-
-    _getQueue: function () {
-        try {
-            var raw = localStorage.getItem(OfflineCache.QUEUE_KEY);
-            return raw ? JSON.parse(raw) : [];
-        } catch (e) {
-            return [];
-        }
     }
 };

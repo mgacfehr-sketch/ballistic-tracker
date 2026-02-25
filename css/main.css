@@ -1804,6 +1804,21 @@ html, body {
     flex-shrink: 0;
 }
 
+.connection-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    background: var(--text-dim);
+    transition: background 0.3s;
+}
+.connection-dot.online  { background: #4caf50; }
+.connection-dot.offline { background: #f44336; }
+
+.high-contrast .connection-dot.online  { background: #1b5e20; }
+.high-contrast .connection-dot.offline { background: #b71c1c; }
+
 /* ── Quick Start Buttons (Beta) ─────────────────────────────── */
 
 .quick-start-section {

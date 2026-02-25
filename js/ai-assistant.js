@@ -36,6 +36,15 @@ AIAssistantManager.prototype.show = function () {
         return;
     }
 
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        this.container.innerHTML =
+            '<div class="ai-no-key">' +
+            '<div class="ai-no-key-title">No Connection</div>' +
+            '<div class="ai-no-key-text">yorT requires an internet connection.</div>' +
+            '</div>';
+        return;
+    }
+
     this._renderChat();
 };
 
