@@ -1816,8 +1816,8 @@ html, body {
 .connection-dot.online  { background: #4caf50; }
 .connection-dot.offline { background: #f44336; }
 
-.high-contrast .connection-dot.online  { background: #0e4212; }
-.high-contrast .connection-dot.offline { background: #000; }
+.high-contrast .connection-dot.online  { background: #1b5e20; }
+.high-contrast .connection-dot.offline { background: #b71c1c; }
 
 /* ── Quick Start Buttons (Beta) ─────────────────────────────── */
 
@@ -2075,44 +2075,48 @@ html, body {
 /* ── High Contrast / Sunlight Mode ─────────────────────────── */
 
 .high-contrast {
-    --bg: #FF8C00;
-    --surface: #FF9A20;
-    --surface-raised: #FFB347;
-    --border: #CC7000;
+    --bg: #ffffff;
+    --surface: #f0f0f0;
+    --surface-raised: #e0e0e0;
+    --border: #666;
     --text: #000000;
-    --text-muted: #1a1a1a;
-    --text-dim: #333333;
-    --primary: #1a5e1f;
-    --primary-dark: #0e4212;
+    --text-muted: #222222;
+    --text-dim: #444444;
+    --primary: #1a7a1e;
+    --primary-dark: #145c17;
     --poa-color: #0d47a1;
-    --impact-color: #1a5e1f;
-    --calibration-color: #7b1fa2;
-    --centroid-color: #b71c1c;
-    --danger: #b71c1c;
+    --impact-color: #1a7a1e;
+    --calibration-color: #e65100;
+    --centroid-color: #c62828;
+    --danger: #c62828;
+    font-size: 18px;
 }
 
 .high-contrast #app-header {
-    background: #E07800;
-    border-color: #CC7000;
+    background: #e0e0e0;
+    border-color: #999;
 }
 
 .high-contrast .nav-tab {
     color: #333;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 .high-contrast .nav-tab.active {
-    background: #FFB347;
+    background: #fff;
     color: #000;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
 .high-contrast #canvas-container {
-    background: #E88A10;
+    background: #ddd;
 }
 
 .high-contrast .header-btn {
-    background: #FFB347;
+    background: #d0d0d0;
     color: #000;
+    font-size: 18px;
 }
 
 .high-contrast .header-logo {
@@ -2123,38 +2127,48 @@ html, body {
 .high-contrast .canvas-watermark {
     filter: none;
     mix-blend-mode: normal;
-    opacity: 0.10;
+    opacity: 0.08;
 }
 
 .high-contrast .btn-primary {
-    background: #1a5e1f;
+    background: #1a7a1e;
     color: #fff;
-    border-color: #0e4212;
+    font-size: 16px;
+    font-weight: 700;
 }
 
 .high-contrast .btn-secondary {
-    background: #FFB347;
+    background: #d0d0d0;
     color: #000;
-    border-color: #CC7000;
+    border-color: #999;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 .high-contrast .ai-message-user {
-    background: #1a5e1f;
+    background: #1a7a1e;
     color: #fff;
 }
 
 .high-contrast .ai-message-assistant {
-    background: #FFD699;
+    background: #e8e8e8;
     color: #000;
-    border-color: #CC7000;
+    border-color: #999;
+}
+
+.high-contrast .form-group label {
+    font-size: 15px;
+    font-weight: 700;
+    color: #000;
 }
 
 .high-contrast .form-group input,
 .high-contrast .form-group select,
 .high-contrast .form-group textarea {
-    background: #FFD699;
-    border-color: #CC7000;
+    background: #fff;
+    border: 2px solid #666;
     color: #000;
+    font-size: 16px;
 }
 
 .high-contrast .form-group select {
@@ -2162,25 +2176,26 @@ html, body {
 }
 
 .high-contrast .preset-btn {
-    background: #FFB347;
+    background: #d0d0d0;
     color: #000;
-    border-color: #CC7000;
+    border-color: #999;
+    font-weight: 600;
 }
 
 .high-contrast .preset-btn.selected {
-    background: #1a5e1f;
+    background: #1a7a1e;
     color: #fff;
 }
 
 .high-contrast #canvas-hint {
     background: rgba(0, 0, 0, 0.80);
     color: #fff;
+    font-size: 16px;
 }
 
 .high-contrast #btn-sunlight-mode {
-    background: #FFD699;
+    background: #ffc107;
     color: #000;
-    border-color: #CC7000;
 }
 
 .high-contrast .profile-card,
@@ -2188,39 +2203,59 @@ html, body {
 .high-contrast .dashboard-stat,
 .high-contrast .admin-stat-card,
 .high-contrast .cb-stat {
-    border-color: #CC7000;
+    border: 2px solid #999;
+}
+
+.high-contrast .profile-card .profile-name,
+.high-contrast .detail-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #000;
 }
 
 .high-contrast .ai-input-bar {
-    border-color: #CC7000;
+    border-color: #999;
 }
 
 .high-contrast .ai-input {
-    background: #FFD699;
+    background: #fff;
     color: #000;
+    font-size: 16px;
 }
 
 .high-contrast .solver-table th {
-    background: #E07800;
+    background: #d0d0d0;
     color: #000;
+    font-weight: 700;
 }
 
 .high-contrast .solver-table td {
-    border-color: #CC7000;
+    border-color: #999;
+    color: #000;
 }
 
 .high-contrast .picker-load-btn {
-    background: #FFB347;
+    background: #e0e0e0;
     color: #000;
-    border-color: #CC7000;
+    border-color: #999;
+    font-size: 15px;
 }
 
 .high-contrast .help-popup {
-    border-color: #CC7000;
+    border-color: #999;
 }
 
 .high-contrast .admin-beta-toggle {
-    border-color: #CC7000;
+    border-color: #999;
+}
+
+.high-contrast .step-badge {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.high-contrast #step-panel {
+    font-size: 16px;
 }
 
 /* ── Landscape tweaks ───────────────────────────────────────── */
