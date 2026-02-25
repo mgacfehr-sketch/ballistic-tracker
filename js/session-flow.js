@@ -84,6 +84,7 @@ SessionFlow.prototype.init = function () {
         inputAltitude: document.getElementById('input-altitude'),
         inputPressure: document.getElementById('input-pressure'),
         dataOptionalDetails: document.getElementById('data-optional-details'),
+        btnFetchWeather: document.getElementById('btn-fetch-weather'),
         // Step 5: POA
         poaStatus: document.getElementById('poa-status'),
         btnRedoPoa: document.getElementById('btn-redo-poa'),
@@ -168,6 +169,12 @@ SessionFlow.prototype.reset = function () {
 
     // Close optional details
     if (this.els.dataOptionalDetails) this.els.dataOptionalDetails.removeAttribute('open');
+
+    // Reset weather button
+    if (this.els.btnFetchWeather) {
+        this.els.btnFetchWeather.disabled = false;
+        this.els.btnFetchWeather.textContent = 'Get Current Weather';
+    }
 
     // Reset button states
     this._hideEl(this.els.btnRedoCalibration);
@@ -452,6 +459,13 @@ SessionFlow.prototype._bindUI = function () {
             self.els.inputBulletDia.value = this.getAttribute('data-value');
             self._validateDataInputs();
             self._updatePresetHighlight();
+        });
+    }
+
+    // Weather fetch button
+    if (this.els.btnFetchWeather) {
+        this.els.btnFetchWeather.addEventListener('click', function () {
+            self._fetchWeather();
         });
     }
 
@@ -1115,6 +1129,100 @@ SessionFlow.prototype._shareImage = function () {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 'image/png');
+};
+
+// ── Weather Fetch ──────────────────────────────────────────────
+
+SessionFlow.prototype._fetchWeather = function () {
+    var self = this;
+    var btn = this.els.btnFetchWeather;
+    if (!btn) return;
+
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Locating...';
+
+    navigator.geolocation.getCurrentPosition(
+        function (position) {
+            var lat = position.coords.latitude.toFixed(4);
+            var lon = position.coords.longitude.toFixed(4);
+            btn.textContent = 'Fetching weather...';
+
+            fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+                '&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m' +
+                '&temperature_unit=fahrenheit&wind_speed_unit=mph')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data && data.current) {
+                    var c = data.current;
+                    if (c.temperature_2m != null && self.els.inputTemp) {
+                        self.els.inputTemp.value = Math.round(c.temperature_2m);
+                    }
+                    if (c.relative_humidity_2m != null && self.els.inputHumidity) {
+                        self.els.inputHumidity.value = Math.round(c.relative_humidity_2m);
+                    }
+                    if (c.surface_pressure != null && self.els.inputPressure) {
+                        self.els.inputPressure.value = (c.surface_pressure * 0.02953).toFixed(2);
+                    }
+                    if (c.wind_speed_10m != null && self.els.inputWindMph) {
+                        self.els.inputWindMph.value = Math.round(c.wind_speed_10m);
+                    }
+                    if (c.wind_direction_10m != null && self.els.inputWindDir) {
+                        self.els.inputWindDir.value = self._degreesToCompass(c.wind_direction_10m);
+                    }
+                }
+
+                // Fetch elevation
+                fetch('https://api.open-meteo.com/v1/elevation?latitude=' + lat + '&longitude=' + lon)
+                .then(function (res) { return res.json(); })
+                .then(function (elevData) {
+                    if (elevData && elevData.elevation && elevData.elevation[0] != null && self.els.inputAltitude) {
+                        self.els.inputAltitude.value = Math.round(elevData.elevation[0] * 3.28084);
+                    }
+                })
+                .catch(function () {
+                    // Elevation fetch failed — not critical
+                });
+
+                // Open the details section
+                if (self.els.dataOptionalDetails) {
+                    self.els.dataOptionalDetails.setAttribute('open', '');
+                }
+
+                btn.textContent = 'Weather Updated';
+                setTimeout(function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Get Current Weather';
+                }, 2000);
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.textContent = 'Get Current Weather';
+                alert('Failed to fetch weather data.');
+            });
+        },
+        function () {
+            btn.disabled = false;
+            btn.textContent = 'Get Current Weather';
+            alert('Location access denied. Enable location to fetch weather.');
+        },
+        { timeout: 10000 }
+    );
+};
+
+/**
+ * Convert meteorological wind degrees to compass direction string.
+ * Wind direction in meteorology = direction wind comes FROM.
+ */
+SessionFlow.prototype._degreesToCompass = function (degrees) {
+    var dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    var index = Math.round(((degrees % 360) + 360) % 360 / 22.5) % 16;
+    return 'from ' + dirs[index];
 };
 
 // ── Helpers ────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ module.exports = async function handler(req, res) {
             },
             body: JSON.stringify({
                 model: 'claude-sonnet-4-5-20250929',
-                max_tokens: 1024,
+                max_tokens: 2048,
                 system: system || '',
                 messages: messages
             })

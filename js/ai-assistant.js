@@ -13,6 +13,7 @@ function AIAssistantManager(db) {
     this.isLoading = false;
     this.conversationId = null;
     this.conversationTitle = null;
+    this.pendingImage = null; // { base64, mediaType }
 }
 
 /**
@@ -85,17 +86,35 @@ AIAssistantManager.prototype._renderChat = function () {
                 '\u2022 Dial-ups and come-ups for any range<br>' +
                 '\u2022 Group analysis and performance trends<br>' +
                 '\u2022 Load comparisons across your profiles<br>' +
+                '\u2022 Target image analysis<br>' +
                 '\u2022 General ballistics questions<br><br>' +
                 'Select a rifle above for personalized data. ' +
                 'Tap <b>Weather</b> to auto-fill current conditions.</div>';
         } else {
             for (var j = 0; j < self.messages.length; j++) {
                 var msg = self.messages[j];
-                var displayContent = self._stripActionBlocks(msg.content);
-                if (msg.role === 'user') {
-                    html += '<div class="ai-message ai-message-user">' + self._escapeHtml(displayContent) + '</div>';
+                var hasImage = false;
+                var displayText = '';
+                if (Array.isArray(msg.content)) {
+                    // Multipart content — extract text and check for images
+                    for (var k = 0; k < msg.content.length; k++) {
+                        if (msg.content[k].type === 'text') {
+                            displayText += msg.content[k].text;
+                        } else if (msg.content[k].type === 'image') {
+                            hasImage = true;
+                        }
+                    }
                 } else {
-                    html += '<div class="ai-message ai-message-assistant">' + self._escapeHtml(displayContent) + '</div>';
+                    displayText = msg.content;
+                }
+                displayText = self._stripActionBlocks(displayText);
+                if (msg.role === 'user') {
+                    html += '<div class="ai-message ai-message-user">';
+                    if (hasImage) html += '<div class="ai-message-img-tag">[Image attached]</div>';
+                    html += self._escapeHtml(displayText);
+                    html += '</div>';
+                } else {
+                    html += '<div class="ai-message ai-message-assistant">' + self._escapeHtml(displayText) + '</div>';
                 }
             }
         }
@@ -104,8 +123,18 @@ AIAssistantManager.prototype._renderChat = function () {
         }
         html += '</div>';
 
+        // Image preview strip (hidden by default)
+        html += '<div class="ai-img-preview" id="ai-img-preview" style="display:none;">';
+        html += '<img class="ai-img-preview-thumb" id="ai-img-preview-thumb" src="" alt="Preview">';
+        html += '<button class="ai-img-preview-remove" id="ai-img-preview-remove" title="Remove image">&times;</button>';
+        html += '</div>';
+
         // Input bar
         html += '<div class="ai-input-bar">';
+        html += '<button class="ai-img-btn" id="ai-img-btn" title="Attach image">';
+        html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+        html += '</button>';
+        html += '<input type="file" id="ai-img-input" accept="image/*" capture="environment" hidden>';
         html += '<textarea class="ai-input" id="ai-input" placeholder="Ask about your shooting data..." rows="1"></textarea>';
         html += '<button class="ai-send-btn" id="ai-send-btn" title="Send">';
         html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
@@ -160,6 +189,27 @@ AIAssistantManager.prototype._bindChatEvents = function () {
                 self.conversationTitle = null;
                 self._renderChat();
             }
+        });
+    }
+
+    // Image upload button and file input
+    var imgBtn = document.getElementById('ai-img-btn');
+    var imgInput = document.getElementById('ai-img-input');
+    var imgRemove = document.getElementById('ai-img-preview-remove');
+    if (imgBtn && imgInput) {
+        imgBtn.addEventListener('click', function () {
+            imgInput.click();
+        });
+        imgInput.addEventListener('change', function () {
+            if (this.files && this.files[0]) {
+                self._stageImage(this.files[0]);
+            }
+            this.value = '';
+        });
+    }
+    if (imgRemove) {
+        imgRemove.addEventListener('click', function () {
+            self._clearStagedImage();
         });
     }
 
@@ -276,13 +326,50 @@ AIAssistantManager.prototype._handleSend = function () {
 AIAssistantManager.prototype._sendMessage = function (userText) {
     var self = this;
 
-    // Add user message
-    this.messages.push({ role: 'user', content: userText });
-    this._appendMessage('user', userText);
+    // Capture staged image before clearing
+    var stagedImage = this.pendingImage;
+    this.pendingImage = null;
+    var previewEl = document.getElementById('ai-img-preview');
+    if (previewEl) previewEl.style.display = 'none';
+
+    // Build user message content (possibly multipart with image)
+    var userContent;
+    var hasImage = false;
+    if (stagedImage) {
+        userContent = [
+            { type: 'image', source: { type: 'base64', media_type: stagedImage.mediaType, data: stagedImage.base64 } },
+            { type: 'text', text: userText }
+        ];
+        hasImage = true;
+    } else {
+        userContent = userText;
+    }
+
+    this.messages.push({ role: 'user', content: userContent });
+    this._appendMessage('user', userText, hasImage);
     this._showLoading(true);
 
-    // Always gather context (all rifles + trajectories)
-    this._gatherContext(this.selectedRifleId).then(function (context) {
+    // Check for session reference to auto-attach image
+    var autoAttachPromise;
+    if (!hasImage) {
+        autoAttachPromise = self._tryAutoAttachImage(userText);
+    } else {
+        autoAttachPromise = Promise.resolve(null);
+    }
+
+    autoAttachPromise.then(function (autoImage) {
+        if (autoImage) {
+            // Replace last user message with multipart including auto-attached image
+            var lastMsg = self.messages[self.messages.length - 1];
+            var origText = typeof lastMsg.content === 'string' ? lastMsg.content : userText;
+            lastMsg.content = [
+                { type: 'image', source: { type: 'base64', media_type: autoImage.mediaType, data: autoImage.base64 } },
+                { type: 'text', text: origText + '\n\n[Session target image auto-attached]' }
+            ];
+        }
+
+        return self._gatherContext(self.selectedRifleId);
+    }).then(function (context) {
         var systemPrompt = self._buildSystemPrompt(context);
         return self._callAPI(systemPrompt);
     }).then(function (response) {
@@ -315,11 +402,11 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
             if (userText.length > 60) self.conversationTitle += '...';
         }
 
-        // Save or update conversation
+        // Save or update conversation (strip image data to avoid bloat)
         var convData = {
             rifleId: self.selectedRifleId || null,
             title: self.conversationTitle,
-            messages: self.messages
+            messages: self._stripImagesForStorage(self.messages)
         };
 
         if (self.conversationId) {
@@ -489,7 +576,15 @@ AIAssistantManager.prototype._extractWeatherFromChat = function () {
     var weather = {};
     for (var i = 0; i < this.messages.length; i++) {
         if (this.messages[i].role !== 'user') continue;
-        var text = this.messages[i].content;
+        var msgContent = this.messages[i].content;
+        var text = '';
+        if (Array.isArray(msgContent)) {
+            for (var t = 0; t < msgContent.length; t++) {
+                if (msgContent[t].type === 'text') text += msgContent[t].text + ' ';
+            }
+        } else {
+            text = msgContent;
+        }
 
         // Temperature: "85 degrees", "85°F", "temp is 85"
         var tempMatch = text.match(/(\-?\d+)\s*(?:degrees?\s*F?|°\s*F?)/i) ||
@@ -797,6 +892,18 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
         }
     }
 
+    // Image analysis instructions
+    lines.push('=== IMAGE ANALYSIS ===');
+    lines.push('When the user sends a target image, analyze it thoroughly:');
+    lines.push('1. Describe the shot group pattern (tight/loose, round/elongated)');
+    lines.push('2. Identify stringing patterns: vertical (velocity/charge variation), horizontal (wind/trigger), diagonal (scope/stock issues)');
+    lines.push('3. Estimate POA offset if visible (high/low/left/right)');
+    lines.push('4. Note any flyers and what the group looks like without them');
+    lines.push('5. Give actionable feedback: what to adjust, what to test next');
+    lines.push('6. If the image includes an overlay with stats, reference those numbers in your analysis');
+    lines.push('Be specific and practical. Shooters want to know what to DO, not just what they see.');
+    lines.push('');
+
     // Database tools instructions
     lines.push('=== DATABASE TOOLS ===');
     lines.push('You can write to the user\'s database by including action blocks in your response.');
@@ -844,9 +951,7 @@ AIAssistantManager.prototype._callAPI = function (systemPrompt) {
             },
             body: JSON.stringify({
                 system: systemPrompt,
-                messages: self.messages.filter(function (m) {
-                    return m.role === 'user' || m.role === 'assistant';
-                })
+                messages: self._prepareMessagesForAPI()
             })
         }).then(function (response) {
             return response.json().then(function (data) {
@@ -887,7 +992,7 @@ AIAssistantManager.prototype._callAPI = function (systemPrompt) {
 /**
  * Append a message bubble to the chat messages area.
  */
-AIAssistantManager.prototype._appendMessage = function (role, content) {
+AIAssistantManager.prototype._appendMessage = function (role, content, hasImage) {
     var messagesEl = document.getElementById('ai-messages');
     if (!messagesEl) return;
 
@@ -897,8 +1002,15 @@ AIAssistantManager.prototype._appendMessage = function (role, content) {
 
     var div = document.createElement('div');
     div.className = 'ai-message ai-message-' + role;
+    if (hasImage && role === 'user') {
+        var imgTag = document.createElement('div');
+        imgTag.className = 'ai-message-img-tag';
+        imgTag.textContent = '[Image attached]';
+        div.appendChild(imgTag);
+    }
     var displayContent = this._stripActionBlocks(content);
-    div.textContent = displayContent;
+    var textNode = document.createTextNode(displayContent);
+    div.appendChild(textNode);
     messagesEl.appendChild(div);
     this._scrollToBottom();
 };
@@ -951,6 +1063,243 @@ AIAssistantManager.prototype._scrollToBottom = function () {
     if (messagesEl) {
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }
+};
+
+/**
+ * Stage an image file for attachment to the next message.
+ * Validates type/size, resizes to max 1024px, stores as JPEG base64.
+ */
+AIAssistantManager.prototype._stageImage = function (file) {
+    var self = this;
+    var validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (validTypes.indexOf(file.type) === -1) {
+        alert('Unsupported image type. Use JPEG, PNG, GIF, or WebP.');
+        return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+        alert('Image too large. Maximum 20MB.');
+        return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+            // Resize to max 1024px
+            var maxDim = 1024;
+            var w = img.width;
+            var h = img.height;
+            if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                    h = Math.round(h * maxDim / w);
+                    w = maxDim;
+                } else {
+                    w = Math.round(w * maxDim / h);
+                    h = maxDim;
+                }
+            }
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+
+            var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            var base64 = dataUrl.split(',')[1];
+
+            self.pendingImage = { base64: base64, mediaType: 'image/jpeg' };
+
+            // Show preview
+            var previewEl = document.getElementById('ai-img-preview');
+            var thumbEl = document.getElementById('ai-img-preview-thumb');
+            if (previewEl && thumbEl) {
+                thumbEl.src = dataUrl;
+                previewEl.style.display = 'flex';
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+};
+
+/**
+ * Clear the staged image and hide preview.
+ */
+AIAssistantManager.prototype._clearStagedImage = function () {
+    this.pendingImage = null;
+    var previewEl = document.getElementById('ai-img-preview');
+    if (previewEl) previewEl.style.display = 'none';
+};
+
+/**
+ * Strip image content blocks from messages for IndexedDB storage.
+ * Replaces image blocks with a text placeholder to avoid base64 bloat.
+ */
+AIAssistantManager.prototype._stripImagesForStorage = function (messages) {
+    return messages.map(function (msg) {
+        if (!Array.isArray(msg.content)) return msg;
+        var stripped = msg.content.map(function (block) {
+            if (block.type === 'image') {
+                return { type: 'text', text: '[Image was attached]' };
+            }
+            return block;
+        });
+        // Collapse to plain string if only text blocks remain
+        var texts = [];
+        for (var i = 0; i < stripped.length; i++) {
+            if (stripped[i].type === 'text') texts.push(stripped[i].text);
+        }
+        return { role: msg.role, content: texts.join('\n') };
+    });
+};
+
+/**
+ * Prepare messages for the API call.
+ * Only the last user message keeps image data; older images are replaced with placeholders.
+ */
+AIAssistantManager.prototype._prepareMessagesForAPI = function () {
+    var filtered = this.messages.filter(function (m) {
+        return m.role === 'user' || m.role === 'assistant';
+    });
+
+    // Find index of last user message
+    var lastUserIdx = -1;
+    for (var i = filtered.length - 1; i >= 0; i--) {
+        if (filtered[i].role === 'user') { lastUserIdx = i; break; }
+    }
+
+    return filtered.map(function (msg, idx) {
+        if (!Array.isArray(msg.content)) return msg;
+
+        // Keep images only in the last user message
+        if (idx === lastUserIdx) return msg;
+
+        // Replace image blocks in older messages
+        var stripped = msg.content.map(function (block) {
+            if (block.type === 'image') {
+                return { type: 'text', text: '[Image was attached]' };
+            }
+            return block;
+        });
+        return { role: msg.role, content: stripped };
+    });
+};
+
+/**
+ * Convert a Blob to base64 string.
+ */
+AIAssistantManager.prototype._blobToBase64 = function (blob) {
+    return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () {
+            var dataUrl = reader.result;
+            var base64 = dataUrl.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = function () { reject(new Error('Failed to read blob')); };
+        reader.readAsDataURL(blob);
+    });
+};
+
+/**
+ * Detect if user text references a session (e.g., "last session", "most recent",
+ * "today", "yesterday", "session #3"). Returns a matching session or null.
+ */
+AIAssistantManager.prototype._detectSessionReference = function (text) {
+    var self = this;
+    var lower = text.toLowerCase();
+
+    // Check for session-related keywords
+    var patterns = [
+        /\blast\s+session\b/,
+        /\bmost\s+recent\b/,
+        /\blatest\s+session\b/,
+        /\btoday['s]?\s+session\b/,
+        /\byesterday['s]?\s+session\b/,
+        /\bmy\s+(?:last|latest|recent)\s+(?:group|target|shot)\b/,
+        /\banalyze\s+(?:my|the|this)\s+(?:last|latest|recent)\b/,
+        /\bsession\s*#?\s*(\d+)\b/
+    ];
+
+    var matched = false;
+    for (var i = 0; i < patterns.length; i++) {
+        if (patterns[i].test(lower)) { matched = true; break; }
+    }
+    if (!matched) return Promise.resolve(null);
+
+    // Fetch recent sessions for the selected rifle (or all if none selected)
+    var fetchPromise;
+    if (self.selectedRifleId) {
+        fetchPromise = self.db.getSessionsByRifle(self.selectedRifleId);
+    } else {
+        fetchPromise = self.db.getAllSessions ? self.db.getAllSessions() : Promise.resolve([]);
+    }
+
+    return fetchPromise.then(function (sessions) {
+        if (!sessions || sessions.length === 0) return null;
+
+        // Sort by date descending
+        sessions.sort(function (a, b) {
+            return (b.date || '').localeCompare(a.date || '');
+        });
+
+        // For "session #N", try to match by index
+        var numMatch = lower.match(/session\s*#?\s*(\d+)/);
+        if (numMatch) {
+            var idx = parseInt(numMatch[1], 10) - 1;
+            if (idx >= 0 && idx < sessions.length) return sessions[idx];
+        }
+
+        // Default: return the most recent session
+        return sessions[0];
+    });
+};
+
+/**
+ * Try to auto-attach a session target image when the user references a session.
+ * Returns { base64, mediaType } or null.
+ */
+AIAssistantManager.prototype._tryAutoAttachImage = function (userText) {
+    var self = this;
+
+    return self._detectSessionReference(userText).then(function (session) {
+        if (!session || !session.id) return null;
+
+        return self.db.getSessionImage(session.id).then(function (record) {
+            if (!record || !record.fullBlob) return null;
+
+            // Resize the blob before attaching
+            return self._blobToBase64(record.fullBlob).then(function (fullBase64) {
+                return new Promise(function (resolve) {
+                    var img = new Image();
+                    img.onload = function () {
+                        var maxDim = 1024;
+                        var w = img.width;
+                        var h = img.height;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) {
+                                h = Math.round(h * maxDim / w);
+                                w = maxDim;
+                            } else {
+                                w = Math.round(w * maxDim / h);
+                                h = maxDim;
+                            }
+                        }
+                        var canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        var ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        var base64 = dataUrl.split(',')[1];
+                        resolve({ base64: base64, mediaType: 'image/jpeg' });
+                    };
+                    img.onerror = function () { resolve(null); };
+                    img.src = 'data:image/jpeg;base64,' + fullBase64;
+                });
+            });
+        }).catch(function () { return null; });
+    }).catch(function () { return null; });
 };
 
 /**
