@@ -111,18 +111,43 @@ ProfileManager.prototype._bindRifleListEvents = function () {
 
 ProfileManager.prototype.showRifleForm = function (rifleId) {
     var self = this;
+    var adminMerged = (typeof isAdmin === 'function' && isAdmin());
     if (rifleId) {
-        this.db.getRifle(rifleId).then(function (rifle) {
-            if (rifle) self._renderRifleForm(rifle);
-        });
+        if (adminMerged) {
+            // Admin: load rifle + barrel together
+            Promise.all([
+                self.db.getRifle(rifleId),
+                self.db.getBarrelsByRifle(rifleId)
+            ]).then(function (results) {
+                var rifle = results[0];
+                var barrels = results[1];
+                var activeBarrel = null;
+                for (var i = 0; i < barrels.length; i++) {
+                    if (barrels[i].isActive) { activeBarrel = barrels[i]; break; }
+                }
+                if (rifle) self._renderRifleForm(rifle, activeBarrel);
+            });
+        } else {
+            this.db.getRifle(rifleId).then(function (rifle) {
+                if (rifle) self._renderRifleForm(rifle, null);
+            });
+        }
     } else {
-        this._renderRifleForm(null);
+        this._renderRifleForm(null, null);
     }
 };
 
-ProfileManager.prototype._renderRifleForm = function (rifle) {
+ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     var isEdit = !!rifle;
     var title = isEdit ? 'Edit Rifle' : 'New Rifle';
+    var adminMerged = (typeof isAdmin === 'function' && isAdmin());
+
+    // Parse existing twist rate number from stored string (e.g. "1:8" → "8", "1:8.5" → "8.5")
+    var twistNum = '';
+    if (barrel && barrel.twistRate) {
+        var parts = barrel.twistRate.split(':');
+        twistNum = parts.length > 1 ? parts[1] : parts[0];
+    }
 
     var html = '<div class="profile-screen">';
     html += '<div class="profile-toolbar">';
@@ -154,6 +179,56 @@ ProfileManager.prototype._renderRifleForm = function (rifle) {
     html += '</div>';
     html += '</div>';
 
+    if (adminMerged) {
+        // ── Admin: Barrel fields merged into rifle form ──
+        html += '<div class="form-row">';
+        html += '<div class="form-group form-group-half">';
+        html += '<label for="rf-twist">Barrel Twist</label>';
+        html += '<div style="display:flex;align-items:center;gap:4px;">';
+        html += '<span style="font-size:1rem;color:#ccc;white-space:nowrap;">1:</span>';
+        html += '<input type="number" id="rf-twist" min="1" max="20" step="0.5" inputmode="decimal" placeholder="8" value="' + escapeAttr(twistNum) + '">';
+        html += '</div>';
+        html += '</div>';
+
+        if (isEdit) {
+            // Show twist direction and round count on edit
+            html += '<div class="form-group form-group-half">';
+            html += '<label for="rf-twist-dir">Twist Direction</label>';
+            html += '<select id="rf-twist-dir">';
+            html += '<option value="Right"' + (barrel && barrel.twistDirection === 'Right' ? ' selected' : (!barrel ? ' selected' : '')) + '>Right</option>';
+            html += '<option value="Left"' + (barrel && barrel.twistDirection === 'Left' ? ' selected' : '') + '>Left</option>';
+            html += '</select>';
+            html += '</div>';
+        } else {
+            // On create, skip twist direction (default Right) — just close the row
+            html += '<div class="form-group form-group-half"></div>';
+        }
+        html += '</div>';
+
+        if (isEdit) {
+            html += '<div class="form-row">';
+            html += '<div class="form-group form-group-half">';
+            html += '<label for="rf-rounds">Round Count</label>';
+            html += '<input type="number" id="rf-rounds" min="0" step="1" inputmode="numeric" placeholder="0" value="' + (barrel ? (barrel.totalRounds || 0) : 0) + '">';
+            html += '</div>';
+            html += '<div class="form-group form-group-half">';
+            html += '<label>Since Cleaned</label>';
+            html += '<span id="rf-since-cleaned" class="form-static-value" style="display:block;padding:8px 0;color:#aaa;">—</span>';
+            html += '</div>';
+            html += '</div>';
+
+            // Install date — collapsed by default
+            html += '<details class="session-details" style="margin:0 0 12px;">';
+            html += '<summary class="session-details-summary">Install Date</summary>';
+            html += '<div class="session-details-body" style="padding:8px 0 0;">';
+            html += '<div class="form-group">';
+            html += '<input type="date" id="rf-install-date" value="' + escapeAttr(barrel ? barrel.installDate : new Date().toISOString().split('T')[0]) + '">';
+            html += '</div>';
+            html += '</div>';
+            html += '</details>';
+        }
+    }
+
     html += '<div class="form-group">';
     html += '<label for="rf-notes">Notes</label>';
     html += '<textarea id="rf-notes" rows="3" placeholder="Optional notes">' + escapeHtml(rifle ? rifle.notes : '') + '</textarea>';
@@ -170,11 +245,24 @@ ProfileManager.prototype._renderRifleForm = function (rifle) {
     html += '</div>';
 
     this.container.innerHTML = html;
-    this._bindRifleFormEvents(rifle);
+    this._bindRifleFormEvents(rifle, barrel);
+
+    // Admin: compute "since cleaned" for display
+    if (adminMerged && isEdit && barrel) {
+        var self = this;
+        this.db.getCleaningLogsByBarrel(barrel.id).then(function (cleaningLogs) {
+            var sinceCleaning = self.historyManager
+                ? self.historyManager._computeRoundsSinceCleaning(barrel.totalRounds || 0, cleaningLogs)
+                : (barrel.totalRounds || 0);
+            var el = document.getElementById('rf-since-cleaned');
+            if (el) el.textContent = sinceCleaning;
+        });
+    }
 };
 
-ProfileManager.prototype._bindRifleFormEvents = function (rifle) {
+ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
     var self = this;
+    var adminMerged = (typeof isAdmin === 'function' && isAdmin());
 
     document.getElementById('btn-form-back').addEventListener('click', function () {
         if (rifle) {
@@ -201,20 +289,75 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle) {
             notes: document.getElementById('rf-notes').value.trim()
         };
 
+        // Admin: collect barrel fields
+        var barrelData = null;
+        if (adminMerged) {
+            var twistInput = document.getElementById('rf-twist');
+            var twistVal = twistInput ? twistInput.value.trim() : '';
+            var twistDirEl = document.getElementById('rf-twist-dir');
+            var twistDir = twistDirEl ? twistDirEl.value : 'Right';
+            var roundsEl = document.getElementById('rf-rounds');
+            var installDateEl = document.getElementById('rf-install-date');
+
+            if (twistVal) {
+                barrelData = {
+                    twistRate: '1:' + twistVal,
+                    twistDirection: twistDir,
+                    totalRounds: roundsEl ? (parseInt(roundsEl.value, 10) || 0) : 0,
+                    installDate: installDateEl ? installDateEl.value : new Date().toISOString().split('T')[0]
+                };
+            }
+        }
+
         if (rifle) {
-            // Update
+            // Update rifle
             rifle.name = data.name;
             rifle.caliber = data.caliber;
             rifle.scopeHeight = data.scopeHeight;
             rifle.zeroRange = data.zeroRange;
             rifle.notes = data.notes;
-            self.db.updateRifle(rifle).then(function () {
+
+            var savePromise = self.db.updateRifle(rifle);
+
+            // Admin: also update or create barrel
+            if (adminMerged && barrelData) {
+                savePromise = savePromise.then(function () {
+                    if (barrel) {
+                        // Update existing barrel
+                        barrel.twistRate = barrelData.twistRate;
+                        barrel.twistDirection = barrelData.twistDirection;
+                        barrel.totalRounds = barrelData.totalRounds;
+                        if (barrelData.installDate) barrel.installDate = barrelData.installDate;
+                        return self.db.updateBarrel(barrel);
+                    } else {
+                        // Create new barrel
+                        barrelData.rifleId = rifle.id;
+                        barrelData.isActive = true;
+                        return self.db.addBarrel(barrelData).then(function (newBarrel) {
+                            return self.db.setActiveBarrel(newBarrel.id, rifle.id);
+                        });
+                    }
+                });
+            }
+
+            savePromise.then(function () {
                 self.showRifleDetail(rifle.id);
             });
         } else {
-            // Create
+            // Create rifle
             self.db.addRifle(data).then(function (newRifle) {
-                self.showRifleDetail(newRifle.id);
+                // Admin: create barrel alongside rifle
+                if (adminMerged && barrelData) {
+                    barrelData.rifleId = newRifle.id;
+                    barrelData.isActive = true;
+                    return self.db.addBarrel(barrelData).then(function (newBarrel) {
+                        return self.db.setActiveBarrel(newBarrel.id, newRifle.id);
+                    }).then(function () {
+                        self.showRifleDetail(newRifle.id);
+                    });
+                } else {
+                    self.showRifleDetail(newRifle.id);
+                }
             }).catch(function (err) {
                 alert(err.message);
             });
@@ -262,6 +405,9 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         return (a.name || '').localeCompare(b.name || '');
     });
 
+    // Admin sees a merged rifle+barrel view; others see the original separate layout
+    var adminMerged = (typeof isAdmin === 'function' && isAdmin());
+
     var html = '<div class="profile-screen">';
 
     // Toolbar
@@ -271,49 +417,75 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     html += '<button class="btn-icon" id="btn-edit-rifle" title="Edit">&#9998;</button>';
     html += '</div>';
 
-    // Rifle info card
-    html += '<div class="detail-card">';
-    html += '<div class="detail-row"><span class="detail-label">Caliber</span><span class="detail-value">' + escapeHtml(rifle.caliber) + '</span></div>';
-    if (rifle.scopeHeight) {
-        html += '<div class="detail-row"><span class="detail-label">Scope Height</span><span class="detail-value">' + rifle.scopeHeight + '"</span></div>';
-    }
-    if (rifle.zeroRange) {
-        html += '<div class="detail-row"><span class="detail-label">Zero Range</span><span class="detail-value">' + rifle.zeroRange + ' yds</span></div>';
-    }
-    if (rifle.notes) {
-        html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(rifle.notes) + '</span></div>';
-    }
-    html += '</div>';
-
-    // Barrel section
-    html += '<div class="detail-section">';
-    html += '<div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Barrel</h3>';
-    if (!activeBarrel) {
-        html += '<button class="btn btn-sm btn-secondary" id="btn-add-barrel">+ Add</button>';
-    }
-    html += '</div>';
-
-    if (activeBarrel) {
+    if (adminMerged) {
+        // ── Admin: Merged rifle + barrel card ──
         html += '<div class="detail-card">';
-        html += '<div class="detail-row"><span class="detail-label">Twist</span><span class="detail-value">' + escapeHtml(activeBarrel.twistRate) + ' ' + activeBarrel.twistDirection + '</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Installed</span><span class="detail-value">' + activeBarrel.installDate + '</span></div>';
-        if (activeBarrel.notes) {
-            html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(activeBarrel.notes) + '</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Caliber</span><span class="detail-value">' + escapeHtml(rifle.caliber) + '</span></div>';
+        if (rifle.scopeHeight) {
+            html += '<div class="detail-row"><span class="detail-label">Scope Height</span><span class="detail-value">' + rifle.scopeHeight + '"</span></div>';
         }
-        html += '<div class="btn-row btn-row-compact">';
-        html += '<button class="btn btn-sm btn-secondary" id="btn-edit-barrel" data-barrel-id="' + activeBarrel.id + '">Edit</button>';
-        html += '<button class="btn btn-sm btn-danger-outline" id="btn-delete-barrel" data-barrel-id="' + activeBarrel.id + '">Delete</button>';
+        if (rifle.zeroRange) {
+            html += '<div class="detail-row"><span class="detail-label">Zero Range</span><span class="detail-value">' + rifle.zeroRange + ' yds</span></div>';
+        }
+        if (activeBarrel && activeBarrel.twistRate) {
+            html += '<div class="detail-row"><span class="detail-label">Twist</span><span class="detail-value">' + escapeHtml(activeBarrel.twistRate) + ' ' + (activeBarrel.twistDirection || 'Right') + '</span></div>';
+        }
+        if (rifle.notes) {
+            html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(rifle.notes) + '</span></div>';
+        }
         html += '</div>';
-        html += '</div>';
-    } else {
-        html += '<p class="empty-state-sub">No barrel configured</p>';
-    }
-    html += '</div>';
 
-    // Barrel stats (round counts)
-    if (activeBarrel) {
-        html += '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
+        // Round count stats (inline, admin merged view)
+        if (activeBarrel) {
+            html += '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
+        }
+
+    } else {
+        // ── Non-admin: Original separate rifle + barrel layout ──
+        // Rifle info card
+        html += '<div class="detail-card">';
+        html += '<div class="detail-row"><span class="detail-label">Caliber</span><span class="detail-value">' + escapeHtml(rifle.caliber) + '</span></div>';
+        if (rifle.scopeHeight) {
+            html += '<div class="detail-row"><span class="detail-label">Scope Height</span><span class="detail-value">' + rifle.scopeHeight + '"</span></div>';
+        }
+        if (rifle.zeroRange) {
+            html += '<div class="detail-row"><span class="detail-label">Zero Range</span><span class="detail-value">' + rifle.zeroRange + ' yds</span></div>';
+        }
+        if (rifle.notes) {
+            html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(rifle.notes) + '</span></div>';
+        }
+        html += '</div>';
+
+        // Barrel section
+        html += '<div class="detail-section">';
+        html += '<div class="detail-section-header">';
+        html += '<h3 class="detail-section-title">Barrel</h3>';
+        if (!activeBarrel) {
+            html += '<button class="btn btn-sm btn-secondary" id="btn-add-barrel">+ Add</button>';
+        }
+        html += '</div>';
+
+        if (activeBarrel) {
+            html += '<div class="detail-card">';
+            html += '<div class="detail-row"><span class="detail-label">Twist</span><span class="detail-value">' + escapeHtml(activeBarrel.twistRate) + ' ' + activeBarrel.twistDirection + '</span></div>';
+            html += '<div class="detail-row"><span class="detail-label">Installed</span><span class="detail-value">' + activeBarrel.installDate + '</span></div>';
+            if (activeBarrel.notes) {
+                html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(activeBarrel.notes) + '</span></div>';
+            }
+            html += '<div class="btn-row btn-row-compact">';
+            html += '<button class="btn btn-sm btn-secondary" id="btn-edit-barrel" data-barrel-id="' + activeBarrel.id + '">Edit</button>';
+            html += '<button class="btn btn-sm btn-danger-outline" id="btn-delete-barrel" data-barrel-id="' + activeBarrel.id + '">Delete</button>';
+            html += '</div>';
+            html += '</div>';
+        } else {
+            html += '<p class="empty-state-sub">No barrel configured</p>';
+        }
+        html += '</div>';
+
+        // Barrel stats (round counts)
+        if (activeBarrel) {
+            html += '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
+        }
     }
 
     // Loads section
@@ -392,6 +564,7 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
 
 ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel) {
     var self = this;
+    var adminMerged = (typeof isAdmin === 'function' && isAdmin());
 
     document.getElementById('btn-detail-back').addEventListener('click', function () {
         self.showRifleList();
@@ -401,31 +574,34 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
         self.showRifleForm(rifle.id);
     });
 
-    var addBarrelBtn = document.getElementById('btn-add-barrel');
-    if (addBarrelBtn) {
-        addBarrelBtn.addEventListener('click', function () {
-            self.showBarrelForm(rifle.id, null);
-        });
-    }
+    // Non-admin: separate barrel buttons
+    if (!adminMerged) {
+        var addBarrelBtn = document.getElementById('btn-add-barrel');
+        if (addBarrelBtn) {
+            addBarrelBtn.addEventListener('click', function () {
+                self.showBarrelForm(rifle.id, null);
+            });
+        }
 
-    var editBarrelBtn = document.getElementById('btn-edit-barrel');
-    if (editBarrelBtn) {
-        editBarrelBtn.addEventListener('click', function () {
-            self.showBarrelForm(rifle.id, activeBarrel);
-        });
-    }
+        var editBarrelBtn = document.getElementById('btn-edit-barrel');
+        if (editBarrelBtn) {
+            editBarrelBtn.addEventListener('click', function () {
+                self.showBarrelForm(rifle.id, activeBarrel);
+            });
+        }
 
-    var deleteBarrelBtn = document.getElementById('btn-delete-barrel');
-    if (deleteBarrelBtn && activeBarrel) {
-        deleteBarrelBtn.addEventListener('click', function () {
-            if (confirm('Delete this barrel?')) {
-                self.db.deleteBarrel(activeBarrel.id).then(function () {
-                    self.showRifleDetail(rifle.id);
-                }).catch(function (err) {
-                    alert('Failed to delete barrel: ' + (err.message || err));
-                });
-            }
-        });
+        var deleteBarrelBtn = document.getElementById('btn-delete-barrel');
+        if (deleteBarrelBtn && activeBarrel) {
+            deleteBarrelBtn.addEventListener('click', function () {
+                if (confirm('Delete this barrel?')) {
+                    self.db.deleteBarrel(activeBarrel.id).then(function () {
+                        self.showRifleDetail(rifle.id);
+                    }).catch(function (err) {
+                        alert('Failed to delete barrel: ' + (err.message || err));
+                    });
+                }
+            });
+        }
     }
 
     document.getElementById('btn-add-load').addEventListener('click', function () {

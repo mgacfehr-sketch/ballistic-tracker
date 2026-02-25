@@ -118,24 +118,24 @@ AdminManager.prototype._render = function (stats, users, usage) {
     }
     html += '</section>';
 
-    // ── Beta Features Section ─────────────────────────────────
-    html += '<section class="admin-section">';
-    html += '<h3 class="admin-section-title">Beta Features</h3>';
-    html += '<p class="admin-desc">Toggle features on to release them to all users. You always have access as admin.</p>';
-    html += '<div class="admin-beta-toggles">';
-    for (var fk in BETA_FEATURES) {
-        var feat = BETA_FEATURES[fk];
-        var checked = getBetaFlag(fk) ? ' checked' : '';
-        html += '<label class="admin-beta-toggle">';
-        html += '<input type="checkbox" data-feature="' + fk + '"' + checked + '>';
-        html += '<span class="admin-beta-toggle-text">';
-        html += '<span class="admin-beta-toggle-label">' + self._esc(feat.label) + '</span>';
-        html += '<span class="admin-beta-toggle-desc">' + self._esc(feat.desc) + '</span>';
-        html += '</span>';
-        html += '</label>';
-    }
-    html += '</div>';
-    html += '</section>';
+    // ── Beta Features Section (hidden until features are ready) ──
+    // html += '<section class="admin-section">';
+    // html += '<h3 class="admin-section-title">Beta Features</h3>';
+    // html += '<p class="admin-desc">Toggle features on to release them to all users.</p>';
+    // html += '<div class="admin-beta-toggles">';
+    // for (var fk in BETA_FEATURES) {
+    //     var feat = BETA_FEATURES[fk];
+    //     var checked = getBetaFlag(fk) ? ' checked' : '';
+    //     html += '<label class="admin-beta-toggle">';
+    //     html += '<input type="checkbox" data-feature="' + fk + '"' + checked + '>';
+    //     html += '<span class="admin-beta-toggle-text">';
+    //     html += '<span class="admin-beta-toggle-label">' + self._esc(feat.label) + '</span>';
+    //     html += '<span class="admin-beta-toggle-desc">' + self._esc(feat.desc) + '</span>';
+    //     html += '</span>';
+    //     html += '</label>';
+    // }
+    // html += '</div>';
+    // html += '</section>';
 
     // ── Export Button ─────────────────────────────────────────
     html += '<section class="admin-section">';

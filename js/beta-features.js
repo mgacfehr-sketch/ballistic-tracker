@@ -34,18 +34,22 @@ function isAdmin() {
 
 /**
  * Check if a beta feature is available to the current user.
- * Admin always has access. Regular users only if the flag is released.
+ * Currently ALL beta features are disabled for everyone (including admin).
+ * To re-enable, restore the original logic below.
  */
 function isBetaEnabled(featureName) {
-    if (isAdmin()) return true;
-    var feat = BETA_FEATURES[featureName];
-    if (!feat) return false;
-    try {
-        var val = localStorage.getItem('yort_' + feat.key);
-        return val === 'true';
-    } catch (e) {
-        return false;
-    }
+    // ── All beta features hidden until ready for release ──
+    return false;
+    // Original logic (re-enable when ready):
+    // if (isAdmin()) return true;
+    // var feat = BETA_FEATURES[featureName];
+    // if (!feat) return false;
+    // try {
+    //     var val = localStorage.getItem('yort_' + feat.key);
+    //     return val === 'true';
+    // } catch (e) {
+    //     return false;
+    // }
 }
 
 /**
