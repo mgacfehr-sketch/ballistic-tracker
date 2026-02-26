@@ -5,6 +5,14 @@
  * to the Anthropic Messages API for shooting analysis and advice.
  */
 
+/**
+ * Strip |||ACTION:...|||  blocks from AI response text before display.
+ */
+function _stripActionBlocks(text) {
+    if (!text) return '';
+    return text.replace(/\|\|\|ACTION:[\s\S]*?\|\|\|/g, '').trim();
+}
+
 function AIAssistantManager(db) {
     this.db = db;
     this.container = null;
@@ -116,7 +124,7 @@ AIAssistantManager.prototype._renderChat = function () {
                 } else {
                     displayText = msg.content;
                 }
-                displayText = self._stripActionBlocks(displayText);
+                displayText = _stripActionBlocks(displayText);
                 if (msg.role === 'user') {
                     html += '<div class="ai-message ai-message-user">';
                     if (hasImage) html += '<div class="ai-message-img-tag">[Image attached]</div>';
@@ -892,7 +900,7 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
                         lines.push('User: ' + (msgs[m].content || '').substring(0, 150));
                         userCount++;
                     } else if (msgs[m].role === 'assistant' && assistantCount < 1) {
-                        lines.push('Assistant: ' + self._stripActionBlocks(msgs[m].content || '').substring(0, 200));
+                        lines.push('Assistant: ' + _stripActionBlocks(msgs[m].content || '').substring(0, 200));
                         assistantCount++;
                     }
                     if (userCount >= 2 && assistantCount >= 1) break;
@@ -1030,7 +1038,7 @@ AIAssistantManager.prototype._appendMessage = function (role, content, hasImage)
         imgTag.textContent = '[Image attached]';
         div.appendChild(imgTag);
     }
-    var displayContent = this._stripActionBlocks(content);
+    var displayContent = _stripActionBlocks(content);
     var textNode = document.createTextNode(displayContent);
     div.appendChild(textNode);
     messagesEl.appendChild(div);
@@ -1334,14 +1342,6 @@ AIAssistantManager.prototype._escapeHtml = function (str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
-};
-
-/**
- * Strip |||ACTION:...|||  blocks from text for display.
- */
-AIAssistantManager.prototype._stripActionBlocks = function (text) {
-    if (!text) return '';
-    return text.replace(/\|\|\|ACTION:[\s\S]*?\|\|\|/g, '').trim();
 };
 
 /**
