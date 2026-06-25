@@ -2072,6 +2072,18 @@ html, body {
     margin-bottom: 8px;
 }
 
+.cb-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--primary);
+    background: rgba(76, 175, 80, 0.15);
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 /* ── High Contrast / Sunlight Mode ─────────────────────────── */
 
 .high-contrast {
@@ -2256,6 +2268,55 @@ html, body {
 
 .high-contrast #step-panel {
     font-size: 16px;
+}
+
+/* ── Mobile Nav (<=768px) — hide logo, scroll tabs full-width ── */
+
+@media (max-width: 768px) {
+    #app-header {
+        padding: 0 8px;
+        gap: 6px;
+    }
+
+    /* Hide brand block in the header on mobile — tabs need the room */
+    .header-brand {
+        display: none;
+    }
+
+    /* Promote nav out of absolute centering — let it own the row */
+    #app-nav {
+        position: static;
+        left: auto;
+        transform: none;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;          /* Firefox */
+        background: transparent;        /* no group background while scrolling */
+        padding: 4px 2px;               /* breathing room so active tab shadow isn't clipped */
+        margin: 0;
+        border-radius: 0;
+        gap: 2px;
+        flex-wrap: nowrap;
+    }
+    #app-nav::-webkit-scrollbar {
+        display: none;                  /* Chrome/Safari */
+    }
+
+    .nav-tab {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+        white-space: nowrap;
+        padding: 8px 14px;
+    }
+
+    /* Keep header-actions on the right, reserve fixed space */
+    .header-actions {
+        flex-shrink: 0;
+    }
 }
 
 /* ── Landscape tweaks ───────────────────────────────────────── */

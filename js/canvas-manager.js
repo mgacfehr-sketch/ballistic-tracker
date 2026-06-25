@@ -364,7 +364,10 @@ CanvasManager.prototype._drawMarker = function (marker) {
         ctx.fillText('POA', sp.x, sp.y - markerSize - 2 * dpr);
     }
     else if (marker.type === 'impact') {
-        var color = '#4caf50';
+        // Shot #1 (cold bore) = orange/yellow, others = green
+        var isColdBore = marker.number === 1;
+        var color = isColdBore ? '#ffc107' : '#4caf50';
+        var bulletCircleColor = isColdBore ? 'rgba(255, 193, 7, 0.5)' : 'rgba(76, 175, 80, 0.5)';
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth;
 
@@ -373,7 +376,7 @@ CanvasManager.prototype._drawMarker = function (marker) {
             var radiusPx = (this.bulletDiameterPx / 2) * this.scale;
             ctx.beginPath();
             ctx.arc(sp.x, sp.y, radiusPx, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(76, 175, 80, 0.5)';
+            ctx.strokeStyle = bulletCircleColor;
             ctx.lineWidth = 1 * dpr;
             ctx.stroke();
             ctx.strokeStyle = color;
@@ -387,12 +390,13 @@ CanvasManager.prototype._drawMarker = function (marker) {
         ctx.moveTo(sp.x, sp.y - markerSize);
         ctx.lineTo(sp.x, sp.y + markerSize);
         ctx.stroke();
-        // Number label
+        // Number label — shot #1 shows "CB" instead of "1"
         ctx.fillStyle = color;
         ctx.font = 'bold ' + (11 * dpr) + 'px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(String(marker.number || ''), sp.x, sp.y - markerSize - 2 * dpr);
+        var label = isColdBore ? 'CB' : String(marker.number || '');
+        ctx.fillText(label, sp.x, sp.y - markerSize - 2 * dpr);
     }
     else if (marker.type === 'centroid') {
         // Small orange-red X

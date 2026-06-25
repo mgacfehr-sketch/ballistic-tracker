@@ -498,6 +498,17 @@ AIAssistantManager.prototype._gatherContext = function (selectedRifleId) {
                 ctx.zeroRecords = results[5] || [];
                 ctx.pastConversations = results[6] || [];
 
+                // Cold bore — pull session-derived + manual entries
+                if (typeof ColdBoreManager !== 'undefined') {
+                    var cbm = new ColdBoreManager(self.db);
+                    return cbm.getSummaryForRifle(selectedRifleId).then(function (cbEntries) {
+                        ctx.coldBoreEntries = cbEntries || [];
+                        return ctx;
+                    }).catch(function () {
+                        ctx.coldBoreEntries = [];
+                        return ctx;
+                    });
+                }
                 return ctx;
             });
         }
@@ -647,6 +658,9 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
     lines.push('');
     lines.push('SCENARIO 2 - Hits are off at long range but zeroed at 100:');
     lines.push('When a shooter says they are zeroed at 100 yards but hitting low (or high) at longer distances beyond 500 yards, do NOT tell them to adjust their scope. The problem is almost certainly that their muzzle velocity or ballistic coefficient in their calculator does not match reality. Tell them: if they don\'t have a verified muzzle velocity from a chronograph, adjust the MV in their calculator until the predicted impact matches where they\'re actually hitting. If they are confident in their MV, then adjust the BC. This is called \'truing\' the gun. The BC printed on the bullet box is an average and may not match their specific rifle, barrel length, or conditions. Every gun shoots slightly differently and the BC needs to be trued for precise long-range work.');
+    lines.push('');
+    lines.push('SCENARIO 2b - Cold bore question:');
+    lines.push('When asked about cold bore for a rifle (e.g., "where does my cold bore land", "what should I hold for my first shot"), check the COLD BORE DATA section below. If present, give a direct answer using the average MOA offset, then state the hold (opposite of average). If multiple loads exist, give per-load numbers. Mention how many data points the average is based on. If no cold-bore data is recorded, tell the shooter to mark shot #1 first when tapping impacts so yorT can build the trend.');
     lines.push('');
     lines.push('SCENARIO 3 - POI change after switching ammo lots:');
     lines.push('When a shooter switches to a new box of the same ammo and notices point of impact has changed, explain that lot-to-lot variation in factory ammunition is real and common. Different production lots can have slight differences in powder charge, bullet concentricity, and other factors. If the shift is consistent over 10 rounds, they should re-zero for that lot. This is one reason serious long-range shooters buy ammo in bulk from the same lot or handload their own ammunition for consistency.');
@@ -806,6 +820,49 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
                 (adj.reason ? ' — ' + adj.reason : ''));
         }
         lines.push('');
+    }
+
+    // Cold Bore — shot #1 offsets from POA (by load when available)
+    if (context.coldBoreEntries && context.coldBoreEntries.length > 0) {
+        lines.push('=== COLD BORE DATA (shot #1 from POA) ===');
+        // Per-load grouping
+        var cbByLoad = {};
+        for (var cbi = 0; cbi < context.coldBoreEntries.length; cbi++) {
+            var ce = context.coldBoreEntries[cbi];
+            var lkey = ce.loadId || '_no_load';
+            if (!cbByLoad[lkey]) cbByLoad[lkey] = { loadName: ce.loadName, entries: [] };
+            cbByLoad[lkey].entries.push(ce);
+        }
+        for (var lk in cbByLoad) {
+            if (!cbByLoad.hasOwnProperty(lk)) continue;
+            var grp = cbByLoad[lk];
+            var n = grp.entries.length;
+            var sV = 0, sH = 0, sT = 0;
+            for (var ge = 0; ge < n; ge++) {
+                sV += grp.entries[ge].vertMOA;
+                sH += grp.entries[ge].horizMOA;
+                sT += grp.entries[ge].totalMOA;
+            }
+            var aV = sV / n, aH = sH / n, aT = sT / n;
+            var elevDir = aV >= 0 ? 'high' : 'low';
+            var windDir = aH >= 0 ? 'right' : 'left';
+            lines.push('--- ' + grp.loadName + ' (' + n + ' shot' + (n !== 1 ? 's' : '') + ') ---');
+            lines.push('Average: ' + Math.abs(aV).toFixed(2) + ' MOA ' + elevDir + ', ' +
+                Math.abs(aH).toFixed(2) + ' MOA ' + windDir + ', ' +
+                aT.toFixed(2) + ' MOA total radial');
+            lines.push('Hold recommendation: opposite of average — ' +
+                Math.abs(aV).toFixed(2) + ' MOA ' + (aV >= 0 ? 'low' : 'high') + ', ' +
+                Math.abs(aH).toFixed(2) + ' MOA ' + (aH >= 0 ? 'left' : 'right'));
+            // Last few data points
+            for (var de = 0; de < Math.min(6, n); de++) {
+                var en = grp.entries[de];
+                var dateS = en.date ? en.date.split('T')[0] : '?';
+                lines.push(dateS + ' | ' + (en.distanceYards || '?') + 'yds | Vert: ' +
+                    en.vertMOA.toFixed(2) + ' MOA, Horiz: ' + en.horizMOA.toFixed(2) +
+                    ' MOA, Total: ' + en.totalMOA.toFixed(2) + ' MOA');
+            }
+            lines.push('');
+        }
     }
 
     // Zero records

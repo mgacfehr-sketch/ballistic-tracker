@@ -128,13 +128,16 @@ function _drawExportMarker(ctx, marker, bulletDiameterPx, sf) {
         ctx.fillText('POA', x, y - armLen - 3 * sf);
     }
     else if (marker.type === 'impact') {
-        var color = '#4caf50';
+        // Shot #1 (cold bore) = orange/yellow, others = green
+        var isColdBore = marker.number === 1;
+        var color = isColdBore ? '#ffc107' : '#4caf50';
+        var bulletCircleColor = isColdBore ? 'rgba(255, 193, 7, 0.5)' : 'rgba(76, 175, 80, 0.5)';
 
         // Bullet diameter circle
         if (bulletDiameterPx > 0) {
             ctx.beginPath();
             ctx.arc(x, y, bulletDiameterPx / 2, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(76, 175, 80, 0.5)';
+            ctx.strokeStyle = bulletCircleColor;
             ctx.lineWidth = 1.5 * sf;
             ctx.stroke();
         }
@@ -149,12 +152,13 @@ function _drawExportMarker(ctx, marker, bulletDiameterPx, sf) {
         ctx.lineTo(x, y + armLen);
         ctx.stroke();
 
-        // Number
+        // Number — shot #1 shows "CB"
         ctx.fillStyle = color;
         ctx.font = 'bold ' + Math.round(14 * sf) + 'px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(String(marker.number || ''), x, y - armLen - 3 * sf);
+        var label = isColdBore ? 'CB' : String(marker.number || '');
+        ctx.fillText(label, x, y - armLen - 3 * sf);
     }
     else if (marker.type === 'centroid') {
         var s = 8 * sf;

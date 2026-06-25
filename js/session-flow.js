@@ -22,8 +22,9 @@ function SessionFlow(canvasManager, db) {
     this.distanceYards = 0;
     this.bulletDiameter = 0;
     this.poa = null;           // {x, y} image coords
-    this.impacts = [];         // [{x, y}] image coords, ordered
+    this.impacts = [];         // [{x, y, shotNumber}] image coords, ordered by tap (shot #1 = cold bore)
     this.results = null;       // output from calculateSession
+    this.coldBore = null;      // {verticalInches, verticalMOA, horizontalInches, horizontalMOA, radialInches, radialMOA} for shot #1
 
     // Profile references (null in Quick/Misc mode)
     this.rifleId = null;
@@ -70,6 +71,7 @@ SessionFlow.prototype.init = function () {
         calibrationStatus: document.getElementById('calibration-status'),
         btnRedoCalibration: document.getElementById('btn-redo-calibration'),
         btnNextCalibration: document.getElementById('btn-next-calibration'),
+        btnManualCalibration: document.getElementById('btn-manual-calibration'),
         // Step 4: Data
         inputDistance: document.getElementById('input-distance'),
         inputBulletDia: document.getElementById('input-bullet-dia'),
@@ -127,6 +129,7 @@ SessionFlow.prototype.reset = function () {
     this.poa = null;
     this.impacts = [];
     this.results = null;
+    this.coldBore = null;
 
     // Clear profile references
     this.rifleId = null;
@@ -179,6 +182,7 @@ SessionFlow.prototype.reset = function () {
     // Reset button states
     this._hideEl(this.els.btnRedoCalibration);
     this._hideEl(this.els.btnNextCalibration);
+    this._hideEl(this.els.btnManualCalibration);
     this._hideEl(this.els.btnRedoPoa);
     this._hideEl(this.els.btnNextPoa);
     if (this.els.btnNextData) this.els.btnNextData.disabled = true;
@@ -473,6 +477,11 @@ SessionFlow.prototype._bindUI = function () {
     this.els.btnNextCalibration.addEventListener('click', function () {
         self._nextStep();
     });
+    if (this.els.btnManualCalibration) {
+        this.els.btnManualCalibration.addEventListener('click', function () {
+            self._startCalibration();
+        });
+    }
 
     // Step 4: Data inputs
     this.els.inputDistance.addEventListener('input', function () {
@@ -569,14 +578,94 @@ SessionFlow.prototype._onImageSelected = function (e) {
         self.image = img;
         self.canvas.loadImage(img);
         if (self.els.canvasWatermark) self.els.canvasWatermark.style.display = 'none';
-        self._startCalibration();
-        self._nextStep();
+        self._nextStep(); // move to calibrate step
+
+        // Try auto-detection of yorT target; fall back to manual if it fails.
+        self._tryAutoCalibration(img);
     }).catch(function (err) {
         alert('Failed to load image: ' + err.message);
     });
 
     // Reset the input so the same file can be re-selected
     e.target.value = '';
+};
+
+/**
+ * Attempt ArUco-based auto-calibration. If all 4 markers detect, warp the
+ * image flat and set scale from the known 6.0" grid. Otherwise fall back
+ * to manual two-point calibration.
+ */
+SessionFlow.prototype._tryAutoCalibration = function (img) {
+    var self = this;
+
+    // If library failed to load, skip straight to manual
+    if (typeof ArucoCalibration === 'undefined' || window.__arucoLoadFailed) {
+        self._startCalibration();
+        return;
+    }
+
+    var ac = new ArucoCalibration();
+    if (!ac.isReady()) {
+        self._startCalibration();
+        return;
+    }
+
+    self.els.calibrationStatus.textContent = 'Looking for yorT target markers…';
+    self._hideEl(self.els.btnRedoCalibration);
+    self._hideEl(self.els.btnNextCalibration);
+    self._hideEl(self.els.btnManualCalibration);
+
+    // Run detection on the next tick so the status text renders first
+    setTimeout(function () {
+        var result;
+        try {
+            result = ac.detect(img);
+        } catch (err) {
+            console.warn('[ArUco] Detection threw:', err);
+            self._fallbackToManual('Detection error — set scale manually.');
+            return;
+        }
+
+        if (!result.success) {
+            self._fallbackToManual('No yorT target detected — set scale manually.');
+            return;
+        }
+
+        // All 4 markers found — warp flat
+        try {
+            var warp = ac.warpFlat(img, result.markers, 120);
+            // Replace the source image with a flattened version (cast canvas to image-like by drawing once more)
+            var flatImg = warp.canvas;
+            self.image = flatImg;
+            self.canvas.loadImage(flatImg);
+
+            // Set calibration as complete using the known scale
+            self.calibration.state = 'complete';
+            self.calibration.pixelsPerInch = warp.pixelsPerInch;
+            self.calibration.pointA = { x: warp.gridStartPx, y: warp.gridStartPx };
+            self.calibration.pointB = { x: warp.gridStartPx + warp.pixelsPerInch, y: warp.gridStartPx };
+
+            // No on-image calibration markers — show overlay status only
+            self.canvas.calibrationLine = null;
+            self.canvas.render();
+
+            self.els.calibrationStatus.innerHTML = '✅ yorT target detected — auto-scaled (' + warp.pixelsPerInch.toFixed(0) + ' px/in)';
+            self._showEl(self.els.btnRedoCalibration);
+            self._showEl(self.els.btnNextCalibration);
+            self._showEl(self.els.btnManualCalibration);
+            self.canvas.setHint('');
+        } catch (err) {
+            console.error('[ArUco] Warp failed:', err);
+            self._fallbackToManual('Auto-scale failed — set scale manually.');
+        }
+    }, 30);
+};
+
+SessionFlow.prototype._fallbackToManual = function (message) {
+    if (message && this.els.calibrationStatus) {
+        this.els.calibrationStatus.textContent = message;
+    }
+    this._startCalibration();
 };
 
 // ── Step 3: Calibration ────────────────────────────────────────
@@ -590,6 +679,7 @@ SessionFlow.prototype._startCalibration = function () {
     this.els.calibrationStatus.textContent = 'Zoom into a known 1-inch reference, then tap Point A';
     this._hideEl(this.els.btnRedoCalibration);
     this._hideEl(this.els.btnNextCalibration);
+    this._hideEl(this.els.btnManualCalibration);
     this._updateHint();
 };
 
@@ -689,8 +779,8 @@ SessionFlow.prototype._placePOA = function (point) {
 SessionFlow.prototype._placeImpact = function (point) {
     if (this.impacts.length >= MAX_IMPACTS) return;
 
-    this.impacts.push({ x: point.x, y: point.y });
-    var num = this.impacts.length;
+    var num = this.impacts.length + 1;
+    this.impacts.push({ x: point.x, y: point.y, shotNumber: num });
 
     this.canvas.markers.push({
         type: 'impact',
@@ -758,6 +848,17 @@ SessionFlow.prototype._calculate = function () {
     } catch (err) {
         alert('Calculation error: ' + err.message);
         return;
+    }
+
+    // Compute cold-bore (shot #1) offset from POA — used by cold-bore tracking
+    this.coldBore = null;
+    if (this.poa && this.impacts.length > 0 && this.impacts[0].shotNumber === 1) {
+        this.coldBore = calculateShotOffset(
+            this.impacts[0],
+            this.poa,
+            this.calibration.pixelsPerInch,
+            this.distanceYards
+        );
     }
 
     // Remove calibration markers and line — they served their purpose
@@ -919,6 +1020,12 @@ SessionFlow.prototype._saveSession = function () {
         return;
     }
 
+    // Warn if POA missing — cold-bore tracking needs it
+    if (!this.poa) {
+        var proceed = confirm("Set your point of aim — it's needed for cold bore tracking.\n\nSave anyway? This session won't count toward cold-bore stats.");
+        if (!proceed) return;
+    }
+
     var roundsFired = this.roundsFired || this.impacts.length;
 
     var sessionData = {
@@ -938,7 +1045,8 @@ SessionFlow.prototype._saveSession = function () {
         bulletDiameter: this.bulletDiameter,
         poaPoint: this.poa,
         impacts: this.impacts.slice(),
-        results: this.results
+        results: this.results,
+        coldBore: this.coldBore
     };
 
     // Store snapshot of rifle/load names for historical reference
@@ -1059,6 +1167,7 @@ SessionFlow.prototype._onCalibrationTap = function (point) {
         this.els.calibrationStatus.textContent = 'Calibrated: ' + formatFixed(ppi, 1) + ' px/in';
         this._showEl(this.els.btnRedoCalibration);
         this._showEl(this.els.btnNextCalibration);
+        this._hideEl(this.els.btnManualCalibration);
         this.canvas.setHint('');
         this._scrollPanelToBottom();
     }

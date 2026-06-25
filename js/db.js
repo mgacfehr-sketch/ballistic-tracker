@@ -387,6 +387,7 @@ BallisticDB.prototype.addSession = function (data) {
         poaPoint: data.poaPoint || null,
         impacts: data.impacts || [],
         results: data.results || null,
+        coldBore: data.coldBore || null,
         sightInComments: data.sightInComments || '',
         isZeroSession: data.isZeroSession || false,
         createdAt: new Date().toISOString()

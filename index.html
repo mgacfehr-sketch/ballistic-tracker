@@ -99,12 +99,13 @@
                 <section class="step" id="step-calibrate" data-step="3">
                     <div class="step-header">
                         <span class="step-badge">3</span>
-                        <span class="step-title">Set 1&quot; Calibration</span>
+                        <span class="step-title">Set Scale</span>
                         <button class="help-btn" onclick="showHelp('calibration')" title="What is calibration?">?</button>
                     </div>
                     <div class="step-body">
-                        <p id="calibration-status" class="step-instruction">Zoom into a known 1-inch reference, then tap Point A</p>
+                        <p id="calibration-status" class="step-instruction">Detecting yorT target&hellip;</p>
                         <div class="btn-row">
+                            <button id="btn-manual-calibration" class="btn btn-secondary hidden">Set scale manually</button>
                             <button id="btn-redo-calibration" class="btn btn-secondary hidden">Redo</button>
                             <button id="btn-next-calibration" class="btn btn-primary hidden">Continue</button>
                         </div>
@@ -272,11 +273,15 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- js-aruco2 — fiducial marker detection (optional; manual calibration is fallback) -->
+    <script src="https://cdn.jsdelivr.net/gh/damianofalcioni/js-aruco2@master/src/cv.js" onerror="window.__arucoLoadFailed=true"></script>
+    <script src="https://cdn.jsdelivr.net/gh/damianofalcioni/js-aruco2@master/src/aruco.js" onerror="window.__arucoLoadFailed=true"></script>
     <script src="js/utils.js"></script>
     <script src="js/db.js"></script>
     <script src="js/calculations.js"></script>
     <script src="js/canvas-manager.js"></script>
     <script src="js/calibration.js"></script>
+    <script src="js/aruco-calibration.js"></script>
     <script src="js/session-flow.js"></script>
     <script src="js/profiles.js"></script>
     <script src="js/history.js"></script>

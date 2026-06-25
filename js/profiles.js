@@ -478,20 +478,22 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     this.container.innerHTML = html;
     this._bindRifleDetailEvents(rifle, activeBarrel);
 
-    // Render beta feature sections if enabled
+    // Cold Bore — real feature for all users
+    if (typeof ColdBoreManager !== 'undefined') {
+        var cbContainer = document.getElementById('beta-cold-bore-section');
+        if (cbContainer) {
+            var cbManager = new ColdBoreManager(this.db);
+            cbManager.renderSection(cbContainer, rifle.id);
+        }
+    }
+
+    // Render remaining beta sections if enabled
     if (typeof isBetaEnabled === 'function') {
         if (isBetaEnabled('dopeLog') && typeof DopeLogManager !== 'undefined') {
             var dopeContainer = document.getElementById('beta-dope-section');
             if (dopeContainer) {
                 var dopeManager = new DopeLogManager(this.db);
                 dopeManager.renderSection(dopeContainer, rifle.id, loads);
-            }
-        }
-        if (isBetaEnabled('coldBore') && typeof ColdBoreManager !== 'undefined') {
-            var cbContainer = document.getElementById('beta-cold-bore-section');
-            if (cbContainer) {
-                var cbManager = new ColdBoreManager(this.db);
-                cbManager.renderSection(cbContainer, rifle.id);
             }
         }
     }

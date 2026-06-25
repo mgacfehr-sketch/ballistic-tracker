@@ -293,6 +293,37 @@ function calculateMeanWindage(impacts, poa, pixelsPerInch) {
 }
 
 /**
+ * Calculate a single shot's offset from POA.
+ * Uses same sign convention as calculatePOAOffset:
+ *   verticalInches > 0 = impact above POA (high)
+ *   horizontalInches > 0 = impact right of POA
+ * Used for cold-bore tracking on shot #1.
+ * @param {{x:number,y:number}} shot - impact pixel coords
+ * @param {{x:number,y:number}} poa - POA pixel coords
+ * @param {number} pixelsPerInch
+ * @param {number} distanceYards
+ * @returns {object|null}
+ */
+function calculateShotOffset(shot, poa, pixelsPerInch, distanceYards) {
+    if (!shot || !poa || !(pixelsPerInch > 0) || !(distanceYards > 0)) return null;
+    var dxPx = shot.x - poa.x;
+    var dyPx = poa.y - shot.y; // canvas Y inverted; positive = high
+    var verticalInches = pixelsToInches(dyPx, pixelsPerInch);
+    var horizontalInches = pixelsToInches(dxPx, pixelsPerInch);
+    var radialInches = Math.sqrt(verticalInches * verticalInches + horizontalInches * horizontalInches);
+    return {
+        verticalInches: round4(verticalInches),
+        verticalMOA: round4(inchesToMOA(Math.abs(verticalInches), distanceYards)) * (verticalInches >= 0 ? 1 : -1),
+        verticalDir: verticalInches >= 0 ? 'High' : 'Low',
+        horizontalInches: round4(horizontalInches),
+        horizontalMOA: round4(inchesToMOA(Math.abs(horizontalInches), distanceYards)) * (horizontalInches >= 0 ? 1 : -1),
+        horizontalDir: horizontalInches >= 0 ? 'Right' : 'Left',
+        radialInches: round4(radialInches),
+        radialMOA: round4(inchesToMOA(radialInches, distanceYards))
+    };
+}
+
+/**
  * Run all calculations for a session and return a complete results object.
  * This is the main entry point for the calculation engine.
  * @param {object} params
@@ -406,6 +437,7 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateHorizontalSD,
         calculateMeanElevation,
         calculateMeanWindage,
+        calculateShotOffset,
         calculateSession,
         round4
     };
