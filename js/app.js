@@ -223,8 +223,6 @@
             wind: document.getElementById('view-wind'),
             admin: document.getElementById('view-admin')
         };
-        var btnNewSession = document.getElementById('btn-new-session');
-
         function switchView(viewName) {
             // Update tabs
             for (var i = 0; i < navTabs.length; i++) {
@@ -242,11 +240,6 @@
                 } else {
                     views[key].classList.remove('active');
                 }
-            }
-
-            // Show/hide new session button (only in session view)
-            if (btnNewSession) {
-                btnNewSession.style.display = viewName === 'session' ? '' : 'none';
             }
 
             // Load profiles content when switching to profiles tab

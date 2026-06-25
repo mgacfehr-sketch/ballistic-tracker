@@ -103,9 +103,11 @@ SessionFlow.prototype.init = function () {
         btnShare: document.getElementById('btn-share'),
         btnNewFromResults: document.getElementById('btn-new-from-results'),
         btnCropImage: document.getElementById('btn-crop-image'),
-        // Global
-        btnNewSession: document.getElementById('btn-new-session'),
-        canvasWatermark: document.querySelector('.canvas-watermark')
+        // Print/share blank target (on profile step)
+        btnPrintTarget: document.getElementById('btn-print-target'),
+        btnShareTarget: document.getElementById('btn-share-target'),
+        // Brand lockup over the empty canvas — hidden once an image loads
+        canvasWatermark: document.querySelector('.canvas-brand-lockup')
     };
 
     // Cache step sections
@@ -561,10 +563,19 @@ SessionFlow.prototype._bindUI = function () {
         });
     }
 
-    // Global new session
-    this.els.btnNewSession.addEventListener('click', function () {
-        self.reset();
-    });
+    // Print Target — open PDF in hidden iframe and trigger print at actual size
+    if (this.els.btnPrintTarget) {
+        this.els.btnPrintTarget.addEventListener('click', function () {
+            self._printBlankTarget();
+        });
+    }
+
+    // Share Blank Target — Web Share API, fall back to download
+    if (this.els.btnShareTarget) {
+        this.els.btnShareTarget.addEventListener('click', function () {
+            self._shareBlankTarget();
+        });
+    }
 };
 
 // ── Step 2: Image Loading ──────────────────────────────────────
@@ -1276,6 +1287,120 @@ SessionFlow.prototype._shareImage = function () {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 'image/png');
+};
+
+// ── Print / Share Blank Target ─────────────────────────────────
+
+var BLANK_TARGET_URL = 'assets/yorT-target.pdf';
+var BLANK_TARGET_FILENAME = 'yorT-target.pdf';
+
+/**
+ * Print the blank yorT target PDF at actual size (100% scale).
+ * Loads the PDF in a hidden iframe and calls its print(), which surfaces
+ * the device's native print sheet. On mobile this exposes any wireless
+ * printer the system has registered.
+ */
+SessionFlow.prototype._printBlankTarget = function () {
+    var btn = this.els.btnPrintTarget;
+    if (btn) {
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = 'Opening print…';
+        setTimeout(function () {
+            btn.disabled = false;
+            btn.textContent = origText;
+        }, 4000);
+    }
+
+    // Inject a print-scope style block that forces actual size
+    var styleId = '__yort_print_actual_size';
+    if (!document.getElementById(styleId)) {
+        var styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        styleEl.media = 'print';
+        styleEl.textContent = '@page { size: auto; margin: 0; }';
+        document.head.appendChild(styleEl);
+    }
+
+    // Reuse a single hidden iframe so repeated taps don't pile up
+    var iframeId = '__yort_print_iframe';
+    var existing = document.getElementById(iframeId);
+    if (existing) existing.parentNode.removeChild(existing);
+
+    var iframe = document.createElement('iframe');
+    iframe.id = iframeId;
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
+    iframe.src = BLANK_TARGET_URL + '#zoom=100&toolbar=0';
+
+    iframe.onload = function () {
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        } catch (err) {
+            // Cross-origin or PDF viewer can't be programmatically printed
+            // — fall back to opening the PDF in a new tab so the user can
+            // tap the system Share/Print menu themselves.
+            console.warn('[Print] iframe.print failed:', err);
+            window.open(BLANK_TARGET_URL, '_blank');
+        }
+    };
+
+    document.body.appendChild(iframe);
+};
+
+/**
+ * Share the blank yorT target PDF via the OS share sheet.
+ * Falls back to download/open when Web Share for files is unavailable.
+ */
+SessionFlow.prototype._shareBlankTarget = function () {
+    var btn = this.els.btnShareTarget;
+    if (btn) {
+        btn.disabled = true;
+        var origText = btn.textContent;
+        var restore = function () { btn.disabled = false; btn.textContent = origText; };
+        setTimeout(restore, 4000);
+    }
+
+    fetch(BLANK_TARGET_URL).then(function (res) {
+        if (!res.ok) throw new Error('PDF not available (' + res.status + ')');
+        return res.blob();
+    }).then(function (blob) {
+        var file = new File([blob], BLANK_TARGET_FILENAME, { type: 'application/pdf' });
+        var shareData = { files: [file], title: 'yorT Target', text: 'yorT printable target' };
+
+        if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+            return navigator.share(shareData).catch(function (err) {
+                // User-cancelled share is normal — swallow silently
+                if (err && err.name !== 'AbortError') {
+                    console.warn('[Share] navigator.share failed:', err);
+                    _fallbackDownload(blob);
+                }
+            });
+        }
+        // No Web Share with file support — download
+        _fallbackDownload(blob);
+    }).catch(function (err) {
+        console.error('[Share] Failed to load target PDF:', err);
+        alert('Could not open the target PDF.');
+    });
+
+    function _fallbackDownload(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = BLANK_TARGET_FILENAME;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
 };
 
 // ── Weather Fetch ──────────────────────────────────────────────

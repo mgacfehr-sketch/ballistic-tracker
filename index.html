@@ -45,7 +45,6 @@
             </nav>
             <div class="header-actions">
                 <span id="connection-status" class="connection-dot"></span>
-                <button id="btn-new-session" class="header-btn" title="New Session">+</button>
                 <button id="btn-sunlight-mode" class="header-btn" title="Sunlight Mode">&#9788;</button>
                 <button id="btn-logout" class="header-btn" title="Log Out">&#x2192;</button>
             </div>
@@ -54,7 +53,10 @@
         <!-- Session View (canvas + step panel) -->
         <div id="view-session" class="app-view active">
             <main id="canvas-container">
-                <img src="assets/logo.png" alt="" class="canvas-watermark" onerror="this.style.display='none'">
+                <div class="canvas-brand-lockup">
+                    <img src="assets/logo.png" alt="" class="canvas-watermark" onerror="this.style.display='none'">
+                    <div class="canvas-wordmark"><span class="brand-yor">yor</span><span class="brand-t">T</span></div>
+                </div>
                 <canvas id="main-canvas"></canvas>
                 <div id="canvas-hint"></div>
                 <div id="zoom-indicator" class="hidden">1.0x</div>
@@ -75,6 +77,10 @@
                         <div id="profile-picker"></div>
                         <div class="btn-row">
                             <button id="btn-quick-mode" class="btn btn-secondary">Quick / Misc</button>
+                        </div>
+                        <div class="target-row">
+                            <button id="btn-print-target" class="btn btn-secondary btn-sm target-btn">Print Target</button>
+                            <button id="btn-share-target" class="btn btn-secondary btn-sm target-btn">Share Blank Target</button>
                         </div>
                     </div>
                 </section>
