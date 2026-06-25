@@ -33,21 +33,17 @@
 
     <div id="app" class="hidden">
         <header id="app-header">
-            <div class="header-brand">
-                <img src="assets/logo.png" alt="" class="header-logo" onerror="this.style.display='none'">
-                <h1><span class="brand-yor">yor</span><span class="brand-t">T</span></h1>
+            <div class="header-utility">
+                <span id="connection-status" class="connection-dot" title="Connection"></span>
+                <button id="btn-sunlight-mode" class="utility-btn" title="Sunlight Mode" aria-label="Sunlight Mode">&#9788;</button>
             </div>
-            <nav id="app-nav">
+            <nav id="app-nav" class="nav-grid">
                 <button class="nav-tab active" data-view="session">Session</button>
                 <button class="nav-tab" data-view="profiles">Profiles</button>
                 <button class="nav-tab" data-view="ai">Ask yorT</button>
                 <button class="nav-tab" data-view="solver">Solver</button>
+                <button id="btn-logout" class="nav-logout">Log Out</button>
             </nav>
-            <div class="header-actions">
-                <span id="connection-status" class="connection-dot"></span>
-                <button id="btn-sunlight-mode" class="header-btn" title="Sunlight Mode">&#9788;</button>
-                <button id="btn-logout" class="header-btn" title="Log Out">&#x2192;</button>
-            </div>
         </header>
 
         <!-- Session View (canvas + step panel) -->

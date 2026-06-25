@@ -44,7 +44,7 @@
                 initBetaFeatures(user.id);
             }
 
-            // Inject admin tab if this is the admin user
+            // Inject admin tab if this is the admin user — insert before Log Out
             if (user.id === ADMIN_USER_ID) {
                 var nav = document.getElementById('app-nav');
                 if (nav && !nav.querySelector('[data-view="admin"]')) {
@@ -52,11 +52,16 @@
                     adminTab.className = 'nav-tab';
                     adminTab.setAttribute('data-view', 'admin');
                     adminTab.textContent = 'Admin';
-                    nav.appendChild(adminTab);
+                    var logoutBtn = document.getElementById('btn-logout');
+                    if (logoutBtn && logoutBtn.parentNode === nav) {
+                        nav.insertBefore(adminTab, logoutBtn);
+                    } else {
+                        nav.appendChild(adminTab);
+                    }
                 }
             }
 
-            // Inject Wind Call tab if beta enabled
+            // Inject Wind Call tab if beta enabled — insert before Admin / Log Out
             if (typeof isBetaEnabled === 'function' && isBetaEnabled('windCall')) {
                 var nav2 = document.getElementById('app-nav');
                 if (nav2 && !nav2.querySelector('[data-view="wind"]')) {
@@ -64,10 +69,10 @@
                     windTab.className = 'nav-tab';
                     windTab.setAttribute('data-view', 'wind');
                     windTab.textContent = 'Wind';
-                    // Insert before admin tab if it exists, otherwise append
-                    var adminTab2 = nav2.querySelector('[data-view="admin"]');
-                    if (adminTab2) {
-                        nav2.insertBefore(windTab, adminTab2);
+                    var anchor = nav2.querySelector('[data-view="admin"]') ||
+                                 document.getElementById('btn-logout');
+                    if (anchor && anchor.parentNode === nav2) {
+                        nav2.insertBefore(windTab, anchor);
                     } else {
                         nav2.appendChild(windTab);
                     }

@@ -17,7 +17,7 @@
     --danger: #f44336;
     --radius: 8px;
     --panel-height: 180px;
-    --header-height: 48px;
+    --header-height: auto;
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */
@@ -55,35 +55,43 @@ html, body {
 
 #app-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: var(--header-height);
-    padding: 0 12px;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 6px 10px 8px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     z-index: 10;
     position: relative;
+    gap: 6px;
 }
 
-.header-brand {
+/* Utility strip — connection dot + sunlight toggle, top-right, separated from nav */
+.header-utility {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
+    justify-content: flex-end;
+    gap: 8px;
+    min-height: 28px;
 }
 
-.header-logo {
-    height: 36px;
-    width: auto;
-    filter: invert(1);
-    mix-blend-mode: screen;
+.utility-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-raised);
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
 }
 
-#app-header h1 {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+.utility-btn:active {
+    background: var(--border);
 }
 
 .brand-yor {
@@ -94,60 +102,57 @@ html, body {
     color: #fff;
 }
 
-.header-btn {
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 50%;
+/* ── Navigation: two-row button grid ───────────────────────── */
+
+#app-nav.nav-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: minmax(40px, auto);
+    gap: 6px;
+    width: 100%;
+}
+
+.nav-tab,
+.nav-logout {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface-raised);
     color: var(--text);
-    font-size: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.header-btn:active {
-    background: var(--primary-dark);
-}
-
-/* ── Navigation Tabs ───────────────────────────────────────── */
-
-#app-nav {
-    display: flex;
-    gap: 4px;
-    background: var(--bg);
-    border-radius: 6px;
-    padding: 2px;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.nav-tab {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 5px;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    padding: 8px 6px;
+    min-height: 40px;
     -webkit-user-select: none;
     user-select: none;
-    min-height: 36px;
-}
-
-.nav-tab.active {
-    background: var(--surface-raised);
-    color: var(--text);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .nav-tab:active {
-    opacity: 0.7;
+    transform: scale(0.98);
+}
+
+.nav-tab.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 1px 4px rgba(76, 175, 80, 0.45);
+}
+
+/* Log Out — distinct, muted-red, sits at end of row 2 */
+.nav-logout {
+    background: transparent;
+    color: #ef9a9a;
+    border-color: rgba(244, 67, 54, 0.35);
+}
+
+.nav-logout:active {
+    background: rgba(244, 67, 54, 0.15);
+    color: #ffcdd2;
 }
 
 /* ── App Views ─────────────────────────────────────────────── */
@@ -2151,25 +2156,40 @@ html, body {
 }
 
 .high-contrast .nav-tab {
-    color: #333;
-    font-size: 16px;
-    font-weight: 600;
+    background: #d0d0d0;
+    color: #000;
+    border-color: #999;
+    font-size: 15px;
+    font-weight: 700;
 }
 
 .high-contrast .nav-tab.active {
-    background: #fff;
-    color: #000;
+    background: #1a7a1e;
+    color: #fff;
+    border-color: #145c17;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.high-contrast .nav-logout {
+    background: #fff;
+    color: #b71c1c;
+    border-color: #b71c1c;
+    font-weight: 700;
+}
+
+.high-contrast .nav-logout:active {
+    background: #fbe9e7;
+}
+
+.high-contrast .utility-btn {
+    background: #d0d0d0;
+    color: #000;
+    border-color: #999;
+    font-size: 18px;
 }
 
 .high-contrast #canvas-container {
     background: #ddd;
-}
-
-.high-contrast .header-btn {
-    background: #d0d0d0;
-    color: #000;
-    font-size: 18px;
 }
 
 .high-contrast .header-logo {
@@ -2311,66 +2331,39 @@ html, body {
     font-size: 16px;
 }
 
-/* ── Mobile Nav (<=768px) — hide logo, scroll tabs full-width ── */
+/* ── Narrow-phone nav scaling (≤390px) ─────────────────────── */
 
-@media (max-width: 768px) {
+@media (max-width: 390px) {
     #app-header {
-        padding: 0 8px;
-        gap: 6px;
+        padding: 4px 6px 6px;
     }
-
-    /* Hide brand block in the header on mobile — tabs need the room */
-    .header-brand {
-        display: none;
-    }
-
-    /* Promote nav out of absolute centering — let it own the row */
-    #app-nav {
-        position: static;
-        left: auto;
-        transform: none;
-        flex: 1 1 auto;
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: x proximity;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;          /* Firefox */
-        background: transparent;        /* no group background while scrolling */
-        padding: 4px 2px;               /* breathing room so active tab shadow isn't clipped */
-        margin: 0;
-        border-radius: 0;
-        gap: 2px;
-        flex-wrap: nowrap;
-    }
-    #app-nav::-webkit-scrollbar {
-        display: none;                  /* Chrome/Safari */
-    }
-
-    .nav-tab {
-        flex: 0 0 auto;
-        scroll-snap-align: start;
-        white-space: nowrap;
-        padding: 8px 14px;
-    }
-
-    /* Keep header-actions on the right, reserve fixed space */
-    .header-actions {
-        flex-shrink: 0;
+    .nav-tab,
+    .nav-logout {
+        font-size: 13px;
+        padding: 6px 4px;
+        min-height: 38px;
     }
 }
 
 /* ── Landscape tweaks ───────────────────────────────────────── */
 
 @media (orientation: landscape) and (max-height: 500px) {
-    :root {
-        --header-height: 40px;
+    #app-header {
+        padding: 4px 8px 6px;
     }
-    #app-header h1 {
+    .header-utility {
+        min-height: 22px;
+    }
+    .utility-btn {
+        width: 28px;
+        height: 28px;
         font-size: 16px;
     }
-    .header-logo {
-        height: 28px;
+    .nav-tab,
+    .nav-logout {
+        min-height: 34px;
+        font-size: 13px;
+        padding: 4px 6px;
     }
     .step {
         padding: 8px 16px;
