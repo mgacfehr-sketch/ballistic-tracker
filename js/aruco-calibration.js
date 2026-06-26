@@ -77,15 +77,9 @@
 
         var detector;
         try {
-            detector = new global.AR.Detector({ dictionaryName: 'ARUCO_DEFAULT' });
-            // ARUCO_DEFAULT = 4x4_50. Some library builds use 'ARUCO' or accept a different name —
-            // try a few fallbacks for compatibility.
+            detector = new global.AR.Detector({ dictionaryName: 'ARUCO_MIP_36h12' });
         } catch (e) {
-            try { detector = new global.AR.Detector({ dictionaryName: 'ARUCO_4X4_50' }); } catch (e2) {
-                try { detector = new global.AR.Detector({ dictionaryName: 'DICT_4X4_50' }); } catch (e3) {
-                    detector = new global.AR.Detector();
-                }
-            }
+            return { success: false, message: 'Failed to create detector: ' + e.message };
         }
 
         var detected;
@@ -95,11 +89,15 @@
             return { success: false, message: 'Detection error: ' + e.message };
         }
 
-        // Build id → center map (rescale from detection canvas back to source image)
+        // Map real corner marker IDs → internal slots: TL=0, TR=1, BL=2, BR=3
+        var ID_TO_SLOT = { 8: 0, 76: 1, 173: 2, 26: 3 };
+
+        // Build slot → center map (rescale from detection canvas back to source image)
         var idMap = {};
         for (var i = 0; i < detected.length; i++) {
             var m = detected[i];
-            if (m.id < 0 || m.id > 3) continue;
+            if (!ID_TO_SLOT.hasOwnProperty(m.id)) continue;
+            var slot = ID_TO_SLOT[m.id];
             // Center = average of 4 corner positions
             var cx = 0, cy = 0;
             for (var k = 0; k < 4; k++) {
@@ -108,7 +106,7 @@
             }
             cx /= 4; cy /= 4;
             // Scale back to source image coords
-            idMap[m.id] = { x: cx / detectScale, y: cy / detectScale };
+            idMap[slot] = { x: cx / detectScale, y: cy / detectScale };
         }
 
         var missing = [];
