@@ -24,7 +24,7 @@
     // ── Target geometry constants ─────────────────────────────────
     var GRID_INCHES = 6.0;          // 6" x 6" measurement grid
     var MARKER_SIZE = 0.6;          // 0.6" square markers
-    var MARKER_OFFSET = 0.18;       // outer corner 0.18" outside grid corner
+    var MARKER_OFFSET = 0.8;        // outer corner 0.8" outside grid corner (measured from printed target)
 
     // Marker centers in grid-inch coords (grid origin = top-left at 0,0):
     //   outer corner of marker is at (-OFFSET, -OFFSET) etc., marker is OFFSET in,
