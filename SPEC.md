@@ -27,7 +27,7 @@ The heart of the app. A standalone flow that works without profiles.
 6. **Mark impacts sequentially** — Tap to place numbered markers (1, 2, 3... up to 10). Each marker is a circle sized to bullet diameter at the current scale. Markers are numbered and color-coded (green crosshair style, referencing Ballistic-X UX). User can tap an existing marker to delete/re-place it.
 7. **Calculate and display results** — Show overlay card on the annotated image
 
-**Calculations (all distances are center-to-center after subtracting one bullet diameter from edge-to-edge pixel measurements):**
+**Calculations (impacts are tapped at hole centers, so all pixel distances are already center-to-center — no bullet-diameter subtraction):**
 
 - **Group size (max spread):** Maximum center-to-center distance between any two impacts. Display in inches AND MOA.
 - **MOA conversion:** `moa = (inches / distance_yards) × (100 / 1.047)`
@@ -282,11 +282,8 @@ MOA_FACTOR = 1.047 // 1 MOA = 1.047 inches at 100 yards
 // Inches to MOA at a given distance
 toMOA(inches, distanceYards) = (inches / distanceYards) * (100 / MOA_FACTOR)
 
-// Center-to-center from pixel measurement
-centerToCenter(pixelDistance, pixelsPerInch, bulletDiameterInches) =
-  (pixelDistance / pixelsPerInch) - bulletDiameterInches
-
 // Group size = max center-to-center distance between any pair of impacts
+// (user taps hole centers directly; pixel distance is already center-to-center)
 // Mean radius = average distance from each impact to centroid
 // Centroid = (mean(all X), mean(all Y))
 // ATZ = negation of (centroid offset from POA), converted to MOA
