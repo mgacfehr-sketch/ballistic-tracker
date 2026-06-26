@@ -89,16 +89,11 @@
             return { success: false, message: 'Detection error: ' + e.message };
         }
 
-        // Map real corner marker IDs → internal slots: TL=0, TR=1, BL=2, BR=3
-        var ID_TO_SLOT = { 8: 0, 76: 1, 173: 2, 26: 3 };
-
-        // Build slot → center map (rescale from detection canvas back to source image)
-        var idMap = {};
+        // Build a list of ALL detected marker centers, ignoring marker ID entirely.
+        // ID decoding varies by device/firmware; position is reliable.
+        var centers = [];
         for (var i = 0; i < detected.length; i++) {
             var m = detected[i];
-            if (!ID_TO_SLOT.hasOwnProperty(m.id)) continue;
-            var slot = ID_TO_SLOT[m.id];
-            // Center = average of 4 corner positions
             var cx = 0, cy = 0;
             for (var k = 0; k < 4; k++) {
                 cx += m.corners[k].x;
@@ -106,19 +101,43 @@
             }
             cx /= 4; cy /= 4;
             // Scale back to source image coords
-            idMap[slot] = { x: cx / detectScale, y: cy / detectScale };
+            centers.push({ x: cx / detectScale, y: cy / detectScale });
         }
 
-        var missing = [];
-        for (var id = 0; id <= 3; id++) {
-            if (!idMap.hasOwnProperty(id)) missing.push(id);
+        if (centers.length < 4) {
+            return { success: false, message: 'Found only ' + centers.length + ' of 4 markers' };
         }
 
-        if (missing.length === 0) {
-            this.lastResult = { success: true, markers: idMap };
-            return this.lastResult;
+        // Pick 4 outermost centers by diagonal projection.
+        // Real corner fiducials are outside the grid; interior noise detections are not extremes.
+        //   top-left     = min(x + y)
+        //   bottom-right = max(x + y)
+        //   top-right    = max(x - y)
+        //   bottom-left  = min(x - y)
+        var tl = centers[0], tr = centers[0], bl = centers[0], br = centers[0];
+        for (var j = 1; j < centers.length; j++) {
+            var c = centers[j];
+            if (c.x + c.y < tl.x + tl.y) tl = c;
+            if (c.x + c.y > br.x + br.y) br = c;
+            if (c.x - c.y > tr.x - tr.y) tr = c;
+            if (c.x - c.y < bl.x - bl.y) bl = c;
         }
-        return { success: false, missingIds: missing, message: 'Found ' + (4 - missing.length) + ' of 4 markers' };
+
+        // Sanity guard: bounding box must span ≥30% of source image in both axes.
+        // Rejects cases where only a small cluster of interior markers was detected.
+        var minX = Math.min(tl.x, tr.x, bl.x, br.x);
+        var maxX = Math.max(tl.x, tr.x, bl.x, br.x);
+        var minY = Math.min(tl.y, tr.y, bl.y, br.y);
+        var maxY = Math.max(tl.y, tr.y, bl.y, br.y);
+        if ((maxX - minX) < w * 0.3 || (maxY - minY) < h * 0.3) {
+            return { success: false, message: 'Markers too clustered — frame the full target' };
+        }
+
+        // slots: 0=TL, 1=TR, 2=BL, 3=BR (matches warpFlat expectations)
+        var idMap = { 0: tl, 1: tr, 2: bl, 3: br };
+
+        this.lastResult = { success: true, markers: idMap };
+        return this.lastResult;
     };
 
     /**
