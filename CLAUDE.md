@@ -30,12 +30,22 @@ Building Phase 1: Core Session Workflow
 
 ## Key Formulas
 ```
-pixelsPerInch = pixelDistanceBetweenCalibrationPoints / 1.0
+pixelsPerInch = pixelDistanceBetweenCalibrationPoints / 1.0   (manual fallback)
 groupSize_inches = pixelDistance / pixelsPerInch
-  (impacts are tapped at hole centers, so pixel distance IS center-to-center)
+  (impacts are tapped at hole centers, so pixel distance IS center-to-center —
+   NO bullet-diameter subtraction anywhere)
 MOA = (inches / distanceYards) * (100 / 1.047)
 ATZ = negate the offset from POA to group centroid, in MOA
 ```
+
+## ArUco Auto-Calibration
+- Dictionary: `ARUCO_MIP_36h12` (loaded from js-aruco2 CDN, pinned commit SHA)
+- Target geometry: 6.0" grid, 0.6" markers, `MARKER_OFFSET = 0.8"` (measured from printed target)
+- Corner assignment is **position-based** (outermost by diagonal projection: min/max of x+y and x-y)
+- **Never use hard-coded marker IDs** — they decode differently across devices
+- Sanity guard: detected bounding box must span ≥30% of image in both axes
+- On success, image is warped flat via 4-point homography; `pixelsPerInch = 120` (fixed)
+- Falls back to manual 2-tap calibration if library is missing or fewer than 4 markers found
 
 ## File Structure
 See SPEC.md for complete structure. Key files for Phase 1:
@@ -43,7 +53,8 @@ See SPEC.md for complete structure. Key files for Phase 1:
 - `css/main.css` — styles
 - `js/app.js` — init and navigation
 - `js/canvas-manager.js` — image loading, zoom/pan, marker placement
-- `js/calibration.js` — calibration logic
+- `js/calibration.js` — manual 2-tap calibration logic
+- `js/aruco-calibration.js` — ArUco auto-calibration (position-based corner detection)
 - `js/calculations.js` — all math (PURE FUNCTIONS)
 - `js/session-flow.js` — step-by-step workflow controller
 - `js/export.js` — annotated image rendering

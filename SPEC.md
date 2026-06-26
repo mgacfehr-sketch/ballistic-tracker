@@ -20,7 +20,7 @@ The heart of the app. A standalone flow that works without profiles.
 
 **Step-by-step UX flow:**
 1. **Load image** — Camera capture or pick from phone photo library
-2. **Set 1" calibration** — User zooms into a known 1-inch reference on the target, taps point A, taps point B. App calculates `pixelsPerInch = distance_in_pixels / 1.0`
+2. **Set scale / calibration** — Primary path: app auto-detects the four ArUco fiducial markers printed on the yorT target (ARUCO_MIP_36h12 dictionary) and warps the image flat using perspective correction, setting `pixelsPerInch` from the known 6.0" grid geometry. Corner assignment is position-based (outermost by diagonal projection), not by marker ID, so it works across devices. Fallback path: user zooms into any known 1-inch reference and taps point A then point B; app calculates `pixelsPerInch = distance_in_pixels / 1.0`.
 3. **Input distance to target** — Numeric input, 1–1500 yards
 4. **Input bullet diameter** — Numeric input in inches (e.g., 0.308). In quick/misc mode this is manual; in profile mode it auto-fills from the load
 5. **Mark Point of Aim (POA)** — Single tap to place a blue/distinct marker where the shooter was aiming
@@ -283,8 +283,17 @@ MOA_FACTOR = 1.047 // 1 MOA = 1.047 inches at 100 yards
 toMOA(inches, distanceYards) = (inches / distanceYards) * (100 / MOA_FACTOR)
 
 // Group size = max center-to-center distance between any pair of impacts
-// (user taps hole centers directly; pixel distance is already center-to-center)
+// (user taps hole centers directly; pixel distance is already center-to-center —
+//  no bullet-diameter subtraction)
 // Mean radius = average distance from each impact to centroid
 // Centroid = (mean(all X), mean(all Y))
 // ATZ = negation of (centroid offset from POA), converted to MOA
+
+// ArUco auto-calibration (js/aruco-calibration.js):
+//   dictionary: ARUCO_MIP_36h12
+//   target grid: 6.0" × 6.0", markers 0.6" square, MARKER_OFFSET = 0.8"
+//   corner selection: position-based diagonal projection (min/max of x+y, x-y)
+//     — NOT by marker ID (IDs decode differently across devices)
+//   sanity guard: bounding box must span ≥30% of image in both axes
+//   output pixelsPerInch = 120 (fixed for the warped flat canvas)
 ```
