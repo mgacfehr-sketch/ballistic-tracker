@@ -452,6 +452,18 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
             }).catch(function (e) {
                 console.warn('[AI] Failed to log usage:', e);
             });
+
+            // Cost transparency: tiny per-answer footer (consent screen
+            // already discloses that usage is tracked)
+            var messagesEl = document.getElementById('ai-messages');
+            if (messagesEl) {
+                var costEl = document.createElement('div');
+                costEl.className = 'ai-cost';
+                costEl.textContent = '~$' + (estimatedCost < 0.01
+                    ? estimatedCost.toFixed(4) : estimatedCost.toFixed(2));
+                messagesEl.appendChild(costEl);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
         }
 
         // Auto-title from first user message

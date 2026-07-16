@@ -178,8 +178,8 @@ ChronoManager.prototype._renderPreview = function () {
 
         out += '<div class="detail-card chrono-session" data-index="' + i + '">';
         out += '<label class="chrono-include"><input type="checkbox" class="chrono-include-cb" data-index="' + i + '" checked> Include</label>';
-        out += '<h3>' + this._escapeHtml(this._sessionTitle(s, i)) +
-            ' <span class="chrono-badge chrono-dup-badge hidden" id="chrono-dup-' + i + '">already imported</span></h3>';
+        out += '<h3>' + this._escapeHtml(this._sessionTitle(s, i)) + '</h3>';
+        out += '<div class="chrono-badge chrono-dup-badge hidden" id="chrono-dup-' + i + '">already imported</div>';
         out += '<div class="chrono-stats-row">';
         out += '<span><strong>' + s.shots.length + '</strong> shots</span>';
         out += '<span>' + formatNum(min, 1) + '–' + formatNum(max, 1) + ' fps</span>';

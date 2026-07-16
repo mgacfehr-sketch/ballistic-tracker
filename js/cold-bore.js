@@ -204,7 +204,7 @@ ColdBoreManager.prototype._renderEntries = function (entries, groups) {
     html += '</div>';
     html += '<div class="cb-stat">';
     html += '<span class="cb-stat-value">' + entries.length + '</span>';
-    html += '<span class="cb-stat-label">Based on ' + entries.length + ' cold bore shot' + (entries.length !== 1 ? 's' : '') + '</span>';
+    html += '<span class="cb-stat-label">cold bore shot' + (entries.length !== 1 ? 's' : '') + '</span>';
     html += '</div>';
     html += '</div>';
 

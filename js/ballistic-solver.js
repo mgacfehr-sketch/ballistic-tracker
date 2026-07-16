@@ -728,7 +728,7 @@ BallisticSolverManager.prototype._render = function () {
     html += '</div>'; // end solver-form
 
     // Results placeholder
-    html += '<div id="solver-results"></div>';
+    html += '<div id="solver-results"><p class="chrono-hint solver-placeholder">Drop and wind table appears here after Calculate.</p></div>';
 
     this.container.innerHTML = html;
     this._bindEvents();

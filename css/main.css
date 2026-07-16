@@ -3115,3 +3115,37 @@ html, body {
 .chrono-rejoin {
     min-height: 44px;
 }
+
+/* ── UX Wave 5 (P3) ──────────────────────────────────────── */
+
+/* Empty session thumbnails read as intentional placeholders */
+.session-thumbnail:not(.loaded) {
+    background: var(--surface-raised);
+    border: 1px dashed var(--border);
+}
+
+/* Duplicate badges live on their own line under the card title */
+.chrono-dup-badge {
+    display: inline-block;
+    margin: 0 0 8px;
+}
+
+/* Per-answer AI cost footer */
+.ai-cost {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    text-align: right;
+    padding: 0 8px 4px;
+}
+
+/* Offline chip replaces the unreadable dot when disconnected */
+.connection-dot.offline {
+    width: auto;
+    height: auto;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    color: var(--danger);
+    background: rgba(244, 67, 54, 0.15);
+    border: 1px solid var(--danger);
+}
