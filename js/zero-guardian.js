@@ -92,6 +92,7 @@ var ZeroGuardian = (function () {
         }
 
         html += '<div class="zg-click-row"><label for="zg-click">Scope clicks</label>';
+        html += '<button class="help-btn" onclick="showHelp(\'clicks\')" title="What are scope clicks?">?</button>';
         html += '<select id="zg-click">';
         html += '<option value="0.25"' + (getClickValue() === 0.25 ? ' selected' : '') + '>1/4 MOA</option>';
         html += '<option value="0.125"' + (getClickValue() === 0.125 ? ' selected' : '') + '>1/8 MOA</option>';

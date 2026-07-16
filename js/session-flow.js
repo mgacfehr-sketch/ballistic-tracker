@@ -242,12 +242,39 @@ SessionFlow.prototype._showStep = function (index) {
 
     // Auto-scroll panel so action buttons are visible
     this._scrollPanelToBottom();
+
+    // Step counter next to the title ("· N of 7") — injected once per
+    // section so the markup stays static
+    var section = this.els.steps[stepName];
+    if (section && !section.querySelector('.step-count')) {
+        var title = section.querySelector('.step-title');
+        if (title) {
+            var count = document.createElement('span');
+            count.className = 'step-count';
+            count.textContent = '· ' + (index + 1) + ' of ' + STEPS.length;
+            title.insertAdjacentElement('afterend', count);
+        }
+    }
 };
 
 SessionFlow.prototype._nextStep = function () {
     if (this.currentStep < STEPS.length - 1) {
         this._showStep(this.currentStep + 1);
     }
+};
+
+/**
+ * Go back one step, preserving everything already entered. Leaving the
+ * results step clears the results overlay (recalculating rebuilds it).
+ */
+SessionFlow.prototype._prevStep = function () {
+    if (this.currentStep <= 0) return;
+    if (STEPS[this.currentStep] === 'results') {
+        this.canvas.overlayResults = null;
+        this._removeMarkersOfType('centroid');
+        this.canvas.render();
+    }
+    this._showStep(this.currentStep - 1);
 };
 
 SessionFlow.prototype._updateHint = function () {
@@ -546,6 +573,15 @@ SessionFlow.prototype._bindUI = function () {
     this.els.btnCalculate.addEventListener('click', function () {
         self._calculate();
     });
+
+    // Back controls (steps 2–7) — correct an earlier entry without
+    // restarting the whole session
+    var backBtns = document.querySelectorAll('.btn-step-back');
+    for (var bk = 0; bk < backBtns.length; bk++) {
+        backBtns[bk].addEventListener('click', function () {
+            self._prevStep();
+        });
+    }
 
     // Step 7: Results
     if (this.els.btnSaveSession) {
@@ -993,7 +1029,7 @@ SessionFlow.prototype._renderResults = function () {
         html += '</div>';
 
         html += '<div class="result-row">';
-        html += '<span class="result-label">Radial SD</span>';
+        html += '<span class="result-label">Radial SD <button class="help-btn" onclick="showHelp(\'radialSD\')" title="What is Radial SD?">?</button></span>';
         html += '<span class="result-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span>';
         html += '</div>';
 

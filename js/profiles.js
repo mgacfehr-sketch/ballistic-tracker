@@ -27,20 +27,39 @@ ProfileManager.prototype.init = function () {
 ProfileManager.prototype.showRifleList = function () {
     this.currentRifleId = null;
     var self = this;
-    this.db.getAllRifles().then(function (rifles) {
+    Promise.all([
+        this.db.getAllRifles(),
+        this.db.getSetting('workflowCardDismissed')
+    ]).then(function (results) {
+        var rifles = results[0];
         rifles.sort(function (a, b) {
             return (a.name || '').localeCompare(b.name || '');
         });
-        self._renderRifleList(rifles);
+        self._renderRifleList(rifles, results[1] === true);
     });
 };
 
-ProfileManager.prototype._renderRifleList = function (rifles) {
+ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed) {
     var html = '<div class="profile-screen">';
     html += '<div class="profile-toolbar">';
     html += '<h2 class="profile-title">Rifles</h2>';
     html += '<button class="btn btn-primary btn-sm" id="btn-add-rifle">+ Add Rifle</button>';
     html += '</div>';
+
+    // One-time workflow pointer — the certificate chain spans four tabs
+    // and is otherwise undiscoverable (dismissible, never returns)
+    if (!workflowDismissed && typeof hasFeature === 'function' && hasFeature('certificate')) {
+        html += '<div class="detail-card workflow-card" id="workflow-card">';
+        html += '<button id="workflow-dismiss" class="workflow-dismiss" aria-label="Dismiss" title="Dismiss">×</button>';
+        html += '<h4>From ammo box to certificate</h4>';
+        html += '<ol class="workflow-steps">';
+        html += '<li>Create a rifle + load here</li>';
+        html += '<li><strong>Chrono</strong> tab — import your ShotView strings</li>';
+        html += '<li><strong>Session</strong> tab — shoot and save target groups</li>';
+        html += '<li>Rifle → <strong>Performance Report</strong> → Generate Certificate</li>';
+        html += '</ol>';
+        html += '</div>';
+    }
 
     if (rifles.length === 0) {
         html += '<div class="empty-state">';
@@ -96,6 +115,15 @@ ProfileManager.prototype._bindRifleListEvents = function () {
     if (addBtn) {
         addBtn.addEventListener('click', function () {
             self.showRifleForm(null);
+        });
+    }
+
+    var workflowDismiss = document.getElementById('workflow-dismiss');
+    if (workflowDismiss) {
+        workflowDismiss.addEventListener('click', function () {
+            self.db.setSetting('workflowCardDismissed', true);
+            var card = document.getElementById('workflow-card');
+            if (card) card.style.display = 'none';
         });
     }
 
@@ -271,7 +299,7 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
 
     html += '<div class="btn-row">';
     if (isEdit) {
-        html += '<button type="button" class="btn btn-danger" id="btn-delete-rifle">Delete</button>';
+        html += '<button type="button" class="btn btn-danger" id="btn-delete-rifle">Delete Rifle</button>';
     }
     html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Rifle') + '</button>';
     html += '</div>';
@@ -495,11 +523,22 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         html += '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
     }
 
+    // Performance Report — the flagship entry, promoted above the fold
+    if (typeof hasFeature === 'function' && hasFeature('certificate')) {
+        html += '<div class="profile-card report-promo" id="btn-performance-report">';
+        html += '<div class="profile-card-main">';
+        html += '<span class="profile-card-name">Performance Report</span>';
+        html += '<span class="profile-card-sub">Best group &middot; velocity stats &middot; certificate</span>';
+        html += '</div>';
+        html += '<span class="profile-card-arrow">&rsaquo;</span>';
+        html += '</div>';
+    }
+
     // Loads section
     html += '<div class="detail-section">';
     html += '<div class="detail-section-header">';
     html += '<h3 class="detail-section-title">Loads</h3>';
-    html += '<button class="btn btn-sm btn-secondary" id="btn-add-load">+ Add</button>';
+    html += '<button class="btn btn-sm btn-secondary" id="btn-add-load">+ Add Load</button>';
     html += '</div>';
 
     if (loads.length === 0) {
@@ -510,7 +549,11 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
             html += '<div class="profile-card load-card" data-load-id="' + ld.id + '">';
             html += '<div class="profile-card-main">';
             html += '<span class="profile-card-name">' + escapeHtml(ld.name) + '</span>';
-            html += '<span class="profile-card-sub">' + escapeHtml(ld.bulletName) + ' &middot; ' + ld.bulletWeight + 'gr &middot; ' + ld.muzzleVelocity + ' fps</span>';
+            var subParts = [];
+            if (ld.bulletName) subParts.push(escapeHtml(ld.bulletName));
+            if (ld.bulletWeight) subParts.push(formatNum(ld.bulletWeight, 1) + 'gr');
+            if (ld.muzzleVelocity) subParts.push(formatNum(ld.muzzleVelocity, 0) + ' fps');
+            html += '<span class="profile-card-sub">' + (subParts.join(' &middot; ') || '&mdash;') + '</span>';
             html += '</div>';
             html += '<span class="profile-card-arrow">&rsaquo;</span>';
             html += '</div>';
@@ -538,12 +581,6 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     html += '<div class="profile-card-main"><span class="profile-card-name">Scope Adjustments</span></div>';
     html += '<span class="profile-card-arrow">&rsaquo;</span>';
     html += '</div>';
-    if (typeof hasFeature === 'function' && hasFeature('certificate')) {
-        html += '<div class="profile-card" id="btn-performance-report">';
-        html += '<div class="profile-card-main"><span class="profile-card-name">Performance Report</span></div>';
-        html += '<span class="profile-card-arrow">&rsaquo;</span>';
-        html += '</div>';
-    }
     html += '</div>';
     html += '</div>';
 
@@ -732,7 +769,7 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
     html += '</div>';
 
     html += '<div class="btn-row">';
-    html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Add Barrel') + '</button>';
+    html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Barrel') + '</button>';
     html += '</div>';
 
     html += '</form>';
@@ -851,6 +888,7 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     html += '<div class="form-group form-group-half">';
     html += '<label for="ld-mv">Muzzle Velocity (fps)</label>';
     html += '<input type="number" id="ld-mv" min="0" max="5000" step="1" inputmode="numeric" placeholder="2650" value="' + (load && load.muzzleVelocity ? load.muzzleVelocity : '') + '">';
+    html += '<p class="chrono-hint">BC + muzzle velocity are needed for the Solver — leave blank if unknown.</p>';
     html += '</div>';
     html += '<div class="form-group form-group-half">';
     html += '<label for="ld-bullet-len">Bullet Length (in)</label>';
@@ -865,7 +903,7 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
 
     html += '<div class="btn-row">';
     if (isEdit) {
-        html += '<button type="button" class="btn btn-danger" id="btn-delete-load">Delete</button>';
+        html += '<button type="button" class="btn btn-danger" id="btn-delete-load">Delete Load</button>';
     }
     html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Load') + '</button>';
     html += '</div>';
@@ -918,10 +956,12 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
             bulletName: document.getElementById('ld-bullet-name').value.trim(),
             bulletWeight: weight,
             bulletDiameter: dia,
-            bulletBC: parseFloat(document.getElementById('ld-bullet-bc').value) || 0,
+            // Blank optional numbers store as null, never 0 — "0 fps"
+            // reads as data corruption on cards and certificates
+            bulletBC: parseFloat(document.getElementById('ld-bullet-bc').value) || null,
             dragModel: document.getElementById('ld-drag-model').value,
-            muzzleVelocity: parseFloat(document.getElementById('ld-mv').value) || 0,
-            bulletLength: parseFloat(document.getElementById('ld-bullet-len').value) || 0,
+            muzzleVelocity: parseFloat(document.getElementById('ld-mv').value) || null,
+            bulletLength: parseFloat(document.getElementById('ld-bullet-len').value) || null,
             notes: document.getElementById('ld-notes').value.trim()
         };
 

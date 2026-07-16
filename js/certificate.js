@@ -444,6 +444,11 @@ CertificateManager.prototype._showPreview = function () {
     }, 'image/jpeg', 0.9);
     status.textContent = 'Review the preview, then export.';
 
+    // The preview is the money moment — bring it above the fold
+    if (wrap.scrollIntoView) {
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     document.getElementById('btn-cert-export').addEventListener('click', function () {
         self._exportPDF();
     });

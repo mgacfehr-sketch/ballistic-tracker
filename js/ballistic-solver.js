@@ -552,6 +552,25 @@ BallisticSolverManager.prototype._render = function () {
     html += '<span class="profile-title">Ballistic Solver</span>';
     html += '<div class="toolbar-spacer"></div></div>';
 
+    // Empty state: no rifles yet — point the user somewhere useful
+    // instead of a dead disabled form
+    if (this.rifles.length === 0) {
+        html += '<div class="empty-state">';
+        html += '<p class="empty-state-text">No rifles yet</p>';
+        html += '<p class="empty-state-sub">The Solver builds drop and wind tables from a rifle + load profile. Create one first.</p>';
+        html += '<button id="solver-go-profiles" class="btn btn-primary">Go to Profiles</button>';
+        html += '</div>';
+        this.container.innerHTML = html;
+        var goBtn = document.getElementById('solver-go-profiles');
+        if (goBtn) {
+            goBtn.addEventListener('click', function () {
+                var tab = document.querySelector('.nav-tab[data-view="profiles"]');
+                if (tab) tab.click();
+            });
+        }
+        return;
+    }
+
     // Form
     html += '<div class="solver-form">';
 
@@ -576,7 +595,11 @@ BallisticSolverManager.prototype._render = function () {
     html += '<label for="solver-load">Load</label>';
     html += '<select id="solver-load"' + (this.loads.length === 0 ? ' disabled' : '') + '>';
     if (this.loads.length === 0) {
-        html += '<option value="">Select a rifle first</option>';
+        // Different truths for different states — never tell a user who
+        // already picked a rifle to "select a rifle first"
+        html += this.selectedRifle
+            ? '<option value="">This rifle has no loads — add one in Profiles</option>'
+            : '<option value="">Select a rifle first</option>';
     } else {
         html += '<option value="">Select a load...</option>';
         for (var j = 0; j < this.loads.length; j++) {
@@ -705,7 +728,7 @@ BallisticSolverManager.prototype._render = function () {
     html += '</div>'; // end solver-form
 
     // Results placeholder
-    html += '<div id="solver-results"></div>';
+    html += '<div id="solver-results"><p class="chrono-hint solver-placeholder">Drop and wind table appears here after Calculate.</p></div>';
 
     this.container.innerHTML = html;
     this._bindEvents();

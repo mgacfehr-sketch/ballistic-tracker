@@ -210,6 +210,8 @@ var OfflineCache = {
         dot.classList.toggle('online', online);
         dot.classList.toggle('offline', !online);
         dot.title = online ? 'Online' : 'Offline';
+        // Offline is worth words, not an 8px dot nobody can read
+        dot.textContent = online ? '' : 'offline';
     },
 
     /**

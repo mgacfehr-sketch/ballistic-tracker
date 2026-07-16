@@ -125,15 +125,16 @@ AIAssistantManager.prototype._renderChat = function () {
         } else {
             for (var j = 0; j < self.messages.length; j++) {
                 var msg = self.messages[j];
-                var hasImage = false;
+                var imgSrc = null;
                 var displayText = '';
                 if (Array.isArray(msg.content)) {
-                    // Multipart content — extract text and check for images
+                    // Multipart content — extract text and the actual image
                     for (var k = 0; k < msg.content.length; k++) {
                         if (msg.content[k].type === 'text') {
                             displayText += msg.content[k].text;
-                        } else if (msg.content[k].type === 'image') {
-                            hasImage = true;
+                        } else if (msg.content[k].type === 'image' && msg.content[k].source) {
+                            imgSrc = 'data:' + msg.content[k].source.media_type +
+                                ';base64,' + msg.content[k].source.data;
                         }
                     }
                 } else {
@@ -142,7 +143,9 @@ AIAssistantManager.prototype._renderChat = function () {
                 displayText = _stripActionBlocks(displayText);
                 if (msg.role === 'user') {
                     html += '<div class="ai-message ai-message-user">';
-                    if (hasImage) html += '<div class="ai-message-img-tag">[Image attached]</div>';
+                    // Show the actual photo, not a "[Image attached]" tag —
+                    // the user needs to see which target they sent
+                    if (imgSrc) html += '<img class="ai-msg-thumb" src="' + imgSrc + '" alt="Attached image">';
                     html += self._escapeHtml(displayText);
                     html += '</div>';
                 } else {
@@ -214,13 +217,24 @@ AIAssistantManager.prototype._bindChatEvents = function () {
     if (rifleSelect) {
         rifleSelect.addEventListener('change', function () {
             var newId = this.value || null;
-            if (newId !== self.selectedRifleId) {
-                self.selectedRifleId = newId;
-                self.messages = [];
-                self.conversationId = null;
-                self.conversationTitle = null;
-                self._renderChat();
+            if (newId === self.selectedRifleId) return;
+
+            // Never discard a visible chat without explicit consent
+            if (self.messages.length > 0) {
+                var note = self.conversationId
+                    ? 'Switching rifles starts a new chat.\n\nYour current chat stays saved under History. Continue?'
+                    : 'Switching rifles starts a new chat and this one has no saved replies yet — it will be lost.\n\nContinue?';
+                if (!window.confirm(note)) {
+                    this.value = self.selectedRifleId || '';
+                    return;
+                }
             }
+
+            self.selectedRifleId = newId;
+            self.messages = [];
+            self.conversationId = null;
+            self.conversationTitle = null;
+            self._renderChat();
         });
     }
 
@@ -389,7 +403,8 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
     }
 
     this.messages.push({ role: 'user', content: userContent });
-    this._appendMessage('user', userText, hasImage);
+    this._appendMessage('user', userText, hasImage,
+        stagedImage ? 'data:' + stagedImage.mediaType + ';base64,' + stagedImage.base64 : null);
     this._showLoading(true);
 
     // Check for session reference to auto-attach image
@@ -437,6 +452,18 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
             }).catch(function (e) {
                 console.warn('[AI] Failed to log usage:', e);
             });
+
+            // Cost transparency: tiny per-answer footer (consent screen
+            // already discloses that usage is tracked)
+            var messagesEl = document.getElementById('ai-messages');
+            if (messagesEl) {
+                var costEl = document.createElement('div');
+                costEl.className = 'ai-cost';
+                costEl.textContent = '~$' + (estimatedCost < 0.01
+                    ? estimatedCost.toFixed(4) : estimatedCost.toFixed(2));
+                messagesEl.appendChild(costEl);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
         }
 
         // Auto-title from first user message
@@ -1099,7 +1126,7 @@ AIAssistantManager.prototype._callAPI = function (systemPrompt) {
 /**
  * Append a message bubble to the chat messages area.
  */
-AIAssistantManager.prototype._appendMessage = function (role, content, hasImage) {
+AIAssistantManager.prototype._appendMessage = function (role, content, hasImage, imageSrc) {
     var messagesEl = document.getElementById('ai-messages');
     if (!messagesEl) return;
 
@@ -1109,7 +1136,13 @@ AIAssistantManager.prototype._appendMessage = function (role, content, hasImage)
 
     var div = document.createElement('div');
     div.className = 'ai-message ai-message-' + role;
-    if (hasImage && role === 'user') {
+    if (hasImage && role === 'user' && imageSrc) {
+        var imgEl = document.createElement('img');
+        imgEl.className = 'ai-msg-thumb';
+        imgEl.alt = 'Attached image';
+        imgEl.src = imageSrc;
+        div.appendChild(imgEl);
+    } else if (hasImage && role === 'user') {
         var imgTag = document.createElement('div');
         imgTag.className = 'ai-message-img-tag';
         imgTag.textContent = '[Image attached]';

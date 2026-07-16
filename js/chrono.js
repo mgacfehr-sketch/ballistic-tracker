@@ -42,9 +42,24 @@ ChronoManager.prototype.show = function () {
     var html = '';
     html += '<div class="chrono-screen">';
     html += '<h2>Chrono Import</h2>';
-    html += '<p class="chrono-intro">Import a Garmin ShotView export — a single-session CSV or a multi-session spreadsheet (.xlsx).</p>';
+    html += '<p class="chrono-intro">Pick the rifle, then import a Garmin ShotView export (single-session CSV or multi-session .xlsx).</p>';
+
+    // Rifle-first: the import context is visible BEFORE any file is
+    // parsed, and survives across multiple imports
+    html += '<div id="chrono-import-section">';
+    html += '<div class="detail-card chrono-assign">';
+    html += '<div class="form-group"><label for="chrono-rifle">Rifle for this import</label>';
+    html += '<select id="chrono-rifle"><option value="">— Pick a rifle —</option></select></div>';
+    html += '<div class="form-group"><label for="chrono-base-rounds">Barrel round count BEFORE this import</label>';
+    html += '<input type="number" id="chrono-base-rounds" min="0" step="1" placeholder="unknown" class="chrono-rounds-input" style="max-width:160px;">';
+    html += '<p class="chrono-hint">Each string is tagged with its AFTER-count: this base + shots fired so far.</p></div>';
+    html += '<label class="chrono-add-rounds"><input type="checkbox" id="chrono-add-rounds" disabled> ' +
+        'Update the barrel round count to match (base + imported shots)</label>';
+    html += '</div>';
     html += '<label class="btn btn-primary chrono-file-label" for="chrono-file">Choose ShotView File</label>';
     html += '<input type="file" id="chrono-file" accept=".csv,.xlsx" class="chrono-file-input">';
+    html += '</div>'; // #chrono-import-section
+
     html += '<div id="chrono-review-launcher" class="detail-card chrono-assign hidden">';
     html += '<div class="form-group"><label for="chrono-review-rifle">Review &amp; assign saved strings</label>';
     html += '<select id="chrono-review-rifle"></select></div>';
@@ -64,18 +79,28 @@ ChronoManager.prototype.show = function () {
         input.value = ''; // allow re-picking the same file
     });
 
-    // Rifle list for assignment dropdowns (non-blocking)
+    // Import-context bindings live here now (panel is static)
+    document.getElementById('chrono-rifle').addEventListener('change', function () {
+        self._onRifleChange(this.value || null);
+    });
+    document.getElementById('chrono-base-rounds').addEventListener('input', function () {
+        self._refreshRoundCountDefaults();
+    });
+
+    // Rifle list for both dropdowns (non-blocking)
     this.db.getAllRifles().then(function (rifles) {
         self.rifles = rifles || [];
         if (!self.rifles.length) return;
+        var importSel = document.getElementById('chrono-rifle');
         var sel = document.getElementById('chrono-review-rifle');
         var launcher = document.getElementById('chrono-review-launcher');
-        if (!sel || !launcher) return; // view re-rendered meanwhile
+        if (!sel || !launcher || !importSel) return; // view re-rendered meanwhile
         var opts = '';
         for (var i = 0; i < self.rifles.length; i++) {
             opts += '<option value="' + self._escapeHtml(self.rifles[i].id) + '">' +
                 self._escapeHtml(self.rifles[i].name) + '</option>';
         }
+        importSel.innerHTML = '<option value="">— Pick a rifle —</option>' + opts;
         sel.innerHTML = opts;
         launcher.classList.remove('hidden');
         document.getElementById('chrono-review-btn').addEventListener('click', function () {
@@ -142,21 +167,6 @@ ChronoManager.prototype._renderPreview = function () {
     var totalShots = 0;
     var warnings = [];
 
-    // Assignment panel
-    out += '<div class="detail-card chrono-assign">';
-    out += '<div class="form-group"><label for="chrono-rifle">Assign to rifle (optional — you can confirm later)</label>';
-    out += '<select id="chrono-rifle"><option value="">— No rifle yet —</option>';
-    for (var r = 0; r < this.rifles.length; r++) {
-        out += '<option value="' + this._escapeHtml(this.rifles[r].id) + '">' +
-            this._escapeHtml(this.rifles[r].name) + '</option>';
-    }
-    out += '</select></div>';
-    out += '<div class="form-group"><label for="chrono-base-rounds">Barrel round count BEFORE this import</label>';
-    out += '<input type="number" id="chrono-base-rounds" min="0" step="1" placeholder="unknown" class="chrono-rounds-input" style="max-width:160px;"></div>';
-    out += '<label class="chrono-add-rounds"><input type="checkbox" id="chrono-add-rounds" disabled> ' +
-        'Update the barrel round count to match (base + imported shots)</label>';
-    out += '</div>';
-
     for (var i = 0; i < this.sessions.length; i++) {
         var s = this.sessions[i];
         totalShots += s.shots.length;
@@ -168,8 +178,8 @@ ChronoManager.prototype._renderPreview = function () {
 
         out += '<div class="detail-card chrono-session" data-index="' + i + '">';
         out += '<label class="chrono-include"><input type="checkbox" class="chrono-include-cb" data-index="' + i + '" checked> Include</label>';
-        out += '<h3>' + this._escapeHtml(this._sessionTitle(s, i)) +
-            ' <span class="chrono-badge chrono-dup-badge hidden" id="chrono-dup-' + i + '">already imported</span></h3>';
+        out += '<h3>' + this._escapeHtml(this._sessionTitle(s, i)) + '</h3>';
+        out += '<div class="chrono-badge chrono-dup-badge hidden" id="chrono-dup-' + i + '">already imported</div>';
         out += '<div class="chrono-stats-row">';
         out += '<span><strong>' + s.shots.length + '</strong> shots</span>';
         out += '<span>' + formatNum(min, 1) + '–' + formatNum(max, 1) + ' fps</span>';
@@ -304,21 +314,12 @@ ChronoManager.prototype._refreshDuplicates = function (rifleId) {
 ChronoManager.prototype._bindPreviewEvents = function () {
     var self = this;
 
-    document.getElementById('chrono-rifle').addEventListener('change', function () {
-        self._onRifleChange(this.value || null);
-    });
-
     var includes = document.querySelectorAll('.chrono-include-cb');
     for (var i = 0; i < includes.length; i++) {
         includes[i].addEventListener('change', function () {
             self._refreshRoundCountDefaults();
         });
     }
-
-    // Base count drives every per-string value
-    document.getElementById('chrono-base-rounds').addEventListener('input', function () {
-        self._refreshRoundCountDefaults();
-    });
 
     // Manual per-string edits win over recomputed defaults
     var counts = document.querySelectorAll('.chrono-roundcount .chrono-rounds-input');
@@ -530,10 +531,16 @@ ChronoManager.prototype._importSelected = function () {
         }).then(function () {
             self.sessions = [];
             document.getElementById('chrono-import-btn').style.display = 'none';
-            // Straight into assignment review when a rifle was chosen
-            if (rifleId) {
-                setTimeout(function () { self.showAssignmentReview(rifleId); }, 900);
-            }
+            // No auto-jump: hand the user an explicit next step instead
+            // of yanking the screen away while they read the status
+            var goBtn = document.createElement('button');
+            goBtn.className = 'btn btn-primary';
+            goBtn.textContent = 'Assign to loads →';
+            goBtn.addEventListener('click', function () {
+                self.showAssignmentReview(rifleId);
+            });
+            status.appendChild(document.createElement('br'));
+            status.appendChild(goBtn);
         }).catch(function (err) {
             btn.disabled = false;
             self._showError('Saved ' + saved + ' of ' + fresh.length + ' strings, then failed: ' +
@@ -556,6 +563,13 @@ ChronoManager.prototype.showAssignmentReview = function (rifleId) {
     var self = this;
     if (!rifleId) return;
     this._showError(null);
+
+    // Review takes over the screen — hide the import controls
+    // (Back to Import re-renders the whole view)
+    var importSection = document.getElementById('chrono-import-section');
+    if (importSection) importSection.classList.add('hidden');
+    var launcher = document.getElementById('chrono-review-launcher');
+    if (launcher) launcher.classList.add('hidden');
 
     // Preserve the confirmed-section expand state across re-renders
     // (deleting/editing several strings in a row shouldn't snap it shut)
@@ -626,12 +640,26 @@ ChronoManager.prototype._renderAssignmentReview = function () {
 
     if (!r.pending.length) {
         out += '<p class="chrono-intro">No strings waiting for assignment.</p>';
+        out += '<button id="chrono-goto-report" class="btn btn-primary">View Performance Report →</button>';
     }
 
+    // Show each load's confirmed velocity in the pickers — this is the
+    // screen where the user decides which load owns which velocities
+    var loadAvg = {};
+    r.strings.forEach(function (s) {
+        if (s.assignmentStatus === 'confirmed' && s.loadId && typeof s.avgFps === 'number') {
+            if (!loadAvg[s.loadId]) loadAvg[s.loadId] = { sum: 0, n: 0 };
+            var w = s.shots && s.shots.length ? s.shots.length : 1;
+            loadAvg[s.loadId].sum += s.avgFps * w;
+            loadAvg[s.loadId].n += w;
+        }
+    });
     var loadOptions = '<option value="">— Pick a load —</option>';
     for (var lo = 0; lo < r.loads.length; lo++) {
+        var la = loadAvg[r.loads[lo].id];
         loadOptions += '<option value="' + this._escapeHtml(r.loads[lo].id) + '">' +
-            this._escapeHtml(r.loads[lo].name) + '</option>';
+            this._escapeHtml(r.loads[lo].name) +
+            (la ? ' (avg ' + formatNum(la.sum / la.n, 0) + ' fps)' : '') + '</option>';
     }
     loadOptions += '<option value="__new__">+ New load…</option>';
 
@@ -671,6 +699,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         out += '</ul>';
         out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' +
             loadOptions + '</select>';
+        out += '<input type="text" class="chrono-newload-name hidden" maxlength="80" placeholder="New load name">';
         out += '<button class="btn btn-primary chrono-cluster-confirm" data-cluster="' + c +
             '" data-select="chrono-cluster-load-' + c + '">Assign group (' + members.length + ')</button></div>';
         out += '</div>';
@@ -694,6 +723,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
             out += '</div>';
             out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-split-load-' +
                 this._escapeHtml(ss.id) + '">' + loadOptions + '</select>';
+            out += '<input type="text" class="chrono-newload-name hidden" maxlength="80" placeholder="New load name">';
             out += '<button class="btn btn-primary chrono-split-confirm" data-id="' + this._escapeHtml(ss.id) +
                 '" data-select="chrono-split-load-' + this._escapeHtml(ss.id) + '">Assign (1)</button></div>';
             out += '</div>';
@@ -720,27 +750,66 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         self.show();
     });
 
-    // Round-count corrections (works on confirmed strings too)
+    // "+ New load…" reveals its inline name field
+    var loadSelects = document.querySelectorAll('.chrono-load-select');
+    for (var lsx = 0; lsx < loadSelects.length; lsx++) {
+        loadSelects[lsx].addEventListener('change', function () {
+            var nameField = this.parentNode.querySelector('.chrono-newload-name');
+            if (nameField) {
+                nameField.classList.toggle('hidden', this.value !== '__new__');
+                if (this.value === '__new__') nameField.focus();
+            }
+        });
+    }
+
+    // Everything confirmed → the natural next step is the report
+    var gotoReport = document.getElementById('chrono-goto-report');
+    if (gotoReport) {
+        gotoReport.addEventListener('click', function () {
+            if (window.ReportNav) window.ReportNav.open(rifleId);
+        });
+    }
+
+    // Round-count corrections (works on confirmed strings too).
+    // Inline edit: the button swaps for a number field — Enter/blur
+    // saves, Escape cancels. No prompt() dialogs.
     var stringById = {};
     strings.forEach(function (s) { stringById[s.id] = s; });
     var editBtns = document.querySelectorAll('.chrono-edit-rounds');
     for (var eb = 0; eb < editBtns.length; eb++) {
         editBtns[eb].addEventListener('click', function () {
             var id = this.getAttribute('data-id');
-            var current = stringById[id] && typeof stringById[id].roundCountAt === 'number'
-                ? String(stringById[id].roundCountAt) : '';
-            var typed = window.prompt('Barrel round count AFTER this string (blank = unknown):', current);
-            if (typed === null) return; // cancelled
-            var value = typed.trim() === '' ? null : parseInt(typed, 10);
-            if (value !== null && (!isFinite(value) || value < 0)) {
-                window.alert('Enter a whole number of rounds, or leave blank.');
-                return;
+            var s = stringById[id];
+            var field = document.createElement('input');
+            field.type = 'number';
+            field.min = '0';
+            field.step = '1';
+            field.className = 'chrono-rounds-inline';
+            field.value = s && typeof s.roundCountAt === 'number' ? s.roundCountAt : '';
+            field.placeholder = 'rounds';
+            this.replaceWith(field);
+            field.focus();
+
+            var done = false;
+            function commit() {
+                if (done) return;
+                done = true;
+                var value = field.value.trim() === '' ? null : parseInt(field.value, 10);
+                if (value !== null && (!isFinite(value) || value < 0)) {
+                    self._renderAssignmentReview(); // invalid → revert
+                    return;
+                }
+                self.db.updateVelocityString({ id: id, roundCountAt: value }).then(function () {
+                    self.showAssignmentReview(rifleId);
+                }).catch(function (err) {
+                    self._showError('Could not update the round count: ' + err.message);
+                });
             }
-            self.db.updateVelocityString({ id: id, roundCountAt: value }).then(function () {
-                self.showAssignmentReview(rifleId);
-            }).catch(function (err) {
-                self._showError('Could not update the round count: ' + err.message);
+            field.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') { done = true; self._renderAssignmentReview(); }
             });
+            field.addEventListener('blur', commit);
         });
     }
 
@@ -825,9 +894,16 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
 
     var loadPromise;
     if (loadValue === '__new__') {
-        var name = window.prompt('Name for the new load (e.g. "Hornady 168gr ELD-M"):');
-        if (!name || !name.trim()) return;
-        loadPromise = this.db.addLoad({ rifleId: rifleId, name: name.trim() })
+        // Inline name field (revealed when "+ New load…" is picked) —
+        // no prompt() dialogs for input flows
+        var nameInput = btn.parentNode ? btn.parentNode.querySelector('.chrono-newload-name') : null;
+        var name = nameInput ? nameInput.value.trim() : '';
+        if (!name) {
+            status.textContent = 'Enter a name for the new load.';
+            if (nameInput) nameInput.focus();
+            return;
+        }
+        loadPromise = this.db.addLoad({ rifleId: rifleId, name: name })
             .then(function (load) { return load.id; });
     } else {
         loadPromise = Promise.resolve(loadValue);
