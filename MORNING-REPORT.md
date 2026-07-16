@@ -12,7 +12,7 @@ Updated incrementally after each step. Session started 2026-07-15 (evening).
 | 4 — Load auto-split clustering | ✅ Code done; tests pass; UI needs browser check | (see git log) |
 | 5 — Per-rifle aggregation view | ✅ Code done; tests pass; UI needs browser check | (see git log) |
 | 6 — Build-sheet fields | ✅ Code done; **needs Migration 1 run first** | (see git log) |
-| 7 — Certificate + PDF | — | — |
+| 7 — Certificate + PDF | ✅ Code done; render/export needs browser check | (see git log) |
 | 8 — Zero Guardian | — | — |
 | 9 — Auto-conditions | — | — |
 | 10 — Onboarding (OCR + QR) | — | — |
@@ -45,10 +45,19 @@ Run `MORNING-migrations.sql` (project root) top-to-bottom in the Supabase SQL Ed
 2. Rifle detail card now shows Serial #/Action/Barrel/Trigger/Chassis/Muzzle rows (empty fields hidden).
 3. IMPORTANT: do NOT create/edit rifles in the app before running Migration 1 — the save will fail (code now always sends the six columns).
 
+**Step 7 — NEEDS MY VERIFICATION (browser):**
+1. Performance Report → "Generate Certificate". With unconfirmed strings you must get a BLOCK screen (with "Resolve strings now"); with clean data you get the pre-flight panel.
+2. Pre-flight defaults = computed best group + ★ recommended load; override dropdowns change the certificate.
+3. Generate → white print-style preview: WORKHORSE header, rifle + serial, build sheet (missing fields print "—"), target photo cover-fit, big group MOA, velocity row (avg/SD/ES/shots/rounds-at-test), conditions line only if the session saved weather, signature line.
+4. Export PDF → phone: share sheet with a valid 1-page letter PDF; desktop: downloads. **Cross-check every printed number against the report screen by hand.**
+5. jsPDF CDN pin verified headless (2.5.1 generates valid PDFs in Node) — only the browser render path remains to check.
+
 ## Decisions skipped for you
 
 - **Step 4:** "+ New load…" creates a name-only load (other bullet fields empty, to be filled in Profiles later). Chosen for flow continuity; if you'd rather force the full load form first, say so and I'll reroute it.
 - **Step 5 (documented rule, not a guess — flagging for awareness):** Recommended load = only loads with ≥1 eligible group (3+ marked shots), ranked by best group MOA, ties within 0.01 MOA broken by lower velocity SD. 5+-shot groups always outrank 3–4-shot groups. Loads with velocity data but no target sessions are never recommended. This is the rule the certificate will print.
+
+- **Step 7 (small decisions I made — review these on the preview):** (1) Header wordmark is the constant `CERT_BRAND = 'WORKHORSE'` in certificate.js — no logo asset exists, text-only until branding lands. (2) "Rounds at test" = the round count of the latest-dated confirmed string of the certified load ("—" if none recorded). (3) Certificate page is print-white with serif type, deliberately unlike the dark app UI. (4) The QR square (bottom-right) is reserved via `CertificateManager.QR_BOX` but empty until Step 10.
 
 ## Surprises / notes
 

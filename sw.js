@@ -40,6 +40,7 @@ var APP_SHELL = [
     './js/velocity-stats.js',
     './js/chrono.js',
     './js/rifle-report.js',
+    './js/certificate.js',
     './js/offline-cache.js',
     './js/app.js',
     './manifest.json',

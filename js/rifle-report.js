@@ -57,6 +57,10 @@ RifleReportManager.prototype._render = function (rifle, agg, strings, loads) {
     html += '<div class="toolbar-spacer"></div>';
     html += '</div>';
 
+    html += '<div style="padding:0 16px 12px;">';
+    html += '<button class="btn btn-primary" id="btn-generate-cert" style="width:100%;">Generate Certificate</button>';
+    html += '</div>';
+
     // Pending-strings warning with resolve link
     var pending = agg.pendingStrings.unassigned + agg.pendingStrings.suggested + agg.pendingStrings.ambiguous;
     if (pending > 0) {
@@ -158,6 +162,15 @@ RifleReportManager.prototype._render = function (rifle, agg, strings, loads) {
         self._revokeThumb();
         self.profileManager.showRifleDetail(rifle.id);
     });
+    var certBtn = document.getElementById('btn-generate-cert');
+    if (certBtn) {
+        certBtn.addEventListener('click', function () {
+            self._revokeThumb();
+            if (self.profileManager.certificateManager) {
+                self.profileManager.certificateManager.showPreflight(rifle.id);
+            }
+        });
+    }
     var resolveBtn = document.getElementById('btn-report-resolve');
     if (resolveBtn) {
         resolveBtn.addEventListener('click', function () {

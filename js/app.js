@@ -195,6 +195,7 @@
             chronoManager = new ChronoManager(db);
             chronoManager.init();
             profileManager.reportManager = new RifleReportManager(db, profileManager);
+            profileManager.certificateManager = new CertificateManager(db, profileManager);
 
             // Bridge so other views (rifle report) can open chrono's
             // assignment review directly (switchView is hoisted below)
