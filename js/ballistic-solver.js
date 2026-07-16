@@ -794,52 +794,29 @@ BallisticSolverManager.prototype._fetchWeather = function () {
         btn.textContent = 'Locating...';
     }
 
-    if (!navigator.geolocation) {
+    NetService.getConditions().then(function (cond) {
+        var tempEl = document.getElementById('solver-temp');
+        var humEl = document.getElementById('solver-humidity');
+        var pressEl = document.getElementById('solver-pressure');
+        var windEl = document.getElementById('solver-wind');
+        var altEl = document.getElementById('solver-altitude');
+
+        if (tempEl && cond.temperature !== null) tempEl.value = cond.temperature;
+        if (humEl && cond.humidity !== null) humEl.value = cond.humidity;
+        if (pressEl && cond.pressure !== null) pressEl.value = cond.pressure.toFixed(2);
+        if (windEl && cond.windSpeed !== null) windEl.value = cond.windSpeed;
+        if (altEl && cond.altitude !== null) altEl.value = cond.altitude;
+
+        // Auto-open the details section
+        var details = document.getElementById('solver-atmo-details');
+        if (details) details.setAttribute('open', '');
         if (btn) { btn.disabled = false; btn.textContent = 'Get Current Weather'; }
-        alert('Geolocation is not supported by your browser.');
-        return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-        function (position) {
-            var lat = position.coords.latitude.toFixed(4);
-            var lon = position.coords.longitude.toFixed(4);
-            if (btn) btn.textContent = 'Fetching weather...';
-
-            fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-                '&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m' +
-                '&temperature_unit=fahrenheit&wind_speed_unit=mph')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                if (data && data.current) {
-                    var c = data.current;
-                    var tempEl = document.getElementById('solver-temp');
-                    var humEl = document.getElementById('solver-humidity');
-                    var pressEl = document.getElementById('solver-pressure');
-                    var windEl = document.getElementById('solver-wind');
-
-                    if (tempEl && c.temperature_2m != null) tempEl.value = Math.round(c.temperature_2m);
-                    if (humEl && c.relative_humidity_2m != null) humEl.value = Math.round(c.relative_humidity_2m);
-                    if (pressEl && c.surface_pressure != null) pressEl.value = (c.surface_pressure * 0.02953).toFixed(2);
-                    if (windEl && c.wind_speed_10m != null) windEl.value = Math.round(c.wind_speed_10m);
-
-                    // Auto-open the details section
-                    var details = document.getElementById('solver-atmo-details');
-                    if (details) details.setAttribute('open', '');
-                }
-                if (btn) { btn.disabled = false; btn.textContent = 'Get Current Weather'; }
-            })
-            .catch(function () {
-                if (btn) { btn.disabled = false; btn.textContent = 'Get Current Weather'; }
-                alert('Failed to fetch weather data.');
-            });
-        },
-        function () {
-            if (btn) { btn.disabled = false; btn.textContent = 'Get Current Weather'; }
-            alert('Location access denied. Enable location to fetch weather.');
-        },
-        { timeout: 10000 }
-    );
+    }).catch(function (err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Get Current Weather'; }
+        alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
+            err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
+            'Failed to fetch weather data.');
+    });
 };
 
 BallisticSolverManager.prototype._calculate = function () {

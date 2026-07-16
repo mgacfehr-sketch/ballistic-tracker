@@ -14,7 +14,7 @@ Updated incrementally after each step. Session started 2026-07-15 (evening).
 | 6 — Build-sheet fields | ✅ Code done; **needs Migration 1 run first** | (see git log) |
 | 7 — Certificate + PDF | ✅ Code done; render/export needs browser check | (see git log) |
 | 8 — Zero Guardian | ✅ Code done; headless-tested; banner needs browser check | (see git log) |
-| 9 — Auto-conditions | — | — |
+| 9 — Auto-conditions | ✅ Code done; needs live GPS/browser check | (see git log) |
 | 10 — Onboarding (OCR + QR) | — | — |
 | 11 — Hardening + compliance | — | — |
 
@@ -58,12 +58,21 @@ Run `MORNING-migrations.sql` (project root) top-to-bottom in the Supabase SQL Ed
 3. Flip the click selector to 1/8 MOA → click counts double; preference survives reload.
 4. A session with no POA marked shows no banner at all.
 
+**Step 9 — NEEDS MY VERIFICATION (browser + location permission):**
+1. Session wizard → data step: weather fields fill silently with zero taps; button reads "Auto-filled · tap to refresh". Fields stay editable.
+2. Deny location permission (fresh profile/incognito): NO error popup on the data step — plain manual form (the explicit button still alerts, by design).
+3. Solver + Ask yorT "Weather" buttons still work — solver now also gets altitude, AI text now includes wind direction + elevation.
+4. Console: `NetService.getConditions()` resolves to a full snapshot.
+5. Tech debt paid: `grep open-meteo js/` hits only net.js now.
+
 ## Decisions skipped for you
 
 - **Step 4:** "+ New load…" creates a name-only load (other bullet fields empty, to be filled in Profiles later). Chosen for flow continuity; if you'd rather force the full load form first, say so and I'll reroute it.
 - **Step 5 (documented rule, not a guess — flagging for awareness):** Recommended load = only loads with ≥1 eligible group (3+ marked shots), ranked by best group MOA, ties within 0.01 MOA broken by lower velocity SD. 5+-shot groups always outrank 3–4-shot groups. Loads with velocity data but no target sessions are never recommended. This is the rule the certificate will print.
 
 - **Step 7 (small decisions I made — review these on the preview):** (1) Header wordmark is the constant `CERT_BRAND = 'WORKHORSE'` in certificate.js — no logo asset exists, text-only until branding lands. (2) "Rounds at test" = the round count of the latest-dated confirmed string of the certified load ("—" if none recorded). (3) Certificate page is print-white with serif type, deliberately unlike the dark app UI. (4) The QR square (bottom-right) is reserved via `CertificateManager.QR_BOX` but empty until Step 10.
+
+- **Step 9 — barometer reality check:** there is NO web API for the phone's barometer; a PWA cannot read it. `NetService.getDevicePressure()` is the documented Capacitor seam (resolves null today; a plugin implementation slots in later). Until then pressure = weather-station surface pressure, which is what the app already used.
 
 ## Surprises / notes
 

@@ -232,6 +232,11 @@ SessionFlow.prototype._showStep = function (index) {
         this._loadProfilePicker();
     }
 
+    // Auto-fill conditions when entering the data step (feature-gated)
+    if (stepName === 'data') {
+        this._autoConditions();
+    }
+
     // Set canvas hints per step
     this._updateHint();
 
@@ -1421,91 +1426,65 @@ SessionFlow.prototype._fetchWeather = function () {
     var btn = this.els.btnFetchWeather;
     if (!btn) return;
 
-    if (!navigator.geolocation) {
-        alert('Geolocation is not supported by your browser.');
-        return;
-    }
-
     btn.disabled = true;
-    btn.textContent = 'Locating...';
+    btn.textContent = 'Fetching conditions...';
 
-    navigator.geolocation.getCurrentPosition(
-        function (position) {
-            var lat = position.coords.latitude.toFixed(4);
-            var lon = position.coords.longitude.toFixed(4);
-            btn.textContent = 'Fetching weather...';
-
-            fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-                '&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m' +
-                '&temperature_unit=fahrenheit&wind_speed_unit=mph')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                if (data && data.current) {
-                    var c = data.current;
-                    if (c.temperature_2m != null && self.els.inputTemp) {
-                        self.els.inputTemp.value = Math.round(c.temperature_2m);
-                    }
-                    if (c.relative_humidity_2m != null && self.els.inputHumidity) {
-                        self.els.inputHumidity.value = Math.round(c.relative_humidity_2m);
-                    }
-                    if (c.surface_pressure != null && self.els.inputPressure) {
-                        self.els.inputPressure.value = (c.surface_pressure * 0.02953).toFixed(2);
-                    }
-                    if (c.wind_speed_10m != null && self.els.inputWindMph) {
-                        self.els.inputWindMph.value = Math.round(c.wind_speed_10m);
-                    }
-                    if (c.wind_direction_10m != null && self.els.inputWindDir) {
-                        self.els.inputWindDir.value = self._degreesToCompass(c.wind_direction_10m);
-                    }
-                }
-
-                // Fetch elevation
-                fetch('https://api.open-meteo.com/v1/elevation?latitude=' + lat + '&longitude=' + lon)
-                .then(function (res) { return res.json(); })
-                .then(function (elevData) {
-                    if (elevData && elevData.elevation && elevData.elevation[0] != null && self.els.inputAltitude) {
-                        self.els.inputAltitude.value = Math.round(elevData.elevation[0] * 3.28084);
-                    }
-                })
-                .catch(function () {
-                    // Elevation fetch failed — not critical
-                });
-
-                // Open the details section
-                if (self.els.dataOptionalDetails) {
-                    self.els.dataOptionalDetails.setAttribute('open', '');
-                }
-
-                btn.textContent = 'Weather Updated';
-                setTimeout(function () {
-                    btn.disabled = false;
-                    btn.textContent = 'Get Current Weather';
-                }, 2000);
-            })
-            .catch(function () {
-                btn.disabled = false;
-                btn.textContent = 'Get Current Weather';
-                alert('Failed to fetch weather data.');
-            });
-        },
-        function () {
+    NetService.getConditions().then(function (cond) {
+        self._fillConditions(cond);
+        if (self.els.dataOptionalDetails) {
+            self.els.dataOptionalDetails.setAttribute('open', '');
+        }
+        btn.textContent = 'Conditions Updated';
+        setTimeout(function () {
             btn.disabled = false;
             btn.textContent = 'Get Current Weather';
-            alert('Location access denied. Enable location to fetch weather.');
-        },
-        { timeout: 10000 }
-    );
+        }, 2000);
+    }).catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Get Current Weather';
+        alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
+            err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
+            'Failed to fetch weather data.');
+    });
 };
 
 /**
- * Convert meteorological wind degrees to compass direction string.
- * Wind direction in meteorology = direction wind comes FROM.
+ * Write a NetService conditions snapshot into the weather inputs.
  */
-SessionFlow.prototype._degreesToCompass = function (degrees) {
-    var dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-    var index = Math.round(((degrees % 360) + 360) % 360 / 22.5) % 16;
-    return 'from ' + dirs[index];
+SessionFlow.prototype._fillConditions = function (cond) {
+    if (!cond) return;
+    if (cond.temperature !== null && this.els.inputTemp) this.els.inputTemp.value = cond.temperature;
+    if (cond.humidity !== null && this.els.inputHumidity) this.els.inputHumidity.value = cond.humidity;
+    if (cond.pressure !== null && this.els.inputPressure) this.els.inputPressure.value = cond.pressure.toFixed(2);
+    if (cond.windSpeed !== null && this.els.inputWindMph) this.els.inputWindMph.value = cond.windSpeed;
+    if (cond.windDirection !== null && this.els.inputWindDir) this.els.inputWindDir.value = cond.windDirection;
+    if (cond.altitude !== null && this.els.inputAltitude) this.els.inputAltitude.value = cond.altitude;
+};
+
+/**
+ * Auto-conditions: silently fill the weather fields when entering the
+ * data step, so the shooter types nothing. Feature-gated; skips when
+ * any field already holds a value; location denial degrades silently
+ * to the manual form.
+ */
+SessionFlow.prototype._autoConditions = function () {
+    var self = this;
+    if (typeof hasFeature !== 'function' || !hasFeature('autoConditions')) return;
+    if (typeof NetService === 'undefined') return;
+
+    var fields = [this.els.inputTemp, this.els.inputHumidity, this.els.inputPressure,
+        this.els.inputWindMph, this.els.inputWindDir, this.els.inputAltitude];
+    for (var i = 0; i < fields.length; i++) {
+        if (fields[i] && fields[i].value !== '') return; // user already entered data
+    }
+
+    NetService.getConditions().then(function (cond) {
+        self._fillConditions(cond);
+        var btn = self.els.btnFetchWeather;
+        if (btn) btn.textContent = 'Auto-filled · tap to refresh';
+    }).catch(function () {
+        // Silent: manual entry stays available
+    });
 };
 
 // ── Helpers ────────────────────────────────────────────────────

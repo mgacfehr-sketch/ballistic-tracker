@@ -265,60 +265,35 @@ AIAssistantManager.prototype._bindChatEvents = function () {
 };
 
 /**
- * Fetch current weather via geolocation + Open-Meteo and prefill chat input.
+ * Fetch current conditions via NetService and prefill the chat input.
  */
 AIAssistantManager.prototype._fetchAndInsertWeather = function () {
     var btn = document.getElementById('ai-weather-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Locating...'; }
 
-    if (!navigator.geolocation) {
+    NetService.getConditions().then(function (cond) {
+        var text = 'Current conditions: ' +
+            (cond.temperature !== null ? cond.temperature : '?') + ' degrees F, ' +
+            (cond.humidity !== null ? cond.humidity : '?') + '% humidity, ' +
+            (cond.pressure !== null ? cond.pressure.toFixed(2) : '?') + ' inHg, ' +
+            (cond.windSpeed !== null ? cond.windSpeed : '?') + ' mph wind' +
+            (cond.windDirection !== null ? ' ' + cond.windDirection : '') +
+            (cond.altitude !== null ? ', ' + cond.altitude + ' ft elevation' : '');
+
+        var input = document.getElementById('ai-input');
+        if (input) {
+            input.value = text;
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+            input.focus();
+        }
         if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
-        alert('Geolocation is not supported by your browser.');
-        return;
+    }).catch(function (err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
+        alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
+            err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
+            'Failed to fetch weather data.');
     }
-
-    navigator.geolocation.getCurrentPosition(
-        function (position) {
-            var lat = position.coords.latitude.toFixed(4);
-            var lon = position.coords.longitude.toFixed(4);
-            if (btn) btn.textContent = 'Fetching...';
-
-            fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-                '&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m' +
-                '&temperature_unit=fahrenheit&wind_speed_unit=mph')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                if (data && data.current) {
-                    var c = data.current;
-                    var tempF = c.temperature_2m != null ? Math.round(c.temperature_2m) : '?';
-                    var humidity = c.relative_humidity_2m != null ? Math.round(c.relative_humidity_2m) : '?';
-                    var pressureInHg = c.surface_pressure != null ? (c.surface_pressure * 0.02953).toFixed(2) : '?';
-                    var windMph = c.wind_speed_10m != null ? Math.round(c.wind_speed_10m) : '?';
-
-                    var text = 'Current conditions: ' + tempF + ' degrees F, ' +
-                        humidity + '% humidity, ' + pressureInHg + ' inHg, ' +
-                        windMph + ' mph wind';
-
-                    var input = document.getElementById('ai-input');
-                    if (input) {
-                        input.value = text;
-                        input.style.height = 'auto';
-                        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-                        input.focus();
-                    }
-                }
-                if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
-            })
-            .catch(function () {
-                if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
-                alert('Failed to fetch weather data.');
-            });
-        },
-        function () {
-            if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
-            alert('Location access denied. Enable location to fetch weather.');
-        },
-        { timeout: 10000 }
     );
 };
 
