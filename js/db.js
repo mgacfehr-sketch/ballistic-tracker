@@ -969,6 +969,57 @@ BallisticDB.prototype.deleteMyAccount = function () {
     });
 };
 
+// ── User settings (Supabase-synced, localStorage write-through) ──
+// Cross-device key/value store (tool activations, onboarding state).
+// Reads fall back to the local cache offline; writes go to both.
+
+BallisticDB.prototype.setUserSetting = function (key, value) {
+    var self = this;
+    try {
+        localStorage.setItem('yort_us_' + key, JSON.stringify(value));
+    } catch (e) { /* cache best-effort */ }
+    var row = {
+        user_id: self.userId,
+        key: key,
+        value: value,
+        updated_at: new Date().toISOString()
+    };
+    return self.supabase.from('user_settings')
+        .upsert(row, { onConflict: 'user_id,key' })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return value;
+        });
+};
+
+BallisticDB.prototype.getUserSetting = function (key) {
+    var self = this;
+    function cached() {
+        try {
+            var raw = localStorage.getItem('yort_us_' + key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+    }
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        return Promise.resolve(cached());
+    }
+    return self.supabase.from('user_settings').select('value')
+        .eq('user_id', self.userId).eq('key', key)
+        .maybeSingle()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            var value = res.data ? res.data.value : null;
+            try {
+                if (value !== null) localStorage.setItem('yort_us_' + key, JSON.stringify(value));
+            } catch (e) { /* cache best-effort */ }
+            return value;
+        })
+        .catch(function (err) {
+            console.warn('[DB] getUserSetting failed, using cache:', err);
+            return cached();
+        });
+};
+
 // ── Settings (localStorage fallback) ──────────────────────────
 
 BallisticDB.prototype.setSetting = function (key, value) {
