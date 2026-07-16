@@ -1,0 +1,16 @@
+-- ════════════════════════════════════════════════════════════
+-- STAGE-B-migrations.sql
+--
+-- NOTHING TO RUN. Stage B required no new database objects.
+--
+-- The three Stage B features (Zero Guardian, auto-conditions,
+-- onboarding OCR + QR deep link) were already delivered during the
+-- Stage A overnight build and use existing tables/columns only:
+--   - Zero Guardian writes the pre-existing sessions.is_zero_session
+--   - auto-conditions writes the pre-existing sessions.weather jsonb
+--   - onboarding writes ordinary loads rows and reads rifles
+--
+-- PREREQUISITE (from Stage A, if not already applied): run
+-- MORNING-migrations.sql — Migration 1 (rifle build-sheet columns)
+-- and Migration 2 (delete_my_account function). Both additive.
+-- ════════════════════════════════════════════════════════════
