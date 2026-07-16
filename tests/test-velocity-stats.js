@@ -152,6 +152,31 @@ var rOne = V.clusterStringsByVelocity([str(2800, 10, 5, 'solo')]);
 check('single string → 1 cluster', rOne.clusters.length, 1);
 check('strings without avgFps excluded', V.clusterStringsByVelocity([{ sdFps: 5 }, str(2800, 10, 5)]).clusters.length, 1);
 
+// ── Round-count assignment (AFTER semantics) ──────────────────
+console.log('\nassignRoundCounts:');
+
+function fakeShots(n) {
+    var a = [];
+    for (var i = 0; i < n; i++) a.push({ shot: i + 1, fps: 2800 });
+    return a;
+}
+var rcSessions = [{ shots: fakeShots(7) }, { shots: fakeShots(11) }, { shots: fakeShots(8) }];
+
+check('fresh barrel, 7/11/8 → 7/18/26 (owner-specified case)',
+    V.assignRoundCounts(0, rcSessions).join(','), '7,18,26');
+check('base 100 → 107/118/126',
+    V.assignRoundCounts(100, rcSessions).join(','), '107,118,126');
+check('unknown base → all null, never guessed',
+    V.assignRoundCounts(null, rcSessions).every(function (v) { return v === null; }), true);
+check('unknown base keeps one slot per session',
+    V.assignRoundCounts(null, rcSessions).length, 3);
+check('empty sessions → []', V.assignRoundCounts(0, []).length, 0);
+check('null sessions → []', V.assignRoundCounts(0, null).length, 0);
+check('single string includes its own shots',
+    V.assignRoundCounts(50, [{ shots: fakeShots(5) }])[0], 55);
+check('sessions without shots arrays count as 0',
+    V.assignRoundCounts(10, [{ shots: null }, { shots: fakeShots(3) }]).join(','), '10,13');
+
 // ── Per-rifle aggregation ─────────────────────────────────────
 console.log('\naggregateRifle:');
 

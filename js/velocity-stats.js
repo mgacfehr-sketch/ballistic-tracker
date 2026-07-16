@@ -220,6 +220,38 @@ function clusterStringsByVelocity(strings) {
     return { clusters: clusters, ambiguous: ambiguous };
 }
 
+// ── Round-count assignment (chrono import) ───────────────────
+
+/**
+ * Assign barrel round counts to a chronological run of strings.
+ *
+ * AFTER semantics (owner decision 2026-07-16): round_count_at is the
+ * barrel's total round count AFTER the string was fired — the odometer
+ * at the end of that string. A fresh barrel (base 0) importing strings
+ * of 7/11/8 shots reads 7/18/26, and the certificate's "ROUNDS AT
+ * TEST" shows 26.
+ *
+ * @param {number|null} baseCount - barrel rounds BEFORE the first
+ *   string; null (unknown) → every count is null, never guessed
+ * @param {Array<{shots: Array}>} sessions - oldest-first strings
+ * @returns {Array<number|null>} one count per session
+ */
+function assignRoundCounts(baseCount, sessions) {
+    var out = [];
+    if (!sessions) return out;
+    var known = typeof baseCount === 'number' && isFinite(baseCount);
+    var running = known ? baseCount : null;
+    for (var i = 0; i < sessions.length; i++) {
+        if (known) {
+            running += (sessions[i].shots && sessions[i].shots.length) || 0;
+            out.push(running);
+        } else {
+            out.push(null);
+        }
+    }
+    return out;
+}
+
 // ── Per-rifle aggregation ─────────────────────────────────────
 
 var MIN_GROUP_SHOTS = 3;      // sessions below this never count as a "group"
@@ -348,6 +380,7 @@ if (typeof module !== 'undefined' && module.exports) {
         parseTimeOfDay,
         splitByTimeGap,
         clusterStringsByVelocity,
+        assignRoundCounts,
         aggregateRifle,
         DEFAULT_STRING_SD
     };

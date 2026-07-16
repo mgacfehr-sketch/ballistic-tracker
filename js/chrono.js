@@ -151,8 +151,10 @@ ChronoManager.prototype._renderPreview = function () {
             this._escapeHtml(this.rifles[r].name) + '</option>';
     }
     out += '</select></div>';
+    out += '<div class="form-group"><label for="chrono-base-rounds">Barrel round count BEFORE this import</label>';
+    out += '<input type="number" id="chrono-base-rounds" min="0" step="1" placeholder="unknown" class="chrono-rounds-input" style="max-width:160px;"></div>';
     out += '<label class="chrono-add-rounds"><input type="checkbox" id="chrono-add-rounds" disabled> ' +
-        'Add imported shots to the barrel round count</label>';
+        'Update the barrel round count to match (base + imported shots)</label>';
     out += '</div>';
 
     for (var i = 0; i < this.sessions.length; i++) {
@@ -181,7 +183,7 @@ ChronoManager.prototype._renderPreview = function () {
         }
         out += '</div>';
 
-        out += '<div class="form-group chrono-roundcount"><label for="chrono-rounds-' + i + '">Barrel round count at this string</label>';
+        out += '<div class="form-group chrono-roundcount"><label for="chrono-rounds-' + i + '">Barrel round count AFTER this string</label>';
         out += '<input type="number" id="chrono-rounds-' + i + '" class="chrono-rounds-input" data-index="' + i + '" min="0" step="1" placeholder="—"></div>';
 
         out += '<details class="chrono-shots"><summary>Shots</summary><table class="chrono-table"><thead><tr><th>#</th><th>Speed (fps)</th><th>Time</th></tr></thead><tbody>';
@@ -225,8 +227,13 @@ ChronoManager.prototype._bindPreviewEvents = function () {
         });
     }
 
-    // Manual edits win over recomputed defaults
-    var counts = document.querySelectorAll('.chrono-rounds-input');
+    // Base count drives every per-string value
+    document.getElementById('chrono-base-rounds').addEventListener('input', function () {
+        self._refreshRoundCountDefaults();
+    });
+
+    // Manual per-string edits win over recomputed defaults
+    var counts = document.querySelectorAll('.chrono-roundcount .chrono-rounds-input');
     for (var c = 0; c < counts.length; c++) {
         counts[c].addEventListener('input', function () {
             this.setAttribute('data-edited', 'true');
@@ -256,6 +263,12 @@ ChronoManager.prototype._onRifleChange = function (rifleId) {
             if (barrels[i].isActive) { self.activeBarrel = barrels[i]; break; }
         }
         if (!self.activeBarrel && barrels.length) self.activeBarrel = barrels[0];
+        // Picking a rifle resets the base to that barrel's current count
+        var baseInput = document.getElementById('chrono-base-rounds');
+        if (baseInput) {
+            baseInput.value = self.activeBarrel && typeof self.activeBarrel.totalRounds === 'number'
+                ? String(self.activeBarrel.totalRounds) : '';
+        }
         self._refreshRoundCountDefaults();
     }).catch(function () {
         self._refreshRoundCountDefaults();
@@ -263,21 +276,51 @@ ChronoManager.prototype._onRifleChange = function (rifleId) {
 };
 
 /**
- * Default round count per string = barrel count + shots of earlier
- * included strings in this import. Never clobbers a hand-edited field.
+ * Current base count from the field, or null when unknown/blank.
+ */
+ChronoManager.prototype._baseRounds = function () {
+    var baseInput = document.getElementById('chrono-base-rounds');
+    if (!baseInput || baseInput.value === '') return null;
+    var v = parseInt(baseInput.value, 10);
+    return isFinite(v) && v >= 0 ? v : null;
+};
+
+/**
+ * Per-string counts for the CURRENT include selection, oldest-first,
+ * AFTER semantics via the pure assignRoundCounts(). Excluded strings
+ * get null (they don't advance the odometer).
+ * @returns {Array<number|null>} one entry per this.sessions index
+ */
+ChronoManager.prototype._computeRoundCounts = function () {
+    var base = this._baseRounds();
+    var included = [];
+    var map = []; // included position → sessions index
+    for (var i = 0; i < this.sessions.length; i++) {
+        var cb = document.querySelector('.chrono-include-cb[data-index="' + i + '"]');
+        if (!cb || cb.checked) {
+            map.push(i);
+            included.push(this.sessions[i]);
+        }
+    }
+    var counts = assignRoundCounts(base, included);
+    var out = [];
+    for (var s = 0; s < this.sessions.length; s++) out.push(null);
+    for (var k = 0; k < map.length; k++) out[map[k]] = counts[k];
+    return out;
+};
+
+/**
+ * Repaint the per-string fields from the computed counts. Never
+ * clobbers a hand-edited field.
  */
 ChronoManager.prototype._refreshRoundCountDefaults = function () {
-    var base = this.activeBarrel && typeof this.activeBarrel.totalRounds === 'number'
-        ? this.activeBarrel.totalRounds : null;
-    var cumulative = 0;
+    var counts = this._computeRoundCounts();
     for (var i = 0; i < this.sessions.length; i++) {
         var input = document.getElementById('chrono-rounds-' + i);
-        var include = document.querySelector('.chrono-include-cb[data-index="' + i + '"]');
         if (!input) continue;
         if (input.getAttribute('data-edited') !== 'true') {
-            input.value = base === null ? '' : String(base + cumulative);
+            input.value = counts[i] === null ? '' : String(counts[i]);
         }
-        if (include && include.checked) cumulative += this.sessions[i].shots.length;
     }
 };
 
@@ -291,6 +334,8 @@ ChronoManager.prototype._importSelected = function () {
     var status = document.getElementById('chrono-status');
     var rifleId = document.getElementById('chrono-rifle').value || null;
     var addRounds = document.getElementById('chrono-add-rounds').checked;
+    var base = this._baseRounds();
+    var counts = this._computeRoundCounts();
 
     var records = [];
     for (var i = 0; i < this.sessions.length; i++) {
@@ -299,9 +344,15 @@ ChronoManager.prototype._importSelected = function () {
 
         var s = this.sessions[i];
         var stats = velocityStats(s.shots);
-        var countInput = document.getElementById('chrono-rounds-' + i);
-        var roundCountAt = countInput && countInput.value !== '' ? parseInt(countInput.value, 10) : null;
         var dateObj = s.date ? new Date(s.date) : null;
+
+        // Hand-edited field wins; otherwise the computed AFTER-count
+        var roundCountAt = counts[i];
+        var countInput = document.getElementById('chrono-rounds-' + i);
+        if (countInput && countInput.getAttribute('data-edited') === 'true' && countInput.value !== '') {
+            var edited = parseInt(countInput.value, 10);
+            if (isFinite(edited) && edited >= 0) roundCountAt = edited;
+        }
 
         records.push({
             rifleId: rifleId,
@@ -313,7 +364,7 @@ ChronoManager.prototype._importSelected = function () {
             avgFps: stats.avg,
             sdFps: stats.sd,
             esFps: stats.es,
-            roundCountAt: isFinite(roundCountAt) && roundCountAt !== null ? roundCountAt : null,
+            roundCountAt: roundCountAt,
             assignmentStatus: rifleId ? 'suggested' : 'unassigned'
         });
     }
@@ -324,39 +375,70 @@ ChronoManager.prototype._importSelected = function () {
     }
 
     btn.disabled = true;
-    status.textContent = 'Saving…';
+    status.textContent = 'Checking for duplicates…';
 
-    var saved = 0;
-    var chain = Promise.resolve();
-    records.forEach(function (record) {
-        chain = chain.then(function () {
-            return self.db.addVelocityString(record).then(function () { saved++; });
+    // Duplicate-import guard: skip strings already saved for this
+    // rifle (or already sitting unassigned) with the same sheet + date.
+    var existingReq = rifleId
+        ? this.db.getVelocityStringsByRifle(rifleId)
+        : this.db.getUnassignedVelocityStrings();
+
+    existingReq.catch(function () { return []; }).then(function (existing) {
+        var seen = {};
+        (existing || []).forEach(function (e) {
+            seen[(e.sheetName || '') + '|' + (e.date || '')] = true;
         });
-    });
+        var fresh = [];
+        var skipped = 0;
+        records.forEach(function (r) {
+            if (seen[(r.sheetName || '') + '|' + r.date]) skipped++;
+            else fresh.push(r);
+        });
 
-    chain.then(function () {
-        var totalShots = records.reduce(function (a, r) { return a + r.shots.length; }, 0);
-        if (addRounds && self.activeBarrel) {
-            var barrel = self.activeBarrel;
-            barrel.totalRounds = (barrel.totalRounds || 0) + totalShots;
-            return self.db.updateBarrel(barrel).then(function () {
-                status.textContent = 'Imported ' + saved + ' string' + (saved === 1 ? '' : 's') +
-                    ' (' + totalShots + ' shots). Barrel round count is now ' + barrel.totalRounds + '.';
+        if (!fresh.length) {
+            btn.disabled = false;
+            status.textContent = 'All ' + skipped + ' selected string' + (skipped === 1 ? ' was' : 's were') +
+                ' already imported — nothing saved.';
+            return;
+        }
+
+        status.textContent = 'Saving…';
+        var saved = 0;
+        var chain = Promise.resolve();
+        fresh.forEach(function (record) {
+            chain = chain.then(function () {
+                return self.db.addVelocityString(record).then(function () { saved++; });
             });
-        }
-        status.textContent = 'Imported ' + saved + ' string' + (saved === 1 ? '' : 's') +
-            ' (' + totalShots + ' shots).';
-    }).then(function () {
-        self.sessions = [];
-        document.getElementById('chrono-import-btn').style.display = 'none';
-        // Straight into assignment review when a rifle was chosen
-        if (rifleId) {
-            setTimeout(function () { self.showAssignmentReview(rifleId); }, 900);
-        }
-    }).catch(function (err) {
-        btn.disabled = false;
-        self._showError('Saved ' + saved + ' of ' + records.length + ' strings, then failed: ' +
-            err.message + ' — fix the connection and re-import the rest (already-saved strings are kept).');
+        });
+
+        return chain.then(function () {
+            var totalShots = fresh.reduce(function (a, r) { return a + r.shots.length; }, 0);
+            var skipNote = skipped ? ' (' + skipped + ' duplicate' + (skipped === 1 ? '' : 's') + ' skipped)' : '';
+            // Absolute barrel update from the SAME base as the strings —
+            // the two displays can no longer drift apart.
+            if (addRounds && self.activeBarrel && base !== null) {
+                var barrel = self.activeBarrel;
+                barrel.totalRounds = base + totalShots;
+                return self.db.updateBarrel(barrel).then(function () {
+                    status.textContent = 'Imported ' + saved + ' string' + (saved === 1 ? '' : 's') +
+                        ' (' + totalShots + ' shots)' + skipNote +
+                        '. Barrel round count set to ' + barrel.totalRounds + '.';
+                });
+            }
+            status.textContent = 'Imported ' + saved + ' string' + (saved === 1 ? '' : 's') +
+                ' (' + totalShots + ' shots)' + skipNote + '.';
+        }).then(function () {
+            self.sessions = [];
+            document.getElementById('chrono-import-btn').style.display = 'none';
+            // Straight into assignment review when a rifle was chosen
+            if (rifleId) {
+                setTimeout(function () { self.showAssignmentReview(rifleId); }, 900);
+            }
+        }).catch(function (err) {
+            btn.disabled = false;
+            self._showError('Saved ' + saved + ' of ' + fresh.length + ' strings, then failed: ' +
+                err.message + ' — fix the connection and re-import the rest (already-saved strings are kept, duplicates will be skipped).');
+        });
     });
 };
 
@@ -426,6 +508,7 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
         for (var m = 0; m < cluster.members.length; m++) {
             var s = cluster.members[m];
             out += '<li>' + this._escapeHtml(this._stringLabel(s)) +
+                ' ' + this._roundsEditHtml(s) +
                 (ambiguousIds[s.id] ? ' <span class="chrono-badge">needs your call</span>' : '') + '</li>';
         }
         out += '</ul>';
@@ -460,7 +543,8 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
             (confirmed.length === 1 ? '' : 's') + '</summary><ul class="chrono-string-list">';
         for (var cf = 0; cf < confirmed.length; cf++) {
             out += '<li>' + this._escapeHtml(this._stringLabel(confirmed[cf])) + ' → ' +
-                this._escapeHtml(loadNames[confirmed[cf].loadId] || 'unknown load') + '</li>';
+                this._escapeHtml(loadNames[confirmed[cf].loadId] || 'unknown load') +
+                ' ' + this._roundsEditHtml(confirmed[cf]) + '</li>';
         }
         out += '</ul></details>';
     }
@@ -471,6 +555,31 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
     document.getElementById('chrono-back-btn').addEventListener('click', function () {
         self.show();
     });
+
+    // Round-count corrections (works on confirmed strings too)
+    var stringById = {};
+    strings.forEach(function (s) { stringById[s.id] = s; });
+    var editBtns = document.querySelectorAll('.chrono-edit-rounds');
+    for (var eb = 0; eb < editBtns.length; eb++) {
+        editBtns[eb].addEventListener('click', function () {
+            var id = this.getAttribute('data-id');
+            var current = stringById[id] && typeof stringById[id].roundCountAt === 'number'
+                ? String(stringById[id].roundCountAt) : '';
+            var typed = window.prompt('Barrel round count AFTER this string (blank = unknown):', current);
+            if (typed === null) return; // cancelled
+            var value = typed.trim() === '' ? null : parseInt(typed, 10);
+            if (value !== null && (!isFinite(value) || value < 0)) {
+                window.alert('Enter a whole number of rounds, or leave blank.');
+                return;
+            }
+            self.db.updateVelocityString({ id: id, roundCountAt: value }).then(function () {
+                self.showAssignmentReview(rifleId);
+            }).catch(function (err) {
+                self._showError('Could not update the round count: ' + err.message);
+            });
+        });
+    }
+
     var buttons = document.querySelectorAll('.chrono-cluster-confirm');
     for (var b = 0; b < buttons.length; b++) {
         buttons[b].addEventListener('click', function () {
@@ -525,6 +634,15 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
         btn.disabled = false;
         status.textContent = 'Assignment failed: ' + err.message;
     });
+};
+
+/**
+ * Small "rounds: N ✎" edit button for one saved string.
+ */
+ChronoManager.prototype._roundsEditHtml = function (s) {
+    var shown = typeof s.roundCountAt === 'number' ? s.roundCountAt : '—';
+    return '<button type="button" class="chrono-edit-rounds" data-id="' + this._escapeHtml(s.id) + '" ' +
+        'title="Edit barrel round count after this string">rounds: ' + shown + ' ✎</button>';
 };
 
 /**
