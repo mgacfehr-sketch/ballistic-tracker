@@ -63,7 +63,7 @@ HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
             html += '<div class="profile-card session-card" data-session-id="' + escapeAttr(s.id) + '">';
             html += '<img class="session-thumbnail" data-session-id="' + escapeAttr(s.id) + '">';
             html += '<div class="profile-card-main">';
-            html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + s.distanceYards + ' yds</span>';
+            html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + formatNum(s.distanceYards, 0) + ' yds</span>';
             html += '<span class="profile-card-sub">' + shotCount + ' shots &middot; ES: ' + groupStr + '</span>';
             html += '</div>';
             html += '<span class="profile-card-arrow">&rsaquo;</span>';
@@ -118,7 +118,7 @@ HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
     // Results card
     if (r) {
         html += '<div class="detail-card">';
-        html += '<div class="detail-row"><span class="detail-label">Distance</span><span class="detail-value">' + session.distanceYards + ' yds</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Distance</span><span class="detail-value">' + formatNum(session.distanceYards, 0) + ' yds</span></div>';
         html += '<div class="detail-row"><span class="detail-label">Shots</span><span class="detail-value">' + (session.impacts ? session.impacts.length : 0) + '</span></div>';
         html += '<div class="detail-row"><span class="detail-label">Extreme Spread</span><span class="detail-value">' + formatFixed(r.groupSizeInches, 3) + '&quot; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span></div>';
         html += '<div class="detail-row"><span class="detail-label">Mean Radius</span><span class="detail-value">' + formatFixed(r.meanRadiusInches, 3) + '&quot; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span></div>';
@@ -610,7 +610,7 @@ HistoryManager.prototype._renderMiscSessionList = function (sessions) {
             html += '<div class="profile-card session-card" data-session-id="' + escapeAttr(s.id) + '">';
             html += '<img class="session-thumbnail" data-session-id="' + escapeAttr(s.id) + '">';
             html += '<div class="profile-card-main">';
-            html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + s.distanceYards + ' yds</span>';
+            html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + formatNum(s.distanceYards, 0) + ' yds</span>';
             html += '<span class="profile-card-sub">' + shotCount + ' shots &middot; ES: ' + groupStr + '</span>';
             html += '</div>';
             html += '<span class="profile-card-arrow">&rsaquo;</span>';
@@ -666,7 +666,7 @@ HistoryManager.prototype._renderMiscSessionDetail = function (session) {
     // Results card
     if (r) {
         html += '<div class="detail-card">';
-        html += '<div class="detail-row"><span class="detail-label">Distance</span><span class="detail-value">' + session.distanceYards + ' yds</span></div>';
+        html += '<div class="detail-row"><span class="detail-label">Distance</span><span class="detail-value">' + formatNum(session.distanceYards, 0) + ' yds</span></div>';
         html += '<div class="detail-row"><span class="detail-label">Shots</span><span class="detail-value">' + (session.impacts ? session.impacts.length : 0) + '</span></div>';
         html += '<div class="detail-row"><span class="detail-label">Extreme Spread</span><span class="detail-value">' + formatFixed(r.groupSizeInches, 3) + '&quot; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span></div>';
         html += '<div class="detail-row"><span class="detail-label">Mean Radius</span><span class="detail-value">' + formatFixed(r.meanRadiusInches, 3) + '&quot; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span></div>';

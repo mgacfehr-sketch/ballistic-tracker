@@ -1016,7 +1016,7 @@ SessionFlow.prototype._renderResults = function () {
         html += '</div>';
 
         html += '<div class="result-row">';
-        html += '<span class="result-label">Radial SD</span>';
+        html += '<span class="result-label">Radial SD <button class="help-btn" onclick="showHelp(\'radialSD\')" title="What is Radial SD?">?</button></span>';
         html += '<span class="result-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span>';
         html += '</div>';
 
