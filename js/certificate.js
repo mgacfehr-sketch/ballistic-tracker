@@ -461,15 +461,25 @@ CertificateManager.prototype._exportPDF = function () {
     var name = 'certificate-' + (this._ctx.rifle.serialNumber || this._ctx.rifle.name || 'rifle')
         .replace(/[^a-z0-9-]+/gi, '-').toLowerCase() + '.pdf';
 
-    // Web Share first (works inside a Capacitor WebView), download fallback
-    var file = null;
-    try { file = new File([blob], name, { type: 'application/pdf' }); } catch (e) { /* older WebView */ }
-    if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-        navigator.share({ files: [file], title: 'Certificate of Performance' }).catch(function () {
-            // user cancelled — no-op
-        });
-        return;
+    // Mobile → Web Share sheet (the Capacitor-safe primary path).
+    // Desktop → straight download: desktop Chrome also implements
+    // canShare({files}), but the OS share dialog there is clumsy and
+    // hard to save from, so it must not win on desktop.
+    var isMobile = navigator.maxTouchPoints > 0 &&
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+        var file = null;
+        try { file = new File([blob], name, { type: 'application/pdf' }); } catch (e) { /* older WebView */ }
+        if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+            navigator.share({ files: [file], title: 'Certificate of Performance' }).catch(function () {
+                // user cancelled — no-op
+            });
+            return;
+        }
+        // Share unavailable on this mobile browser — fall through to download
     }
+
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -477,6 +487,7 @@ CertificateManager.prototype._exportPDF = function () {
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    status.textContent = 'PDF downloaded: ' + name;
 };
 
 CertificateManager.prototype._revokePreview = function () {
