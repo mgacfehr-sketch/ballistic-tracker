@@ -488,42 +488,7 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     html += '<button class="btn-icon" id="btn-edit-rifle" title="Edit">&#9998;</button>';
     html += '</div>';
 
-    // Merged rifle + barrel card
-    html += '<div class="detail-card">';
-    html += '<div class="detail-row"><span class="detail-label">Caliber</span><span class="detail-value">' + escapeHtml(rifle.caliber) + '</span></div>';
-    if (rifle.scopeHeight) {
-        html += '<div class="detail-row"><span class="detail-label">Scope Height</span><span class="detail-value">' + rifle.scopeHeight + '"</span></div>';
-    }
-    if (rifle.zeroRange) {
-        html += '<div class="detail-row"><span class="detail-label">Zero Range</span><span class="detail-value">' + rifle.zeroRange + ' yds</span></div>';
-    }
-    if (activeBarrel && activeBarrel.twistRate) {
-        html += '<div class="detail-row"><span class="detail-label">Twist</span><span class="detail-value">' + escapeHtml(activeBarrel.twistRate) + ' ' + (activeBarrel.twistDirection || 'Right') + '</span></div>';
-    }
-    // Build sheet lines (only filled fields show)
-    var buildRows = [
-        ['Serial #', rifle.serialNumber],
-        ['Action', rifle.action],
-        ['Barrel', rifle.barrelSpec],
-        ['Trigger', rifle.triggerSpec],
-        ['Chassis', rifle.chassis],
-        ['Muzzle', rifle.muzzleDevice]
-    ];
-    for (var br = 0; br < buildRows.length; br++) {
-        if (buildRows[br][1]) {
-            html += '<div class="detail-row"><span class="detail-label">' + buildRows[br][0] +
-                '</span><span class="detail-value">' + escapeHtml(buildRows[br][1]) + '</span></div>';
-        }
-    }
-    if (rifle.notes) {
-        html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(rifle.notes) + '</span></div>';
-    }
-    html += '</div>';
-
-    // Round count stats
-    if (activeBarrel) {
-        html += '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
-    }
+    // (Build-info and barrel stats moved into cards — rifle-cards.js)
 
     // Performance Report — the flagship entry, promoted above the fold
     if (typeof hasFeature === 'function' && hasFeature('certificate')) {
@@ -652,61 +617,7 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
         });
     }
 
-    // Load barrel round counts from stored totalRounds
-    if (activeBarrel && this.historyManager) {
-        var totalRounds = activeBarrel.totalRounds || 0;
-        this.db.getCleaningLogsByBarrel(activeBarrel.id).then(function (cleaningLogs) {
-            var sinceCleaning = self.historyManager._computeRoundsSinceCleaning(totalRounds, cleaningLogs);
-
-            var statsEl = document.getElementById('barrel-stats');
-            if (statsEl) {
-                statsEl.innerHTML =
-                    '<div class="dashboard-stat" id="stat-total-rounds">' +
-                        '<span class="dashboard-stat-value" id="rounds-display">' + totalRounds + '</span>' +
-                        '<span class="dashboard-stat-label">Total Rounds</span>' +
-                        '<button class="btn btn-sm btn-secondary" id="btn-edit-rounds" style="margin-top:4px;padding:2px 10px;font-size:0.75rem;">Edit</button>' +
-                    '</div>' +
-                    '<div class="dashboard-stat">' +
-                        '<span class="dashboard-stat-value">' + sinceCleaning + '</span>' +
-                        '<span class="dashboard-stat-label">Since Cleaning</span>' +
-                    '</div>';
-
-                document.getElementById('btn-edit-rounds').addEventListener('click', function () {
-                    var statEl = document.getElementById('stat-total-rounds');
-                    if (!statEl) return;
-                    statEl.innerHTML =
-                        '<input type="number" id="rounds-input" min="0" step="1" inputmode="numeric" value="' + totalRounds + '" style="width:80px;text-align:center;font-size:1.1rem;padding:4px;border-radius:6px;border:1px solid #555;background:#2a2a2a;color:#fff;">' +
-                        '<div style="display:flex;gap:6px;margin-top:6px;">' +
-                            '<button class="btn btn-sm btn-primary" id="btn-save-rounds" style="padding:2px 10px;font-size:0.75rem;">Save</button>' +
-                            '<button class="btn btn-sm btn-secondary" id="btn-cancel-rounds" style="padding:2px 10px;font-size:0.75rem;">Cancel</button>' +
-                        '</div>';
-                    var inp = document.getElementById('rounds-input');
-                    inp.focus();
-                    inp.select();
-
-                    document.getElementById('btn-save-rounds').addEventListener('click', function () {
-                        var parsed = parseInt(inp.value, 10);
-                        if (!isNaN(parsed) && parsed >= 0) {
-                            activeBarrel.totalRounds = parsed;
-                            self.db.updateBarrel(activeBarrel).then(function () {
-                                self.showRifleDetail(rifle.id);
-                            });
-                        }
-                    });
-
-                    document.getElementById('btn-cancel-rounds').addEventListener('click', function () {
-                        self.showRifleDetail(rifle.id);
-                    });
-
-                    inp.addEventListener('keydown', function (e) {
-                        if (e.key === 'Enter') {
-                            document.getElementById('btn-save-rounds').click();
-                        }
-                    });
-                });
-            }
-        });
-    }
+    // (Barrel round counts + inline editor moved into the 'barrel' card)
 };
 
 // ── Barrel Form ────────────────────────────────────────────────
