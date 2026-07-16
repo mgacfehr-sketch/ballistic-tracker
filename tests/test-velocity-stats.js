@@ -152,6 +152,28 @@ var rOne = V.clusterStringsByVelocity([str(2800, 10, 5, 'solo')]);
 check('single string → 1 cluster', rOne.clusters.length, 1);
 check('strings without avgFps excluded', V.clusterStringsByVelocity([{ sdFps: 5 }, str(2800, 10, 5)]).clusters.length, 1);
 
+// ── Duplicate-import keys ──────────────────────────────────────
+console.log('\nstringDedupKey:');
+
+// THE bug that broke the guard: same instant, two serializations —
+// JS toISOString (Z) vs PostgREST timestamptz (+00:00 offset)
+check('Z and +00:00 forms of the same instant match',
+    V.stringDedupKey('Sheet1', '2026-06-26T21:07:00.000Z'),
+    V.stringDedupKey('Sheet1', '2026-06-26T21:07:00+00:00'));
+check('non-UTC offset of the same instant matches too',
+    V.stringDedupKey('Sheet1', '2026-06-26T21:07:00.000Z'),
+    V.stringDedupKey('Sheet1', '2026-06-26T16:07:00-05:00'));
+check('different instants differ',
+    V.stringDedupKey('Sheet1', '2026-06-26T21:07:00Z') !==
+    V.stringDedupKey('Sheet1', '2026-06-26T21:08:00Z'), true);
+check('different sheet names differ',
+    V.stringDedupKey('Sheet1', '2026-06-26T21:07:00Z') !==
+    V.stringDedupKey('Sheet2', '2026-06-26T21:07:00Z'), true);
+check('null date → name|', V.stringDedupKey('Sheet1', null), 'Sheet1|');
+check('null name + null date', V.stringDedupKey(null, null), '|');
+check('unparseable date falls back to raw string',
+    V.stringDedupKey('S', 'not-a-date'), 'S|not-a-date');
+
 // ── Round-count assignment (AFTER semantics) ──────────────────
 console.log('\nassignRoundCounts:');
 

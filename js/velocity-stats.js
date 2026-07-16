@@ -220,6 +220,26 @@ function clusterStringsByVelocity(strings) {
     return { clusters: clusters, ambiguous: ambiguous };
 }
 
+// ── Duplicate-import keys ─────────────────────────────────────
+
+/**
+ * Format-agnostic identity key for a velocity string: sheet name +
+ * epoch milliseconds of the date. Two serializations of the same
+ * instant ("2026-06-26T21:07:00.000Z" from JS toISOString vs
+ * "2026-06-26T21:07:00+00:00" from PostgREST) yield the SAME key —
+ * raw string comparison of round-tripped dates is what broke the
+ * original duplicate guard. Unparseable dates fall back to the raw
+ * string; missing dates to ''.
+ */
+function stringDedupKey(sheetName, date) {
+    var t = '';
+    if (date) {
+        var ms = new Date(date).getTime();
+        t = isNaN(ms) ? String(date) : String(ms);
+    }
+    return (sheetName || '') + '|' + t;
+}
+
 // ── Round-count assignment (chrono import) ───────────────────
 
 /**
@@ -380,6 +400,7 @@ if (typeof module !== 'undefined' && module.exports) {
         parseTimeOfDay,
         splitByTimeGap,
         clusterStringsByVelocity,
+        stringDedupKey,
         assignRoundCounts,
         aggregateRifle,
         DEFAULT_STRING_SD

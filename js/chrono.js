@@ -168,7 +168,8 @@ ChronoManager.prototype._renderPreview = function () {
 
         out += '<div class="detail-card chrono-session" data-index="' + i + '">';
         out += '<label class="chrono-include"><input type="checkbox" class="chrono-include-cb" data-index="' + i + '" checked> Include</label>';
-        out += '<h3>' + this._escapeHtml(this._sessionTitle(s, i)) + '</h3>';
+        out += '<h3>' + this._escapeHtml(this._sessionTitle(s, i)) +
+            ' <span class="chrono-badge chrono-dup-badge hidden" id="chrono-dup-' + i + '">already imported</span></h3>';
         out += '<div class="chrono-stats-row">';
         out += '<span><strong>' + s.shots.length + '</strong> shots</span>';
         out += '<span>' + formatNum(min, 1) + '–' + formatNum(max, 1) + ' fps</span>';
@@ -211,6 +212,48 @@ ChronoManager.prototype._renderPreview = function () {
 
     document.getElementById('chrono-results').innerHTML = out;
     this._bindPreviewEvents();
+
+    // Mark strings that already exist (against the current rifle pick,
+    // or the unassigned pool) BEFORE any counts can build on them
+    var rifleSel = document.getElementById('chrono-rifle');
+    this._refreshDuplicates(rifleSel && rifleSel.value ? rifleSel.value : null);
+};
+
+/**
+ * Preview-time duplicate marking: fetch existing strings and disable +
+ * untick any parsed session that matches (epoch-normalized key). This
+ * both prevents re-import AND keeps duplicate shots from advancing the
+ * round-count odometer — excluded strings never count.
+ */
+ChronoManager.prototype._refreshDuplicates = function (rifleId) {
+    var self = this;
+    var req = rifleId
+        ? this.db.getVelocityStringsByRifle(rifleId)
+        : this.db.getUnassignedVelocityStrings();
+
+    req.catch(function () { return []; }).then(function (existing) {
+        var seen = {};
+        (existing || []).forEach(function (e) {
+            seen[stringDedupKey(e.sheetName, e.date)] = true;
+        });
+        for (var i = 0; i < self.sessions.length; i++) {
+            var isDup = !!seen[stringDedupKey(self.sessions[i].name, self.sessions[i].date)];
+            var cb = document.querySelector('.chrono-include-cb[data-index="' + i + '"]');
+            var badge = document.getElementById('chrono-dup-' + i);
+            if (cb) {
+                if (isDup) {
+                    cb.checked = false;
+                    cb.disabled = true;
+                } else if (cb.disabled) {
+                    // no longer a duplicate under the new rifle pick
+                    cb.disabled = false;
+                    cb.checked = true;
+                }
+            }
+            if (badge) badge.classList.toggle('hidden', !isDup);
+        }
+        self._refreshRoundCountDefaults();
+    });
 };
 
 ChronoManager.prototype._bindPreviewEvents = function () {
@@ -255,7 +298,7 @@ ChronoManager.prototype._onRifleChange = function (rifleId) {
     addRounds.disabled = !rifleId;
     if (!rifleId) {
         addRounds.checked = false;
-        this._refreshRoundCountDefaults();
+        this._refreshDuplicates(null); // check vs the unassigned pool
         return;
     }
     this.db.getBarrelsByRifle(rifleId).then(function (barrels) {
@@ -269,7 +312,9 @@ ChronoManager.prototype._onRifleChange = function (rifleId) {
             baseInput.value = self.activeBarrel && typeof self.activeBarrel.totalRounds === 'number'
                 ? String(self.activeBarrel.totalRounds) : '';
         }
-        self._refreshRoundCountDefaults();
+        // Re-check duplicates against THIS rifle's strings (also
+        // refreshes the round-count defaults afterwards)
+        self._refreshDuplicates(rifleId);
     }).catch(function () {
         self._refreshRoundCountDefaults();
     });
@@ -386,12 +431,12 @@ ChronoManager.prototype._importSelected = function () {
     existingReq.catch(function () { return []; }).then(function (existing) {
         var seen = {};
         (existing || []).forEach(function (e) {
-            seen[(e.sheetName || '') + '|' + (e.date || '')] = true;
+            seen[stringDedupKey(e.sheetName, e.date)] = true;
         });
         var fresh = [];
         var skipped = 0;
         records.forEach(function (r) {
-            if (seen[(r.sheetName || '') + '|' + r.date]) skipped++;
+            if (seen[stringDedupKey(r.sheetName, r.date)]) skipped++;
             else fresh.push(r);
         });
 
@@ -514,7 +559,7 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
             out += '<input type="checkbox" class="chrono-member-cb" data-cluster="' + c + '" data-id="' +
                 this._escapeHtml(s.id) + '"' + (amb ? '' : ' checked') + '> ';
             out += this._escapeHtml(this._stringLabel(s));
-            out += '</label> ' + this._roundsEditHtml(s);
+            out += '</label> ' + this._roundsEditHtml(s) + ' ' + this._deleteBtnHtml(s);
             if (amb) {
                 out += ' <span class="chrono-badge">needs your call — sits between velocity groups</span>';
             }
@@ -534,7 +579,8 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
         for (var cf = 0; cf < confirmed.length; cf++) {
             out += '<li>' + this._escapeHtml(this._stringLabel(confirmed[cf])) + ' → ' +
                 this._escapeHtml(loadNames[confirmed[cf].loadId] || 'unknown load') +
-                ' ' + this._roundsEditHtml(confirmed[cf]) + '</li>';
+                ' ' + this._roundsEditHtml(confirmed[cf]) +
+                ' ' + this._deleteBtnHtml(confirmed[cf]) + '</li>';
         }
         out += '</ul></details>';
     }
@@ -602,6 +648,23 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
             self._confirmAssignment(rifleId, ids, select.value, this);
         });
     }
+
+    // Per-string deletion (confirm-guarded; works on confirmed strings)
+    var delBtns = document.querySelectorAll('.chrono-delete-string');
+    for (var db2 = 0; db2 < delBtns.length; db2++) {
+        delBtns[db2].addEventListener('click', function () {
+            var id = this.getAttribute('data-id');
+            var s = stringById[id];
+            var label = s ? self._stringLabel(s) : id;
+            if (!window.confirm('Delete this velocity string?\n\n' + label +
+                '\n\nThis removes it permanently and cannot be undone.')) return;
+            self.db.deleteVelocityString(id).then(function () {
+                self.showAssignmentReview(rifleId);
+            }).catch(function (err) {
+                self._showError('Could not delete the string: ' + err.message);
+            });
+        });
+    }
 };
 
 /**
@@ -648,6 +711,14 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
         btn.disabled = false;
         status.textContent = 'Assignment failed: ' + err.message;
     });
+};
+
+/**
+ * Small 🗑 delete button for one saved string (confirm-guarded).
+ */
+ChronoManager.prototype._deleteBtnHtml = function (s) {
+    return '<button type="button" class="chrono-delete-string" data-id="' + this._escapeHtml(s.id) + '" ' +
+        'title="Delete this string permanently">🗑</button>';
 };
 
 /**
