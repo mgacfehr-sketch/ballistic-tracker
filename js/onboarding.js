@@ -135,6 +135,55 @@ var Onboarding = (function () {
         });
     }
 
+    // ── First-run onboarding (the wizard's first consumer) ────
+
+    var ONBOARDING_WIZARD = {
+        id: 'onboarding',
+        version: 1,
+        steps: [{
+            id: 'main-use',
+            prompt: 'What do you mainly do?',
+            type: 'choice',
+            choices: [
+                { value: 'hunt', label: 'Hunt', desc: 'Zero checks, dope, first-shot confidence' },
+                { value: 'compete', label: 'Compete', desc: 'Chrono data, groups, trends' },
+                { value: 'handload', label: 'Handload', desc: 'Loads, velocities, testing' },
+                { value: 'all', label: 'All of it', desc: 'Wake everything up' }
+            ]
+        }]
+    };
+
+    /**
+     * One question, ten seconds, and the app is shaped like its owner
+     * (UX Architecture rule 6). Runs once per account, cross-device via
+     * user_settings; a certificate QR deep link always wins.
+     */
+    function maybeRunFirstRun(db) {
+        if (!enabled()) return;
+        if (typeof WizardShell === 'undefined' || typeof ToolRegistry === 'undefined') return;
+
+        // Deep link is the better first-run (the rifle arrives knowing
+        // itself) — skip onboarding entirely on that path
+        try {
+            if (new URLSearchParams(window.location.search).get('rifle')) return;
+        } catch (e) { /* no URLSearchParams — proceed */ }
+
+        db.getUserSetting('onboarding_done').then(function (done) {
+            if (done) return;
+            new WizardShell(db, ONBOARDING_WIZARD, {
+                modal: true,
+                onComplete: function (answers) {
+                    ToolRegistry.applyPreset(answers['main-use']);
+                    db.setUserSetting('onboarding_done', true);
+                    if (window.AppNav) window.AppNav.go('home');
+                },
+                onCancel: function () {
+                    // Resumable next launch; never nag twice in a session
+                }
+            }).start();
+        });
+    }
+
     // ── Certificate QR + deep link ────────────────────────────
 
     /**
@@ -205,6 +254,7 @@ var Onboarding = (function () {
         rifleUrl: rifleUrl,
         stampQR: stampQR,
         handleDeepLink: handleDeepLink,
+        maybeRunFirstRun: maybeRunFirstRun,
         _parseOcrReply: _parseOcrReply // exposed for tests
     };
 })();

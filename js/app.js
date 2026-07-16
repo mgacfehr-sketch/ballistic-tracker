@@ -263,6 +263,11 @@
                     if (homeView && homeView.classList.contains('active')) {
                         homeManager.show();
                     }
+                    // First-run onboarding (after activations are known;
+                    // deep links win inside maybeRunFirstRun)
+                    if (typeof Onboarding !== 'undefined' && Onboarding.maybeRunFirstRun) {
+                        Onboarding.maybeRunFirstRun(db);
+                    }
                 });
             }
 

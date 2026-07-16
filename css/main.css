@@ -3272,3 +3272,122 @@ html, body {
 .home-drawer-active {
     border-style: solid;
 }
+
+/* ── Wizard shell ────────────────────────────────────────── */
+.wizard-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+}
+
+.wizard-card {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px 20px;
+}
+
+.wizard-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 22px;
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+}
+
+.wizard-progress {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 4px;
+}
+
+.wizard-progress-bar {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 2px;
+}
+
+.wizard-count {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    margin-bottom: 12px;
+}
+
+.wizard-prompt {
+    margin: 0 0 16px;
+    font-size: 1.2rem;
+}
+
+.wizard-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 100%;
+    min-height: 56px;
+    margin: 0 0 10px;
+    padding: 10px 16px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+}
+
+.wizard-choice:active {
+    border-color: var(--primary);
+}
+
+.wizard-choice-desc {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+
+.wizard-input {
+    width: 100%;
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 1.1rem;
+    min-height: 48px;
+}
+
+.wizard-error {
+    color: var(--danger);
+    font-size: 0.85rem;
+    min-height: 18px;
+    margin: 8px 0 0;
+}
+
+.wizard-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.wizard-nav .wizard-next {
+    margin-left: auto;
+    min-width: 120px;
+}
