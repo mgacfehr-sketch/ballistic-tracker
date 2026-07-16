@@ -9,7 +9,7 @@
  * Strip |||ACTION:...|||  blocks from AI response text before display.
  */
 function _stripActionBlocks(text) {
-    if (!text) return '';
+    if (!text || typeof text !== 'string') return '';
     return text.replace(/\|\|\|ACTION:[\s\S]*?\|\|\|/g, '').trim();
 }
 
@@ -1025,21 +1025,15 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
 };
 
 /**
- * Call the API proxy at /api/chat.
+ * Call the Claude API proxy via NetService.apiChat.
  */
 AIAssistantManager.prototype._callAPI = function (systemPrompt) {
     var self = this;
 
     return new Promise(function (resolve, reject) {
-        fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                system: systemPrompt,
-                messages: self._prepareMessagesForAPI()
-            })
+        NetService.apiChat({
+            system: systemPrompt,
+            messages: self._prepareMessagesForAPI()
         }).then(function (response) {
             return response.json().then(function (data) {
                 if (!response.ok) {
