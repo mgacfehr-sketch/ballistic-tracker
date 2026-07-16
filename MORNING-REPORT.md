@@ -13,7 +13,7 @@ Updated incrementally after each step. Session started 2026-07-15 (evening).
 | 5 — Per-rifle aggregation view | ✅ Code done; tests pass; UI needs browser check | (see git log) |
 | 6 — Build-sheet fields | ✅ Code done; **needs Migration 1 run first** | (see git log) |
 | 7 — Certificate + PDF | ✅ Code done; render/export needs browser check | (see git log) |
-| 8 — Zero Guardian | — | — |
+| 8 — Zero Guardian | ✅ Code done; headless-tested; banner needs browser check | (see git log) |
 | 9 — Auto-conditions | — | — |
 | 10 — Onboarding (OCR + QR) | — | — |
 | 11 — Hardening + compliance | — | — |
@@ -51,6 +51,12 @@ Run `MORNING-migrations.sql` (project root) top-to-bottom in the Supabase SQL Ed
 3. Generate → white print-style preview: WORKHORSE header, rifle + serial, build sheet (missing fields print "—"), target photo cover-fit, big group MOA, velocity row (avg/SD/ES/shots/rounds-at-test), conditions line only if the session saved weather, signature line.
 4. Export PDF → phone: share sheet with a valid 1-page letter PDF; desktop: downloads. **Cross-check every printed number against the report screen by hand.**
 5. jsPDF CDN pin verified headless (2.5.1 generates valid PDFs in Node) — only the browser render path remains to check.
+
+**Step 8 — NEEDS MY VERIFICATION (browser):**
+1. Run a session with impacts tight around POA → green "✓ ZERO CONFIRMED" banner atop the results; save it → `is_zero_session = true` in Supabase.
+2. Run a deliberately offset group → amber "Adjust: X clicks DOWN/UP, Y clicks RIGHT/LEFT" — verify directions against the existing ATZ card below it.
+3. Flip the click selector to 1/8 MOA → click counts double; preference survives reload.
+4. A session with no POA marked shows no banner at all.
 
 ## Decisions skipped for you
 

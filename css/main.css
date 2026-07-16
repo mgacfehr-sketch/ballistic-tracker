@@ -2621,3 +2621,51 @@ html, body {
     border: 1px solid var(--border);
     background: #fff;
 }
+
+/* ── Zero Guardian banner ────────────────────────────────── */
+.zg-banner {
+    margin: 0 0 10px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    font-size: 1.15rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.zg-banner .zg-sub {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    font-weight: 400;
+    opacity: 0.85;
+}
+
+.zg-confirmed {
+    background: rgba(76, 175, 80, 0.16);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+}
+
+.zg-adjust {
+    background: rgba(255, 152, 0, 0.14);
+    border: 1px solid var(--calibration-color);
+    color: var(--calibration-color);
+}
+
+.zg-click-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.zg-click-row select {
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    min-height: 44px;
+}

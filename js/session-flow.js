@@ -910,6 +910,9 @@ SessionFlow.prototype._renderResults = function () {
 
     var html = '';
 
+    // Zero Guardian verdict banner (populated after innerHTML below)
+    html += '<div id="zero-guardian-banner"></div>';
+
     // Group size
     html += '<div class="result-section-title">Group Size</div>';
     html += '<div class="result-row highlight">';
@@ -1019,6 +1022,11 @@ SessionFlow.prototype._renderResults = function () {
     }
 
     card.innerHTML = html;
+
+    // Zero Guardian plain-English verdict (feature-gated inside render)
+    if (typeof ZeroGuardian !== 'undefined') {
+        ZeroGuardian.render(document.getElementById('zero-guardian-banner'), r);
+    }
 };
 
 // ── Save Session ───────────────────────────────────────────────
@@ -1057,7 +1065,10 @@ SessionFlow.prototype._saveSession = function () {
         poaPoint: this.poa,
         impacts: this.impacts.slice(),
         results: this.results,
-        coldBore: this.coldBore
+        coldBore: this.coldBore,
+        // Zero Guardian: a confirmed verdict marks this as a zero session
+        isZeroSession: typeof ZeroGuardian !== 'undefined' && this.poa
+            ? ZeroGuardian.isConfirmed(this.results) : false
     };
 
     // Store snapshot of rifle/load names for historical reference

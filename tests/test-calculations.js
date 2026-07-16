@@ -237,6 +237,42 @@ assert(wideResult.horizontalSDInches != null, 'Wide group has horizontalSDInches
 assert(wideResult.meanElevationInches != null, 'Wide group has meanElevationInches');
 assert(wideResult.meanWindageInches != null, 'Wide group has meanWindageInches');
 
+// ─── Zero Guardian verdict ──────────────────────────────────────
+
+console.log('\nZero Guardian verdict:');
+
+const zvConfirmed = calc.zeroVerdict(
+    { elevationMOA: 0.1, windageMOA: 0.1, elevationDir: 'Down', windageDir: 'Right' }, 0.25, 0.25);
+assert(zvConfirmed.confirmed === true, '0.1/0.1 MOA → zero confirmed');
+
+// Group 0.6 MOA high-left → ATZ Down/Right → 2 clicks each at 1/4 MOA
+const zvOff = calc.zeroVerdict(
+    { elevationMOA: 0.6, windageMOA: 0.6, elevationDir: 'Down', windageDir: 'Right' }, 0.25, 0.25);
+assert(zvOff.confirmed === false, '0.6/0.6 MOA → NOT confirmed');
+assert(zvOff.elevClicks === 2 && zvOff.elevDir === 'Down', '0.6 MOA @ 1/4 → 2 clicks Down');
+assert(zvOff.windClicks === 2 && zvOff.windDir === 'Right', '0.6 MOA @ 1/4 → 2 clicks Right');
+
+// 1/8 MOA clicks double the count
+const zvEighth = calc.zeroVerdict(
+    { elevationMOA: 0.6, windageMOA: 0.0, elevationDir: 'Up', windageDir: 'Left' }, 0.125, 0.25);
+assert(zvEighth.elevClicks === 5, '0.6 MOA @ 1/8 → 5 clicks (round 4.8)');
+assert(zvEighth.windClicks === 0, 'zero windage → 0 clicks');
+
+// Boundary: exactly at tolerance = confirmed
+const zvEdge = calc.zeroVerdict(
+    { elevationMOA: 0.25, windageMOA: 0.25, elevationDir: 'Up', windageDir: 'Left' }, 0.25, 0.25);
+assert(zvEdge.confirmed === true, 'exactly 0.25/0.25 at tol 0.25 → confirmed');
+
+// One axis off is enough to fail
+const zvOneAxis = calc.zeroVerdict(
+    { elevationMOA: 0.05, windageMOA: 0.9, elevationDir: 'Up', windageDir: 'Left' }, 0.25, 0.25);
+assert(zvOneAxis.confirmed === false, 'one bad axis → NOT confirmed');
+assert(zvOneAxis.windClicks === 4, '0.9 MOA @ 1/4 → 4 clicks (round 3.6)');
+
+// Defaults: 1/4 MOA click, 0.25 tolerance
+const zvDefaults = calc.zeroVerdict({ elevationMOA: 0.5, windageMOA: 0.1, elevationDir: 'Down', windageDir: 'Right' });
+assert(zvDefaults.confirmed === false && zvDefaults.elevClicks === 2, 'defaults: 1/4 MOA click + 0.25 tol');
+
 // ─── Summary ────────────────────────────────────────────────────
 
 console.log(`\n${'═'.repeat(40)}`);

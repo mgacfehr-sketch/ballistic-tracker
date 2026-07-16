@@ -198,6 +198,33 @@ function calculateATZ(offset, distanceYards) {
 }
 
 /**
+ * Zero Guardian verdict — plain-English zero assessment from an ATZ.
+ *
+ * @param {{elevationMOA: number, windageMOA: number, elevationDir: string, windageDir: string}} atz
+ *   Output of calculateATZ (magnitudes + corrective directions).
+ * @param {number} [clickValueMOA=0.25] - scope click value in MOA
+ * @param {number} [toleranceMOA=0.25] - both axes at/under this = confirmed
+ * @returns {{confirmed: boolean, elevClicks: number, elevDir: string,
+ *            windClicks: number, windDir: string}}
+ *   Click counts are Math.round(MOA / clickValue) — the correction the
+ *   shooter should dial when not confirmed.
+ */
+function zeroVerdict(atz, clickValueMOA, toleranceMOA) {
+    var click = clickValueMOA || 0.25;
+    var tol = typeof toleranceMOA === 'number' ? toleranceMOA : 0.25;
+    var elevMOA = Math.abs(atz.elevationMOA || 0);
+    var windMOA = Math.abs(atz.windageMOA || 0);
+
+    return {
+        confirmed: elevMOA <= tol && windMOA <= tol,
+        elevClicks: Math.round(elevMOA / click),
+        elevDir: atz.elevationDir || '',
+        windClicks: Math.round(windMOA / click),
+        windDir: atz.windageDir || ''
+    };
+}
+
+/**
  * Population standard deviation of an array of numbers.
  * @param {number[]} values
  * @returns {number}
@@ -439,6 +466,7 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateMeanWindage,
         calculateShotOffset,
         calculateSession,
+        zeroVerdict,
         round4
     };
 }
