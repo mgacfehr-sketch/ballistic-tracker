@@ -2924,6 +2924,7 @@ html, body {
     color: var(--primary);
 }
 
+
 /* ── Crowd Data Warehouse (admin-only) ─────────────────────── */
 
 .crowd-toolbar {
@@ -3149,3 +3150,4 @@ html, body {
     background: rgba(244, 67, 54, 0.15);
     border: 1px solid var(--danger);
 }
+

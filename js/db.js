@@ -936,6 +936,20 @@ BallisticDB.prototype.adminExportAll = function () {
     });
 };
 
+/**
+ * Crowd Data Warehouse rows (admin-only). Unlike the legacy admin_*
+ * RPCs, crowd_get_data() verifies the caller SERVER-SIDE against the
+ * admin_users table and raises for anyone else. Rows are anonymized
+ * (opaque shooter_key, no emails/notes/filenames) and stay snake_case
+ * — they are export data, not app entities.
+ */
+BallisticDB.prototype.crowdGetData = function () {
+    return this.supabase.rpc('crowd_get_data').then(function (res) {
+        if (res.error) throw res.error;
+        return res.data || [];
+    });
+};
+
 // ── Account deletion ───────────────────────────────────────────
 
 /**

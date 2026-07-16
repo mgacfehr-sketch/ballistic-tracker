@@ -137,6 +137,13 @@ AdminManager.prototype._render = function (stats, users, usage) {
     // html += '</div>';
     // html += '</section>';
 
+    // ── Crowd Data Warehouse ──────────────────────────────────
+    html += '<section class="admin-section">';
+    html += '<h3 class="admin-section-title">Crowd Data Warehouse</h3>';
+    html += '<p class="admin-desc">Anonymized velocity strings + group data across all users — filter by caliber, twist, ammo and export as CSV/XLSX for external analysis.</p>';
+    html += '<button class="btn btn-primary" id="admin-crowd-btn">Open Crowd Data</button>';
+    html += '</section>';
+
     // ── Export Button ─────────────────────────────────────────
     html += '<section class="admin-section">';
     html += '<h3 class="admin-section-title">Backup</h3>';
@@ -158,6 +165,14 @@ AdminManager.prototype._render = function (stats, users, usage) {
         });
     }
 
+    // Bind crowd data warehouse button
+    var crowdBtn = document.getElementById('admin-crowd-btn');
+    if (crowdBtn) {
+        crowdBtn.addEventListener('click', function () {
+            self._showCrowdData();
+        });
+    }
+
     // Bind beta feature toggles
     var toggles = document.querySelectorAll('.admin-beta-toggle input[type="checkbox"]');
     for (var ti = 0; ti < toggles.length; ti++) {
@@ -165,6 +180,22 @@ AdminManager.prototype._render = function (stats, users, usage) {
             setBetaFlag(this.getAttribute('data-feature'), this.checked);
         });
     }
+};
+
+AdminManager.prototype._showCrowdData = function () {
+    var self = this;
+    if (typeof CrowdDataManager === 'undefined') {
+        alert('Crowd data module failed to load. Hard-reload and try again.');
+        return;
+    }
+    if (!self.crowdManager) {
+        self.crowdManager = new CrowdDataManager(self.db);
+    }
+    var content = document.getElementById('admin-content');
+    if (!content) return;
+    self.crowdManager.show(content, function () {
+        self.show();
+    });
 };
 
 AdminManager.prototype._exportAllData = function () {
