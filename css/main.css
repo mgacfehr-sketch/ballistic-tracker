@@ -3026,3 +3026,92 @@ html, body {
     margin-bottom: 6px;
     object-fit: cover;
 }
+
+/* ── UX Wave 4 (P2) ──────────────────────────────────────── */
+
+/* Inline error text for log forms (validation without alert()) */
+.form-error {
+    color: var(--danger);
+    font-size: 0.85rem;
+    min-height: 18px;
+    margin: 4px 0 8px;
+}
+
+/* Inline round-count editor + new-load name field in review */
+.chrono-rounds-inline {
+    width: 110px;
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    min-height: 36px;
+}
+
+.chrono-newload-name {
+    flex: 1;
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    min-height: 44px;
+}
+
+/* Step counter beside wizard titles */
+.step-count {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-left: 6px;
+}
+
+/* Progress bar default = 1/7 (was 1/6) before JS takes over */
+#progress-bar {
+    width: 14.3%;
+}
+
+/* F17 — touch targets: honor the app's own 44px rule.
+   Visual size stays; hit areas grow via padding or ::after inset. */
+.help-btn {
+    position: relative;
+}
+
+.help-btn::after {
+    content: '';
+    position: absolute;
+    inset: -13px;
+}
+
+.utility-btn {
+    position: relative;
+}
+
+.utility-btn::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+}
+
+.preset-btn {
+    min-height: 44px;
+}
+
+.nav-tab,
+.nav-logout {
+    min-height: 44px;
+}
+
+.btn-sm {
+    min-height: 44px;
+}
+
+.target-row .target-btn {
+    min-height: 44px;
+}
+
+.chrono-edit-rounds,
+.chrono-delete-string,
+.chrono-rejoin {
+    min-height: 44px;
+}

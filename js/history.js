@@ -366,6 +366,7 @@ HistoryManager.prototype._renderCleaningForm = function (rifle, barrelId, totalR
     html += '<label for="cl-notes">Notes</label>';
     html += '<textarea id="cl-notes" rows="2" placeholder="Optional notes"></textarea>';
     html += '</div>';
+    html += '<p id="cl-error" class="form-error"></p>';
 
     html += '<div class="btn-row">';
     html += '<button type="submit" class="btn btn-primary">Save</button>';
@@ -383,11 +384,19 @@ HistoryManager.prototype._renderCleaningForm = function (rifle, barrelId, totalR
 
     document.getElementById('cleaning-form').addEventListener('submit', function (e) {
         e.preventDefault();
+        var rounds = parseInt(document.getElementById('cl-rounds').value, 10);
+        var errEl = document.getElementById('cl-error');
+        if (!isFinite(rounds) || rounds <= 0) {
+            // Inline validation — a 0-round cleaning is junk data that
+            // pollutes the since-cleaning math
+            if (errEl) errEl.textContent = 'Enter the barrel round count at cleaning (must be above 0).';
+            return;
+        }
         var data = {
             rifleId: rifle.id,
             barrelId: barrelId,
             date: document.getElementById('cl-date').value || new Date().toISOString(),
-            roundCountAtCleaning: parseInt(document.getElementById('cl-rounds').value, 10) || 0,
+            roundCountAtCleaning: rounds,
             notes: document.getElementById('cl-notes').value.trim()
         };
         self.db.addCleaningLog(data).then(function () {
@@ -535,6 +544,7 @@ HistoryManager.prototype._renderScopeAdjustmentForm = function (rifle) {
     html += '<label for="sa-notes">Notes</label>';
     html += '<textarea id="sa-notes" rows="2" placeholder="Optional notes"></textarea>';
     html += '</div>';
+    html += '<p id="sa-error" class="form-error"></p>';
 
     html += '<div class="btn-row">';
     html += '<button type="submit" class="btn btn-primary">Save</button>';
@@ -552,11 +562,19 @@ HistoryManager.prototype._renderScopeAdjustmentForm = function (rifle) {
 
     document.getElementById('scope-adj-form').addEventListener('submit', function (e) {
         e.preventDefault();
+        var elev = parseFloat(document.getElementById('sa-elev').value) || 0;
+        var wind = parseFloat(document.getElementById('sa-wind').value) || 0;
+        var errEl = document.getElementById('sa-error');
+        if (elev === 0 && wind === 0) {
+            // A 0/0 adjustment is noise in the trend data
+            if (errEl) errEl.textContent = 'Enter at least one non-zero adjustment.';
+            return;
+        }
         var data = {
             rifleId: rifle.id,
             date: document.getElementById('sa-date').value || new Date().toISOString(),
-            elevationChange: parseFloat(document.getElementById('sa-elev').value) || 0,
-            windageChange: parseFloat(document.getElementById('sa-wind').value) || 0,
+            elevationChange: elev,
+            windageChange: wind,
             reason: document.getElementById('sa-reason').value.trim(),
             notes: document.getElementById('sa-notes').value.trim()
         };

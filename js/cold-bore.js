@@ -353,6 +353,7 @@ ColdBoreManager.prototype._showAddForm = function (rifleId) {
     html += '<label>Notes (optional)</label>';
     html += '<input type="text" id="cb-notes" placeholder="e.g., barrel cleaned yesterday">';
     html += '</div>';
+    html += '<p id="cb-error" class="form-error"></p>';
 
     html += '<div class="btn-row">';
     html += '<button class="btn btn-secondary" id="cb-cancel-btn">Cancel</button>';
@@ -367,12 +368,22 @@ ColdBoreManager.prototype._showAddForm = function (rifleId) {
     });
 
     document.getElementById('cb-save-btn').addEventListener('click', function () {
+        var elev = parseFloat(document.getElementById('cb-elev').value) || 0;
+        var wind = parseFloat(document.getElementById('cb-wind').value) || 0;
+        if (elev === 0 && wind === 0) {
+            // A 0/0 entry adds noise to the cold-bore trend; require a
+            // real offset (a genuinely centered cold shot is ~never
+            // exactly 0.00/0.00)
+            var errEl = document.getElementById('cb-error');
+            if (errEl) errEl.textContent = 'Enter at least one non-zero offset.';
+            return;
+        }
         var shot = {
             rifleId: rifleId,
             distanceYards: parseFloat(document.getElementById('cb-distance').value) || 100,
             condition: document.getElementById('cb-condition').value,
-            elevationOffsetMOA: parseFloat(document.getElementById('cb-elev').value) || 0,
-            windageOffsetMOA: parseFloat(document.getElementById('cb-wind').value) || 0,
+            elevationOffsetMOA: elev,
+            windageOffsetMOA: wind,
             notes: document.getElementById('cb-notes').value.trim(),
             date: new Date().toISOString()
         };

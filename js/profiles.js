@@ -299,7 +299,7 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
 
     html += '<div class="btn-row">';
     if (isEdit) {
-        html += '<button type="button" class="btn btn-danger" id="btn-delete-rifle">Delete</button>';
+        html += '<button type="button" class="btn btn-danger" id="btn-delete-rifle">Delete Rifle</button>';
     }
     html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Rifle') + '</button>';
     html += '</div>';
@@ -538,7 +538,7 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     html += '<div class="detail-section">';
     html += '<div class="detail-section-header">';
     html += '<h3 class="detail-section-title">Loads</h3>';
-    html += '<button class="btn btn-sm btn-secondary" id="btn-add-load">+ Add</button>';
+    html += '<button class="btn btn-sm btn-secondary" id="btn-add-load">+ Add Load</button>';
     html += '</div>';
 
     if (loads.length === 0) {
@@ -769,7 +769,7 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
     html += '</div>';
 
     html += '<div class="btn-row">';
-    html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Add Barrel') + '</button>';
+    html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Barrel') + '</button>';
     html += '</div>';
 
     html += '</form>';
@@ -903,7 +903,7 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
 
     html += '<div class="btn-row">';
     if (isEdit) {
-        html += '<button type="button" class="btn btn-danger" id="btn-delete-load">Delete</button>';
+        html += '<button type="button" class="btn btn-danger" id="btn-delete-load">Delete Load</button>';
     }
     html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Load') + '</button>';
     html += '</div>';

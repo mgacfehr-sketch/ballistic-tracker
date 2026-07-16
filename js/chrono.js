@@ -643,10 +643,23 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         out += '<button id="chrono-goto-report" class="btn btn-primary">View Performance Report →</button>';
     }
 
+    // Show each load's confirmed velocity in the pickers — this is the
+    // screen where the user decides which load owns which velocities
+    var loadAvg = {};
+    r.strings.forEach(function (s) {
+        if (s.assignmentStatus === 'confirmed' && s.loadId && typeof s.avgFps === 'number') {
+            if (!loadAvg[s.loadId]) loadAvg[s.loadId] = { sum: 0, n: 0 };
+            var w = s.shots && s.shots.length ? s.shots.length : 1;
+            loadAvg[s.loadId].sum += s.avgFps * w;
+            loadAvg[s.loadId].n += w;
+        }
+    });
     var loadOptions = '<option value="">— Pick a load —</option>';
     for (var lo = 0; lo < r.loads.length; lo++) {
+        var la = loadAvg[r.loads[lo].id];
         loadOptions += '<option value="' + this._escapeHtml(r.loads[lo].id) + '">' +
-            this._escapeHtml(r.loads[lo].name) + '</option>';
+            this._escapeHtml(r.loads[lo].name) +
+            (la ? ' (avg ' + formatNum(la.sum / la.n, 0) + ' fps)' : '') + '</option>';
     }
     loadOptions += '<option value="__new__">+ New load…</option>';
 
@@ -686,6 +699,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         out += '</ul>';
         out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' +
             loadOptions + '</select>';
+        out += '<input type="text" class="chrono-newload-name hidden" maxlength="80" placeholder="New load name">';
         out += '<button class="btn btn-primary chrono-cluster-confirm" data-cluster="' + c +
             '" data-select="chrono-cluster-load-' + c + '">Assign group (' + members.length + ')</button></div>';
         out += '</div>';
@@ -709,6 +723,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
             out += '</div>';
             out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-split-load-' +
                 this._escapeHtml(ss.id) + '">' + loadOptions + '</select>';
+            out += '<input type="text" class="chrono-newload-name hidden" maxlength="80" placeholder="New load name">';
             out += '<button class="btn btn-primary chrono-split-confirm" data-id="' + this._escapeHtml(ss.id) +
                 '" data-select="chrono-split-load-' + this._escapeHtml(ss.id) + '">Assign (1)</button></div>';
             out += '</div>';
@@ -735,6 +750,18 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         self.show();
     });
 
+    // "+ New load…" reveals its inline name field
+    var loadSelects = document.querySelectorAll('.chrono-load-select');
+    for (var lsx = 0; lsx < loadSelects.length; lsx++) {
+        loadSelects[lsx].addEventListener('change', function () {
+            var nameField = this.parentNode.querySelector('.chrono-newload-name');
+            if (nameField) {
+                nameField.classList.toggle('hidden', this.value !== '__new__');
+                if (this.value === '__new__') nameField.focus();
+            }
+        });
+    }
+
     // Everything confirmed → the natural next step is the report
     var gotoReport = document.getElementById('chrono-goto-report');
     if (gotoReport) {
@@ -743,27 +770,46 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         });
     }
 
-    // Round-count corrections (works on confirmed strings too)
+    // Round-count corrections (works on confirmed strings too).
+    // Inline edit: the button swaps for a number field — Enter/blur
+    // saves, Escape cancels. No prompt() dialogs.
     var stringById = {};
     strings.forEach(function (s) { stringById[s.id] = s; });
     var editBtns = document.querySelectorAll('.chrono-edit-rounds');
     for (var eb = 0; eb < editBtns.length; eb++) {
         editBtns[eb].addEventListener('click', function () {
             var id = this.getAttribute('data-id');
-            var current = stringById[id] && typeof stringById[id].roundCountAt === 'number'
-                ? String(stringById[id].roundCountAt) : '';
-            var typed = window.prompt('Barrel round count AFTER this string (blank = unknown):', current);
-            if (typed === null) return; // cancelled
-            var value = typed.trim() === '' ? null : parseInt(typed, 10);
-            if (value !== null && (!isFinite(value) || value < 0)) {
-                window.alert('Enter a whole number of rounds, or leave blank.');
-                return;
+            var s = stringById[id];
+            var field = document.createElement('input');
+            field.type = 'number';
+            field.min = '0';
+            field.step = '1';
+            field.className = 'chrono-rounds-inline';
+            field.value = s && typeof s.roundCountAt === 'number' ? s.roundCountAt : '';
+            field.placeholder = 'rounds';
+            this.replaceWith(field);
+            field.focus();
+
+            var done = false;
+            function commit() {
+                if (done) return;
+                done = true;
+                var value = field.value.trim() === '' ? null : parseInt(field.value, 10);
+                if (value !== null && (!isFinite(value) || value < 0)) {
+                    self._renderAssignmentReview(); // invalid → revert
+                    return;
+                }
+                self.db.updateVelocityString({ id: id, roundCountAt: value }).then(function () {
+                    self.showAssignmentReview(rifleId);
+                }).catch(function (err) {
+                    self._showError('Could not update the round count: ' + err.message);
+                });
             }
-            self.db.updateVelocityString({ id: id, roundCountAt: value }).then(function () {
-                self.showAssignmentReview(rifleId);
-            }).catch(function (err) {
-                self._showError('Could not update the round count: ' + err.message);
+            field.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') { done = true; self._renderAssignmentReview(); }
             });
+            field.addEventListener('blur', commit);
         });
     }
 
@@ -848,9 +894,16 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
 
     var loadPromise;
     if (loadValue === '__new__') {
-        var name = window.prompt('Name for the new load (e.g. "Hornady 168gr ELD-M"):');
-        if (!name || !name.trim()) return;
-        loadPromise = this.db.addLoad({ rifleId: rifleId, name: name.trim() })
+        // Inline name field (revealed when "+ New load…" is picked) —
+        // no prompt() dialogs for input flows
+        var nameInput = btn.parentNode ? btn.parentNode.querySelector('.chrono-newload-name') : null;
+        var name = nameInput ? nameInput.value.trim() : '';
+        if (!name) {
+            status.textContent = 'Enter a name for the new load.';
+            if (nameInput) nameInput.focus();
+            return;
+        }
+        loadPromise = this.db.addLoad({ rifleId: rifleId, name: name })
             .then(function (load) { return load.id; });
     } else {
         loadPromise = Promise.resolve(loadValue);

@@ -242,6 +242,19 @@ SessionFlow.prototype._showStep = function (index) {
 
     // Auto-scroll panel so action buttons are visible
     this._scrollPanelToBottom();
+
+    // Step counter next to the title ("· N of 7") — injected once per
+    // section so the markup stays static
+    var section = this.els.steps[stepName];
+    if (section && !section.querySelector('.step-count')) {
+        var title = section.querySelector('.step-title');
+        if (title) {
+            var count = document.createElement('span');
+            count.className = 'step-count';
+            count.textContent = '· ' + (index + 1) + ' of ' + STEPS.length;
+            title.insertAdjacentElement('afterend', count);
+        }
+    }
 };
 
 SessionFlow.prototype._nextStep = function () {

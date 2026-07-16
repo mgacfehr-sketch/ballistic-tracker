@@ -7,7 +7,7 @@ Branch `ux-audit`. Updated after each wave.
 | 1 (P0) | F1 password reset · F2 AI chat-wipe guard · F3 wizard Back · F4 solver empty states | ✅ done |
 | 2 (P1 flow) | F7 F9 F13 F14 F6 F11 F26 (+F20 hint, pulled forward) | ✅ done |
 | 3 (P1 data trust) | F15 F5 F12 F10 | ✅ done |
-| 4 (P2) | F16a F17 F18 F19 F20 F21 F22 F23 | — |
+| 4 (P2) | F16a F17 F18(partial) F19 F21 F22 F23(partial) — F20 done in W2 | ✅ done |
 | 5 (P3) | F24 F25 F27 F28 F29 F30 F31 | — |
 
 ## Wave 1 notes
@@ -35,6 +35,16 @@ Branch `ux-audit`. Updated after each wave.
 - **F5:** load form hint under Muzzle Velocity: "BC + muzzle velocity are needed for the Solver — leave blank if unknown."
 - **F12:** HELP_TEXTS gained `impacts` (Wave 1), `radialSD`, `clicks`; "?" wired on the Radial SD results row and the Zero Guardian click selector. (Solver info-card BC "?" skipped — display-only card, load form already has the BC help.)
 - **F10:** attached AI images now render as real thumbnails in the chat bubble (built from the base64 already in the message — no extra storage); "[Image attached]" tag remains only as a fallback.
+
+## Wave 4 notes
+
+- **F16a:** both `prompt()` INPUT flows replaced — "+ New load…" reveals an inline name field next to the picker; "rounds: N ✎" swaps to an inline number field (Enter/blur saves, Escape cancels). `confirm()` stays for destructive checks by design; the type-DELETE account flow keeps `prompt()` deliberately (friction is the feature there).
+- **F17:** 44px hit areas via CSS — help "?" and sunlight button get invisible ::after hit-zones (visual size unchanged); presets/nav/logout/btn-sm/target/chrono buttons bumped to min-height 44.
+- **F18 (partial):** "Add Barrel"→"Create Barrel", form "Delete"→"Delete Rifle"/"Delete Load", "+ Add"→"+ Add Load". **Deferred (index.html is yours right now):** weather-button label unification, "Set scale manually" casing.
+- **F19:** inline `.form-error` validation (no alerts): cleaning requires rounds > 0; scope adjustment and cold-bore entries require at least one non-zero value.
+- **F21:** certificate preview scrolls into view on generate (collapse-to-summary skipped — scroll solves the fold problem without new UI).
+- **F22:** review load pickers now show each load's confirmed avg fps.
+- **F23 (partial):** "· N of 7" counter injected beside step titles via JS; progress-bar CSS default corrected to 14.3%. (No index.html edits needed after all.)
 
 ## ⚠ Concurrent-work guardrail (mid-run)
 
