@@ -149,6 +149,60 @@
                 });
         });
 
+        // ── Forgot password ───────────────────────────────────
+        var btnForgot = document.getElementById('btn-forgot');
+        if (btnForgot) {
+            btnForgot.addEventListener('click', function () {
+                var email = emailInput.value.trim();
+                if (!email) {
+                    showAuthError('Enter your email above, then tap "Forgot password?" again.');
+                    return;
+                }
+                btnForgot.disabled = true;
+                client.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin + window.location.pathname
+                }).then(function (result) {
+                    btnForgot.disabled = false;
+                    if (result.error) {
+                        showAuthError(result.error.message);
+                    } else {
+                        showAuthError('Password reset link sent — check your email.');
+                    }
+                });
+            });
+        }
+
+        // ── Password recovery (user arrives via the reset email) ──
+        var resetPanel = document.getElementById('auth-reset');
+        var resetInput = document.getElementById('auth-new-password');
+        var btnSetPassword = document.getElementById('btn-set-password');
+        client.auth.onAuthStateChange(function (event) {
+            if (event === 'PASSWORD_RECOVERY' && resetPanel) {
+                showAuth();
+                resetPanel.classList.remove('hidden');
+                showAuthError('Set a new password to finish the reset.');
+            }
+        });
+        if (btnSetPassword) {
+            btnSetPassword.addEventListener('click', function () {
+                var pw = resetInput.value;
+                if (pw.length < 6) {
+                    showAuthError('Password must be at least 6 characters.');
+                    return;
+                }
+                btnSetPassword.disabled = true;
+                client.auth.updateUser({ password: pw }).then(function (result) {
+                    btnSetPassword.disabled = false;
+                    if (result.error) {
+                        showAuthError(result.error.message);
+                    } else {
+                        resetPanel.classList.add('hidden');
+                        startApp(result.data.user);
+                    }
+                });
+            });
+        }
+
         // ── Allow Enter key to submit ─────────────────────────
         passInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {

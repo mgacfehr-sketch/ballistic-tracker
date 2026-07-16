@@ -2836,3 +2836,42 @@ html, body {
     cursor: pointer;
     min-height: 32px;
 }
+
+/* ── UX Wave 1 (P0) ──────────────────────────────────────── */
+
+/* Forgot password — quiet link under the auth buttons */
+.auth-forgot {
+    display: block;
+    margin: 12px auto 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.9rem;
+    min-height: 44px;
+    padding: 0 12px;
+}
+
+#auth-reset {
+    margin-top: 16px;
+}
+
+/* Wizard back chevron — sits left of the step badge */
+.btn-step-back {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    min-width: 44px;
+    min-height: 36px;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.btn-step-back:active {
+    background: var(--border);
+}

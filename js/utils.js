@@ -95,6 +95,7 @@ function dist(a, b) {
 
 var HELP_TEXTS = {
     calibration: 'Tap two points exactly 1 inch apart on your target to set the scale for accurate measurements.',
+    impacts: 'Tap the center of each bullet hole, in the order you fired (shot #1 first — it counts as your cold-bore shot). Use Undo Last or Clear All to fix mis-taps. You need at least 2 impacts to calculate.',
     bulletDiameter: 'The diameter of your bullet in inches (e.g., .308 for 7.62mm). Used for center-to-center group size.',
     bc: 'Ballistic Coefficient \u2014 how well the bullet resists drag. Higher = less drop/drift. Found on the bullet box.',
     dragModel: 'G1 is traditional for flat-base bullets. G7 is more accurate for modern boat-tail bullets.',

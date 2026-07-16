@@ -250,6 +250,20 @@ SessionFlow.prototype._nextStep = function () {
     }
 };
 
+/**
+ * Go back one step, preserving everything already entered. Leaving the
+ * results step clears the results overlay (recalculating rebuilds it).
+ */
+SessionFlow.prototype._prevStep = function () {
+    if (this.currentStep <= 0) return;
+    if (STEPS[this.currentStep] === 'results') {
+        this.canvas.overlayResults = null;
+        this._removeMarkersOfType('centroid');
+        this.canvas.render();
+    }
+    this._showStep(this.currentStep - 1);
+};
+
 SessionFlow.prototype._updateHint = function () {
     var step = STEPS[this.currentStep];
     switch (step) {
@@ -546,6 +560,15 @@ SessionFlow.prototype._bindUI = function () {
     this.els.btnCalculate.addEventListener('click', function () {
         self._calculate();
     });
+
+    // Back controls (steps 2–7) — correct an earlier entry without
+    // restarting the whole session
+    var backBtns = document.querySelectorAll('.btn-step-back');
+    for (var bk = 0; bk < backBtns.length; bk++) {
+        backBtns[bk].addEventListener('click', function () {
+            self._prevStep();
+        });
+    }
 
     // Step 7: Results
     if (this.els.btnSaveSession) {

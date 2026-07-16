@@ -214,13 +214,24 @@ AIAssistantManager.prototype._bindChatEvents = function () {
     if (rifleSelect) {
         rifleSelect.addEventListener('change', function () {
             var newId = this.value || null;
-            if (newId !== self.selectedRifleId) {
-                self.selectedRifleId = newId;
-                self.messages = [];
-                self.conversationId = null;
-                self.conversationTitle = null;
-                self._renderChat();
+            if (newId === self.selectedRifleId) return;
+
+            // Never discard a visible chat without explicit consent
+            if (self.messages.length > 0) {
+                var note = self.conversationId
+                    ? 'Switching rifles starts a new chat.\n\nYour current chat stays saved under History. Continue?'
+                    : 'Switching rifles starts a new chat and this one has no saved replies yet — it will be lost.\n\nContinue?';
+                if (!window.confirm(note)) {
+                    this.value = self.selectedRifleId || '';
+                    return;
+                }
             }
+
+            self.selectedRifleId = newId;
+            self.messages = [];
+            self.conversationId = null;
+            self.conversationTitle = null;
+            self._renderChat();
         });
     }
 

@@ -28,6 +28,14 @@
             <p id="auth-error" class="auth-error"></p>
             <button id="btn-login" class="btn btn-primary auth-btn">Log In</button>
             <button id="btn-signup" class="btn btn-secondary auth-btn">Sign Up</button>
+            <button id="btn-forgot" class="auth-forgot">Forgot password?</button>
+            <div id="auth-reset" class="hidden">
+                <div class="form-group">
+                    <label for="auth-new-password">New Password</label>
+                    <input type="password" id="auth-new-password" autocomplete="new-password" placeholder="At least 6 characters">
+                </div>
+                <button id="btn-set-password" class="btn btn-primary auth-btn">Set New Password</button>
+            </div>
             <p class="auth-legal"><a href="privacy-policy.html">Privacy Policy</a></p>
         </div>
     </div>
@@ -86,6 +94,7 @@
                 <!-- Step 2: Load Image -->
                 <section class="step" id="step-load" data-step="2">
                     <div class="step-header">
+                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
                         <span class="step-badge">2</span>
                         <span class="step-title">Load Target Image</span>
                     </div>
@@ -102,6 +111,7 @@
                 <!-- Step 3: Calibrate -->
                 <section class="step" id="step-calibrate" data-step="3">
                     <div class="step-header">
+                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
                         <span class="step-badge">3</span>
                         <span class="step-title">Set Scale</span>
                         <button class="help-btn" onclick="showHelp('calibration')" title="What is calibration?">?</button>
@@ -119,6 +129,7 @@
                 <!-- Step 4: Input Data -->
                 <section class="step" id="step-data" data-step="4">
                     <div class="step-header">
+                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
                         <span class="step-badge">4</span>
                         <span class="step-title">Distance &amp; Bullet</span>
                     </div>
@@ -198,6 +209,7 @@
                 <!-- Step 5: Mark POA -->
                 <section class="step" id="step-poa" data-step="5">
                     <div class="step-header">
+                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
                         <span class="step-badge">5</span>
                         <span class="step-title">Mark Point of Aim</span>
                         <button class="help-btn" onclick="showHelp('poa')" title="What is Point of Aim?">?</button>
@@ -214,8 +226,10 @@
                 <!-- Step 6: Mark Impacts -->
                 <section class="step" id="step-impacts" data-step="6">
                     <div class="step-header">
+                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
                         <span class="step-badge">6</span>
                         <span class="step-title">Mark Impacts</span>
+                        <button class="help-btn" onclick="showHelp('impacts')" title="How do I mark impacts?">?</button>
                     </div>
                     <div class="step-body">
                         <p id="impact-status" class="step-instruction">Tap each bullet hole (0/10)</p>
@@ -230,6 +244,7 @@
                 <!-- Step 7: Results -->
                 <section class="step" id="step-results" data-step="7">
                     <div class="step-header">
+                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
                         <span class="step-badge">7</span>
                         <span class="step-title">Results</span>
                     </div>
