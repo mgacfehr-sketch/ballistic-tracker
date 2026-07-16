@@ -86,6 +86,13 @@ BallisticDB.prototype.addRifle = function (data) {
                 zeroRange: data.zeroRange || 0,
                 angleUnit: data.angleUnit || 'MOA',
                 notes: data.notes || '',
+                // Build sheet (certificate) — all optional
+                serialNumber: data.serialNumber || null,
+                action: data.action || null,
+                barrelSpec: data.barrelSpec || null,
+                triggerSpec: data.triggerSpec || null,
+                chassis: data.chassis || null,
+                muzzleDevice: data.muzzleDevice || null,
                 createdAt: now,
                 updatedAt: now
             };

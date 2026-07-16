@@ -11,7 +11,7 @@ Updated incrementally after each step. Session started 2026-07-15 (evening).
 | 3 — Velocity strings + stats | ✅ Done; migration RUN by owner | `18a758b` |
 | 4 — Load auto-split clustering | ✅ Code done; tests pass; UI needs browser check | (see git log) |
 | 5 — Per-rifle aggregation view | ✅ Code done; tests pass; UI needs browser check | (see git log) |
-| 6 — Build-sheet fields | — | — |
+| 6 — Build-sheet fields | ✅ Code done; **needs Migration 1 run first** | (see git log) |
 | 7 — Certificate + PDF | — | — |
 | 8 — Zero Guardian | — | — |
 | 9 — Auto-conditions | — | — |
@@ -20,7 +20,9 @@ Updated incrementally after each step. Session started 2026-07-15 (evening).
 
 ## Migrations to run in the morning
 
-Run `MORNING-migrations.sql` (project root) top-to-bottom in the Supabase SQL Editor. (File will be created at Step 6; order and safety notes are inside it.)
+Run `MORNING-migrations.sql` (project root) top-to-bottom in the Supabase SQL Editor **before browser testing** — creating/editing a rifle will otherwise fail with "column does not exist".
+- **Migration 1 (Step 6):** six optional build-sheet text columns on `rifles`. Pure `ADD COLUMN IF NOT EXISTS`, existing rows untouched.
+- (More appended as later steps add them — always run the whole file top-to-bottom; every block is re-runnable.)
 
 ## Browser/testing checklist (single sitting)
 
@@ -37,6 +39,11 @@ Run `MORNING-migrations.sql` (project root) top-to-bottom in the Supabase SQL Ed
 1. Profiles → your rifle → new "Performance Report" card under History & Logs → opens the report.
 2. With the fixture data imported+confirmed: per-load table shows combined avg/SD/ES from confirmed strings only; pending strings show a warning banner whose "Resolve now" button jumps to the Chrono review screen.
 3. Best Group card shows your best 5+-shot session with its target thumbnail; ★ Recommended Load matches the load with the best group (tie → lower SD).
+
+**Step 6 — NEEDS MY VERIFICATION (browser, AFTER Migration 1):**
+1. Edit your rifle → collapsed "Build Sheet (for certificate)" section → fill all six fields → Save → re-open form: values persisted.
+2. Rifle detail card now shows Serial #/Action/Barrel/Trigger/Chassis/Muzzle rows (empty fields hidden).
+3. IMPORTANT: do NOT create/edit rifles in the app before running Migration 1 — the save will fail (code now always sends the six columns).
 
 ## Decisions skipped for you
 

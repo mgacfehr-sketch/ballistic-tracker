@@ -219,6 +219,25 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
         html += '</details>';
     }
 
+    // Build sheet (certificate fields) — collapsed by default
+    html += '<details class="session-details" style="margin:0 0 12px;"' + (rifle && (rifle.serialNumber || rifle.action || rifle.barrelSpec || rifle.triggerSpec || rifle.chassis || rifle.muzzleDevice) ? ' open' : '') + '>';
+    html += '<summary class="session-details-summary">Build Sheet (for certificate)</summary>';
+    html += '<div class="session-details-body" style="padding:8px 0 0;">';
+    html += '<div class="form-group"><label for="rf-serial">Serial Number</label>';
+    html += '<input type="text" id="rf-serial" placeholder="e.g. WH-0042" value="' + escapeAttr(rifle && rifle.serialNumber ? rifle.serialNumber : '') + '"></div>';
+    html += '<div class="form-group"><label for="rf-action">Action</label>';
+    html += '<input type="text" id="rf-action" placeholder="e.g. Defiance Deviant Elite" value="' + escapeAttr(rifle && rifle.action ? rifle.action : '') + '"></div>';
+    html += '<div class="form-group"><label for="rf-barrel-spec">Barrel</label>';
+    html += '<input type="text" id="rf-barrel-spec" placeholder="e.g. Proof Research CF 24&quot; Sendero" value="' + escapeAttr(rifle && rifle.barrelSpec ? rifle.barrelSpec : '') + '"></div>';
+    html += '<div class="form-group"><label for="rf-trigger">Trigger</label>';
+    html += '<input type="text" id="rf-trigger" placeholder="e.g. TriggerTech Diamond" value="' + escapeAttr(rifle && rifle.triggerSpec ? rifle.triggerSpec : '') + '"></div>';
+    html += '<div class="form-group"><label for="rf-chassis">Chassis / Stock</label>';
+    html += '<input type="text" id="rf-chassis" placeholder="e.g. MPA BA Comp" value="' + escapeAttr(rifle && rifle.chassis ? rifle.chassis : '') + '"></div>';
+    html += '<div class="form-group"><label for="rf-muzzle">Muzzle Device</label>';
+    html += '<input type="text" id="rf-muzzle" placeholder="e.g. Area 419 Hellfire" value="' + escapeAttr(rifle && rifle.muzzleDevice ? rifle.muzzleDevice : '') + '"></div>';
+    html += '</div>';
+    html += '</details>';
+
     html += '<div class="form-group">';
     html += '<label for="rf-notes">Notes</label>';
     html += '<textarea id="rf-notes" rows="3" placeholder="Optional notes">' + escapeHtml(rifle ? rifle.notes : '') + '</textarea>';
@@ -275,7 +294,13 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
             caliber: caliber,
             scopeHeight: parseFloat(document.getElementById('rf-scope-height').value) || 0,
             zeroRange: parseFloat(document.getElementById('rf-zero-range').value) || 0,
-            notes: document.getElementById('rf-notes').value.trim()
+            notes: document.getElementById('rf-notes').value.trim(),
+            serialNumber: document.getElementById('rf-serial').value.trim() || null,
+            action: document.getElementById('rf-action').value.trim() || null,
+            barrelSpec: document.getElementById('rf-barrel-spec').value.trim() || null,
+            triggerSpec: document.getElementById('rf-trigger').value.trim() || null,
+            chassis: document.getElementById('rf-chassis').value.trim() || null,
+            muzzleDevice: document.getElementById('rf-muzzle').value.trim() || null
         };
 
         // Collect barrel fields
@@ -303,6 +328,12 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
             rifle.scopeHeight = data.scopeHeight;
             rifle.zeroRange = data.zeroRange;
             rifle.notes = data.notes;
+            rifle.serialNumber = data.serialNumber;
+            rifle.action = data.action;
+            rifle.barrelSpec = data.barrelSpec;
+            rifle.triggerSpec = data.triggerSpec;
+            rifle.chassis = data.chassis;
+            rifle.muzzleDevice = data.muzzleDevice;
 
             var savePromise = self.db.updateRifle(rifle);
 
@@ -412,6 +443,21 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     }
     if (activeBarrel && activeBarrel.twistRate) {
         html += '<div class="detail-row"><span class="detail-label">Twist</span><span class="detail-value">' + escapeHtml(activeBarrel.twistRate) + ' ' + (activeBarrel.twistDirection || 'Right') + '</span></div>';
+    }
+    // Build sheet lines (only filled fields show)
+    var buildRows = [
+        ['Serial #', rifle.serialNumber],
+        ['Action', rifle.action],
+        ['Barrel', rifle.barrelSpec],
+        ['Trigger', rifle.triggerSpec],
+        ['Chassis', rifle.chassis],
+        ['Muzzle', rifle.muzzleDevice]
+    ];
+    for (var br = 0; br < buildRows.length; br++) {
+        if (buildRows[br][1]) {
+            html += '<div class="detail-row"><span class="detail-label">' + buildRows[br][0] +
+                '</span><span class="detail-value">' + escapeHtml(buildRows[br][1]) + '</span></div>';
+        }
     }
     if (rifle.notes) {
         html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(rifle.notes) + '</span></div>';
