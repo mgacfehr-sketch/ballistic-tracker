@@ -2799,3 +2799,12 @@ html, body {
 .chrono-dup-badge {
     font-weight: 400;
 }
+
+.chrono-fp-warn {
+    display: block;
+    margin-top: 6px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    white-space: normal;
+}

@@ -174,6 +174,33 @@ check('null name + null date', V.stringDedupKey(null, null), '|');
 check('unparseable date falls back to raw string',
     V.stringDedupKey('S', 'not-a-date'), 'S|not-a-date');
 
+// ── Velocity fingerprints ──────────────────────────────────────
+console.log('\nvelocityFingerprint:');
+
+var seqA = [{ fps: 2691.5 }, { fps: 2800.3 }, { fps: 2769.3 }];
+var seqAcopy = [{ fps: 2691.5 }, { fps: 2800.3 }, { fps: 2769.3 }];
+var seqOneOff = [{ fps: 2691.5 }, { fps: 2800.4 }, { fps: 2769.3 }];
+var seqShorter = [{ fps: 2691.5 }, { fps: 2800.3 }];
+var seqReversed = [{ fps: 2769.3 }, { fps: 2800.3 }, { fps: 2691.5 }];
+
+check('identical sequences match',
+    V.velocityFingerprint(seqA), V.velocityFingerprint(seqAcopy));
+check('one differing value = no match',
+    V.velocityFingerprint(seqA) !== V.velocityFingerprint(seqOneOff), true);
+check('different length = no match',
+    V.velocityFingerprint(seqA) !== V.velocityFingerprint(seqShorter), true);
+check('order matters (reversed = no match)',
+    V.velocityFingerprint(seqA) !== V.velocityFingerprint(seqReversed), true);
+check('float noise canonicalized to 0.1 fps',
+    V.velocityFingerprint([{ fps: 2691.5 }]), V.velocityFingerprint([{ fps: 2691.5000001 }]));
+check('plain number arrays accepted',
+    V.velocityFingerprint([2691.5, 2800.3]), V.velocityFingerprint([{ fps: 2691.5 }, { fps: 2800.3 }]));
+check('empty → null (no identity)', V.velocityFingerprint([]), null);
+check('null → null', V.velocityFingerprint(null), null);
+check('two empties never match each other',
+    V.velocityFingerprint([]) === V.velocityFingerprint([]) &&
+    V.velocityFingerprint([]) === null, true);
+
 // ── Round-count assignment (AFTER semantics) ──────────────────
 console.log('\nassignRoundCounts:');
 

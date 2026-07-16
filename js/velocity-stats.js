@@ -240,6 +240,28 @@ function stringDedupKey(sheetName, date) {
     return (sheetName || '') + '|' + t;
 }
 
+/**
+ * Velocity fingerprint: a string's identity is its full per-shot
+ * velocity SEQUENCE — two real chronograph strings never produce
+ * identical shot-for-shot velocities. Immune to renamed files, edited
+ * timestamps, or matching averages. Values are canonicalized to 0.1 fps
+ * (ShotView export precision) so float noise can't break a match.
+ * Order matters; different lengths never match; empty → null (an empty
+ * string has no identity and must never "match" another empty one).
+ *
+ * @param {Array} shots - shot objects with .fps, or plain numbers
+ * @returns {string|null}
+ */
+function velocityFingerprint(shots) {
+    if (!shots || !shots.length) return null;
+    var parts = [];
+    for (var i = 0; i < shots.length; i++) {
+        var v = typeof shots[i] === 'number' ? shots[i] : (shots[i] && shots[i].fps);
+        parts.push(typeof v === 'number' && isFinite(v) ? v.toFixed(1) : '?');
+    }
+    return parts.join(',');
+}
+
 // ── Round-count assignment (chrono import) ───────────────────
 
 /**
@@ -401,6 +423,7 @@ if (typeof module !== 'undefined' && module.exports) {
         splitByTimeGap,
         clusterStringsByVelocity,
         stringDedupKey,
+        velocityFingerprint,
         assignRoundCounts,
         aggregateRifle,
         DEFAULT_STRING_SD

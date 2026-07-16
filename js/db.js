@@ -796,6 +796,17 @@ BallisticDB.prototype.getVelocityStringsByRifle = function (rifleId) {
         });
 };
 
+BallisticDB.prototype.getAllVelocityStrings = function () {
+    var self = this;
+    return self.supabase.from('velocity_strings').select()
+        .eq('user_id', self.userId)
+        .order('date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
 BallisticDB.prototype.getUnassignedVelocityStrings = function () {
     var self = this;
     return self.supabase.from('velocity_strings').select()

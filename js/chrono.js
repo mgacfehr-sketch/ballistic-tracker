@@ -220,37 +220,82 @@ ChronoManager.prototype._renderPreview = function () {
 };
 
 /**
- * Preview-time duplicate marking: fetch existing strings and disable +
- * untick any parsed session that matches (epoch-normalized key). This
- * both prevents re-import AND keeps duplicate shots from advancing the
- * round-count odometer — excluded strings never count.
+ * Preview-time duplicate marking, two layers:
+ *
+ * 1. VELOCITY FINGERPRINT (primary): the incoming string's full
+ *    per-shot velocity sequence is checked against EVERY saved string
+ *    for this user, across all rifles — two real chrono strings never
+ *    share identical shot-for-shot velocities. A hit shows a prominent
+ *    warning naming the rifle it's already on and unticks the string,
+ *    but leaves the checkbox ENABLED: re-ticking is the legitimate
+ *    override for moving a string that was imported to the wrong rifle.
+ *
+ * 2. NAME+TIMESTAMP (backstop): a same-rifle (or unassigned-pool)
+ *    sheet_name + epoch-date match is a hard duplicate — unticked AND
+ *    disabled ("already imported").
+ *
+ * Either way, excluded strings never advance the round-count odometer.
  */
 ChronoManager.prototype._refreshDuplicates = function (rifleId) {
     var self = this;
-    var req = rifleId
-        ? this.db.getVelocityStringsByRifle(rifleId)
-        : this.db.getUnassignedVelocityStrings();
 
-    req.catch(function () { return []; }).then(function (existing) {
-        var seen = {};
+    this.db.getAllVelocityStrings().catch(function () { return []; }).then(function (existing) {
+        var exactKeys = {};    // same-rifle/pool name+date → hard dup
+        var fingerprints = {}; // velocity sequence → owning rifleId (or null)
         (existing || []).forEach(function (e) {
-            seen[stringDedupKey(e.sheetName, e.date)] = true;
+            var samePool = rifleId ? e.rifleId === rifleId : !e.rifleId;
+            if (samePool) exactKeys[stringDedupKey(e.sheetName, e.date)] = true;
+            var fp = velocityFingerprint(e.shots);
+            if (fp && !(fp in fingerprints)) fingerprints[fp] = e.rifleId || null;
         });
+
+        var rifleNames = {};
+        (self.rifles || []).forEach(function (r) { rifleNames[r.id] = r.name; });
+
         for (var i = 0; i < self.sessions.length; i++) {
-            var isDup = !!seen[stringDedupKey(self.sessions[i].name, self.sessions[i].date)];
+            var s = self.sessions[i];
+            var isExact = !!exactKeys[stringDedupKey(s.name, s.date)];
+            var fp2 = velocityFingerprint(s.shots);
+            var fpOwner = fp2 && (fp2 in fingerprints) ? fingerprints[fp2] : undefined;
+            var isFpDup = fpOwner !== undefined;
+
             var cb = document.querySelector('.chrono-include-cb[data-index="' + i + '"]');
             var badge = document.getElementById('chrono-dup-' + i);
+
             if (cb) {
-                if (isDup) {
+                if (isExact) {
                     cb.checked = false;
                     cb.disabled = true;
-                } else if (cb.disabled) {
+                } else if (isFpDup) {
+                    // default excluded, but overridable on purpose
+                    if (!cb.disabled && cb.getAttribute('data-fp-warned') !== 'true') {
+                        cb.checked = false;
+                        cb.setAttribute('data-fp-warned', 'true');
+                    }
+                    cb.disabled = false;
+                } else if (cb.disabled || cb.getAttribute('data-fp-warned') === 'true') {
                     // no longer a duplicate under the new rifle pick
                     cb.disabled = false;
                     cb.checked = true;
+                    cb.removeAttribute('data-fp-warned');
                 }
             }
-            if (badge) badge.classList.toggle('hidden', !isDup);
+            if (badge) {
+                if (isExact) {
+                    badge.textContent = 'already imported';
+                    badge.classList.remove('chrono-fp-warn');
+                    badge.classList.remove('hidden');
+                } else if (isFpDup) {
+                    var where = fpOwner === null ? 'in your unassigned strings'
+                        : 'on rifle "' + (rifleNames[fpOwner] || 'unknown') + '"';
+                    badge.textContent = '⚠ these exact shots are already imported ' + where +
+                        ' — tick Include only to import anyway';
+                    badge.classList.add('chrono-fp-warn');
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
         }
         self._refreshRoundCountDefaults();
     });
