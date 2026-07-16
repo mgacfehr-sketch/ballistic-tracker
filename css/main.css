@@ -2508,3 +2508,48 @@ html, body {
 .chrono-roundcount input {
     max-width: 160px;
 }
+
+/* Chrono assignment review (load auto-split) */
+.chrono-review-title {
+    margin: 16px 0 8px;
+}
+
+.chrono-cluster {
+    margin: 0 0 12px;
+}
+
+.chrono-cluster h4 {
+    margin: 0 0 8px;
+}
+
+.chrono-string-list {
+    margin: 0 0 10px;
+    padding-left: 18px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.chrono-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(255, 152, 0, 0.18);
+    border: 1px solid var(--calibration-color);
+    color: var(--calibration-color);
+    font-size: 0.75rem;
+    vertical-align: middle;
+}
+
+.chrono-ambiguous {
+    border-color: var(--calibration-color);
+}
+
+.chrono-confirm-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.chrono-confirm-row select {
+    flex: 1;
+}

@@ -45,6 +45,11 @@ ChronoManager.prototype.show = function () {
     html += '<p class="chrono-intro">Import a Garmin ShotView export — a single-session CSV or a multi-session spreadsheet (.xlsx).</p>';
     html += '<label class="btn btn-primary chrono-file-label" for="chrono-file">Choose ShotView File</label>';
     html += '<input type="file" id="chrono-file" accept=".csv,.xlsx" class="chrono-file-input">';
+    html += '<div id="chrono-review-launcher" class="detail-card chrono-assign hidden">';
+    html += '<div class="form-group"><label for="chrono-review-rifle">Review &amp; assign saved strings</label>';
+    html += '<select id="chrono-review-rifle"></select></div>';
+    html += '<button id="chrono-review-btn" class="btn btn-secondary">Review Strings</button>';
+    html += '</div>';
     html += '<div id="chrono-error" class="chrono-error hidden"></div>';
     html += '<div id="chrono-results"></div>';
     html += '</div>';
@@ -59,9 +64,23 @@ ChronoManager.prototype.show = function () {
         input.value = ''; // allow re-picking the same file
     });
 
-    // Rifle list for the assignment dropdown (non-blocking)
+    // Rifle list for assignment dropdowns (non-blocking)
     this.db.getAllRifles().then(function (rifles) {
         self.rifles = rifles || [];
+        if (!self.rifles.length) return;
+        var sel = document.getElementById('chrono-review-rifle');
+        var launcher = document.getElementById('chrono-review-launcher');
+        if (!sel || !launcher) return; // view re-rendered meanwhile
+        var opts = '';
+        for (var i = 0; i < self.rifles.length; i++) {
+            opts += '<option value="' + self._escapeHtml(self.rifles[i].id) + '">' +
+                self._escapeHtml(self.rifles[i].name) + '</option>';
+        }
+        sel.innerHTML = opts;
+        launcher.classList.remove('hidden');
+        document.getElementById('chrono-review-btn').addEventListener('click', function () {
+            self.showAssignmentReview(sel.value);
+        });
     }).catch(function () {
         self.rifles = [];
     });
@@ -330,11 +349,196 @@ ChronoManager.prototype._importSelected = function () {
     }).then(function () {
         self.sessions = [];
         document.getElementById('chrono-import-btn').style.display = 'none';
+        // Straight into assignment review when a rifle was chosen
+        if (rifleId) {
+            setTimeout(function () { self.showAssignmentReview(rifleId); }, 900);
+        }
     }).catch(function (err) {
         btn.disabled = false;
         self._showError('Saved ' + saved + ' of ' + records.length + ' strings, then failed: ' +
             err.message + ' — fix the connection and re-import the rest (already-saved strings are kept).');
     });
+};
+
+// ── Assignment review (load auto-split) ───────────────────────
+
+/**
+ * Cluster a rifle's saved strings by velocity and let the user confirm
+ * which load each cluster belongs to. Ambiguous strings are never part
+ * of a bulk confirm — each gets its own "needs your call" card.
+ */
+ChronoManager.prototype.showAssignmentReview = function (rifleId) {
+    var self = this;
+    if (!rifleId) return;
+    this._showError(null);
+    document.getElementById('chrono-results').innerHTML =
+        '<p class="chrono-intro">Loading strings…</p>';
+
+    Promise.all([
+        this.db.getVelocityStringsByRifle(rifleId),
+        this.db.getLoadsByRifle(rifleId)
+    ]).then(function (results) {
+        self._renderAssignmentReview(rifleId, results[0] || [], results[1] || []);
+    }).catch(function (err) {
+        self._showError('Could not load strings: ' + err.message);
+    });
+};
+
+ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, loads) {
+    var self = this;
+    var pending = strings.filter(function (s) { return s.assignmentStatus !== 'confirmed'; });
+    var confirmed = strings.filter(function (s) { return s.assignmentStatus === 'confirmed'; });
+
+    var result = clusterStringsByVelocity(pending);
+    var ambiguousIds = {};
+    for (var a = 0; a < result.ambiguous.length; a++) {
+        ambiguousIds[result.ambiguous[a].string.id] = true;
+    }
+
+    var loadNames = {};
+    for (var ln = 0; ln < loads.length; ln++) loadNames[loads[ln].id] = loads[ln].name;
+
+    var out = '<button id="chrono-back-btn" class="btn btn-secondary">← Back to Import</button>';
+    out += '<h3 class="chrono-review-title">Assign Strings to Ammo</h3>';
+
+    if (!pending.length) {
+        out += '<p class="chrono-intro">No strings waiting for assignment.</p>';
+    }
+
+    var loadOptions = '<option value="">— Pick a load —</option>';
+    for (var lo = 0; lo < loads.length; lo++) {
+        loadOptions += '<option value="' + this._escapeHtml(loads[lo].id) + '">' +
+            this._escapeHtml(loads[lo].name) + '</option>';
+    }
+    loadOptions += '<option value="__new__">+ New load…</option>';
+
+    // Cluster cards (bulk confirm covers only unambiguous members)
+    for (var c = 0; c < result.clusters.length; c++) {
+        var cluster = result.clusters[c];
+        var clean = cluster.members.filter(function (m) { return !ambiguousIds[m.id]; });
+        var cleanIds = clean.map(function (m) { return m.id; });
+
+        out += '<div class="detail-card chrono-cluster">';
+        out += '<h4>Cluster ' + (c + 1) + ' — avg ~' + formatNum(cluster.meanFps, 0) + ' fps · ' +
+            cluster.members.length + ' string' + (cluster.members.length === 1 ? '' : 's') +
+            ' · ' + cluster.shotCount + ' shots</h4>';
+        out += '<ul class="chrono-string-list">';
+        for (var m = 0; m < cluster.members.length; m++) {
+            var s = cluster.members[m];
+            out += '<li>' + this._escapeHtml(this._stringLabel(s)) +
+                (ambiguousIds[s.id] ? ' <span class="chrono-badge">needs your call</span>' : '') + '</li>';
+        }
+        out += '</ul>';
+        if (cleanIds.length) {
+            out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' +
+                loadOptions + '</select>';
+            out += '<button class="btn btn-primary chrono-cluster-confirm" data-ids="' +
+                this._escapeHtml(cleanIds.join(',')) + '" data-select="chrono-cluster-load-' + c + '">' +
+                'Confirm ' + cleanIds.length + ' string' + (cleanIds.length === 1 ? '' : 's') + '</button></div>';
+        }
+        out += '</div>';
+    }
+
+    // Individual cards for ambiguous strings — never bulk-assigned
+    var ambIdx = 0;
+    for (var a2 = 0; a2 < result.ambiguous.length; a2++) {
+        var amb = result.ambiguous[a2].string;
+        out += '<div class="detail-card chrono-cluster chrono-ambiguous">';
+        out += '<h4><span class="chrono-badge">needs your call</span> ' +
+            this._escapeHtml(this._stringLabel(amb)) + '</h4>';
+        out += '<p class="chrono-intro">This string sits between velocity groups — same-velocity ammo cannot be told apart automatically. Pick its load yourself.</p>';
+        out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-amb-load-' + ambIdx + '">' +
+            loadOptions + '</select>';
+        out += '<button class="btn btn-primary chrono-cluster-confirm" data-ids="' +
+            this._escapeHtml(amb.id) + '" data-select="chrono-amb-load-' + ambIdx + '">Confirm</button></div>';
+        out += '</div>';
+        ambIdx++;
+    }
+
+    if (confirmed.length) {
+        out += '<details class="chrono-shots"><summary>' + confirmed.length + ' already-confirmed string' +
+            (confirmed.length === 1 ? '' : 's') + '</summary><ul class="chrono-string-list">';
+        for (var cf = 0; cf < confirmed.length; cf++) {
+            out += '<li>' + this._escapeHtml(this._stringLabel(confirmed[cf])) + ' → ' +
+                this._escapeHtml(loadNames[confirmed[cf].loadId] || 'unknown load') + '</li>';
+        }
+        out += '</ul></details>';
+    }
+
+    out += '<div id="chrono-status" class="chrono-intro"></div>';
+    document.getElementById('chrono-results').innerHTML = out;
+
+    document.getElementById('chrono-back-btn').addEventListener('click', function () {
+        self.show();
+    });
+    var buttons = document.querySelectorAll('.chrono-cluster-confirm');
+    for (var b = 0; b < buttons.length; b++) {
+        buttons[b].addEventListener('click', function () {
+            var ids = this.getAttribute('data-ids').split(',');
+            var select = document.getElementById(this.getAttribute('data-select'));
+            self._confirmAssignment(rifleId, ids, select.value, this);
+        });
+    }
+};
+
+/**
+ * Persist a load assignment for the given string ids. '__new__' creates
+ * a minimal load first (user fills in bullet details later in Profiles).
+ */
+ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadValue, btn) {
+    var self = this;
+    var status = document.getElementById('chrono-status');
+    if (!loadValue) {
+        status.textContent = 'Pick a load first.';
+        return;
+    }
+
+    var loadPromise;
+    if (loadValue === '__new__') {
+        var name = window.prompt('Name for the new load (e.g. "Hornady 168gr ELD-M"):');
+        if (!name || !name.trim()) return;
+        loadPromise = this.db.addLoad({ rifleId: rifleId, name: name.trim() })
+            .then(function (load) { return load.id; });
+    } else {
+        loadPromise = Promise.resolve(loadValue);
+    }
+
+    btn.disabled = true;
+    status.textContent = 'Saving assignment…';
+
+    loadPromise.then(function (loadId) {
+        var chain = Promise.resolve();
+        stringIds.forEach(function (id) {
+            chain = chain.then(function () {
+                return self.db.updateVelocityString({
+                    id: id,
+                    rifleId: rifleId,
+                    loadId: loadId,
+                    assignmentStatus: 'confirmed'
+                });
+            });
+        });
+        return chain;
+    }).then(function () {
+        self.showAssignmentReview(rifleId); // re-render with fresh state
+    }).catch(function (err) {
+        btn.disabled = false;
+        status.textContent = 'Assignment failed: ' + err.message;
+    });
+};
+
+/**
+ * Short label for a saved string: date · avg/SD/ES · shot count.
+ */
+ChronoManager.prototype._stringLabel = function (s) {
+    var when = '—';
+    if (s.date) {
+        var d = new Date(s.date);
+        if (!isNaN(d.getTime())) when = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+    var n = s.shots && s.shots.length ? s.shots.length : 0;
+    return when + ' · avg ' + formatNum(s.avgFps, 1) + ' · SD ' + formatNum(s.sdFps, 1) +
+        ' · ES ' + formatNum(s.esFps, 1) + ' · ' + n + ' shots';
 };
 
 /**
