@@ -496,11 +496,7 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     // migrate into cards one commit at a time (foundation step 6).
     html += '<div id="rifle-cards"></div>';
 
-    // (History & log links moved into the 'history-links' card)
-
-    // Beta feature sections (DOPE Log, Cold Bore) — placeholders injected here, populated after render
-    html += '<div id="beta-dope-section"></div>';
-    html += '<div id="beta-cold-bore-section"></div>';
+    // (History links, cold bore, and DOPE log all live in cards now)
 
     html += '</div>'; // close .profile-screen
 
@@ -524,25 +520,6 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         });
     }
 
-    // Cold Bore — real feature for all users
-    if (typeof ColdBoreManager !== 'undefined') {
-        var cbContainer = document.getElementById('beta-cold-bore-section');
-        if (cbContainer) {
-            var cbManager = new ColdBoreManager(this.db);
-            cbManager.renderSection(cbContainer, rifle.id);
-        }
-    }
-
-    // Render remaining beta sections if enabled
-    if (typeof isBetaEnabled === 'function') {
-        if (isBetaEnabled('dopeLog') && typeof DopeLogManager !== 'undefined') {
-            var dopeContainer = document.getElementById('beta-dope-section');
-            if (dopeContainer) {
-                var dopeManager = new DopeLogManager(this.db);
-                dopeManager.renderSection(dopeContainer, rifle.id, loads);
-            }
-        }
-    }
 };
 
 ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel) {

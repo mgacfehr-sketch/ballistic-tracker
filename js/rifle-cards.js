@@ -123,6 +123,58 @@ RifleCards.register({
     }
 });
 
+// ── ready: zero status (the universal need — always present) ──
+RifleCards.register({
+    id: 'zero-status',
+    slot: 'ready',
+    tool: null,
+    isVisible: function (ctx) { return !!ctx.rifle; },
+    render: function (el, ctx) {
+        el.innerHTML = '<div class="detail-card zero-status-card" id="zero-status-body"></div>';
+        var body = el.querySelector('#zero-status-body');
+
+        function emptyState() {
+            body.innerHTML =
+                '<p class="empty-state-sub" style="padding:0;">No zero check yet — photograph a target and yorT gives you the verdict.</p>' +
+                '<button class="btn btn-primary" id="zero-status-check" style="margin-top:8px;">Check a target</button>';
+            body.querySelector('#zero-status-check').addEventListener('click', function () {
+                if (window.AppNav) window.AppNav.go('session');
+            });
+        }
+
+        ctx.db.getSessionsByRifle(ctx.rifle.id).then(function (sessions) {
+            (sessions || []).sort(function (a, b) {
+                return (b.date || '').localeCompare(a.date || '');
+            });
+            var latest = null;
+            for (var i = 0; i < sessions.length; i++) {
+                if (sessions[i].results && typeof sessions[i].results.atzElevationMOA === 'number') {
+                    latest = sessions[i];
+                    break;
+                }
+            }
+            var verdict = latest && typeof ZeroGuardian !== 'undefined'
+                ? ZeroGuardian.verdictFor(latest.results) : null;
+            if (!verdict) { emptyState(); return; }
+
+            var when = latest.date ? new Date(latest.date).toLocaleDateString() : '';
+            if (verdict.confirmed) {
+                body.innerHTML = '<div class="zg-banner zg-confirmed">✓ ZERO CONFIRMED' +
+                    '<span class="zg-sub">Last checked ' + when + '</span></div>';
+            } else {
+                var parts = [];
+                if (verdict.elevClicks > 0) parts.push(verdict.elevClicks + ' click' + (verdict.elevClicks === 1 ? '' : 's') + ' ' + verdict.elevDir.toUpperCase());
+                if (verdict.windClicks > 0) parts.push(verdict.windClicks + ' click' + (verdict.windClicks === 1 ? '' : 's') + ' ' + verdict.windDir.toUpperCase());
+                body.innerHTML = '<div class="zg-banner zg-adjust">' +
+                    (parts.length ? 'Last check: adjust ' + parts.join(', ') : 'Last check: nearly there') +
+                    '<span class="zg-sub">' + when + ' — shoot a confirmation group</span></div>';
+            }
+        }).catch(function () {
+            emptyState();
+        });
+    }
+});
+
 // ── progress: barrel round counts (with inline editor) ────────
 RifleCards.register({
     id: 'barrel',
@@ -230,6 +282,31 @@ RifleCards.register({
         }
         html += '</div>';
         el.innerHTML = html;
+    }
+});
+
+// ── progress: cold bore (delegates to ColdBoreManager) ────────
+RifleCards.register({
+    id: 'cold-bore',
+    slot: 'progress',
+    tool: null,
+    isVisible: function () { return typeof ColdBoreManager !== 'undefined'; },
+    render: function (el, ctx) {
+        new ColdBoreManager(ctx.db).renderSection(el, ctx.rifle.id);
+    }
+});
+
+// ── progress: DOPE log (beta-gated, delegates) ─────────────────
+RifleCards.register({
+    id: 'dope-log',
+    slot: 'progress',
+    tool: null,
+    isVisible: function () {
+        return typeof isBetaEnabled === 'function' && isBetaEnabled('dopeLog') &&
+            typeof DopeLogManager !== 'undefined';
+    },
+    render: function (el, ctx) {
+        new DopeLogManager(ctx.db).renderSection(el, ctx.rifle.id, ctx.loads);
     }
 });
 
