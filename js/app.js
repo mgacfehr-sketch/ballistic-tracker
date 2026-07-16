@@ -251,20 +251,30 @@
             profileManager.reportManager = new RifleReportManager(db, profileManager);
             profileManager.certificateManager = new CertificateManager(db, profileManager);
 
-            // Bridge so other views (rifle report) can open chrono's
-            // assignment review directly (switchView is hoisted below)
-            window.ChronoNav = {
-                openReview: function (rifleId) {
+            // ── AppNav facade ──────────────────────────────────
+            // The single string-addressable way to open closure-scoped
+            // views from anywhere (Home actions, cards, deep links).
+            // switchView is hoisted from below.
+            window.AppNav = {
+                go: function (viewName) {
+                    switchView(viewName);
+                },
+                openRifle: function (rifleId) {
+                    switchView('profiles');
+                    profileManager.showRifleDetail(rifleId);
+                },
+                openChronoReview: function (rifleId) {
                     switchView('chrono');
                     chronoManager.showAssignmentReview(rifleId);
-                }
-            };
-            window.ReportNav = {
-                open: function (rifleId) {
+                },
+                openReport: function (rifleId) {
                     switchView('profiles');
                     profileManager.reportManager.show(rifleId);
                 }
             };
+            // Back-compat delegates (existing call sites keep working)
+            window.ChronoNav = { openReview: window.AppNav.openChronoReview };
+            window.ReportNav = { open: window.AppNav.openReport };
 
             if (user && user.id === ADMIN_USER_ID) {
                 adminManager = new AdminManager(db);
