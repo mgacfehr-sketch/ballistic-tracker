@@ -1,31 +1,37 @@
-# Ballistic Tracker PWA — Full Specification
+# yorT (Ballistic Tracker) PWA — Full Specification
 
 ## Overview
-A Progressive Web App (PWA) for precision rifle shooters to photograph targets, mark shot impacts, calculate group statistics, manage gun/load profiles, track barrel life, and get AI-powered shooting advice. Designed for mobile-first use at the range. Zero cost, no app store — installable from the browser.
+yorT is a Progressive Web App (PWA) for precision rifle shooters: photograph a target, mark shot impacts, calculate group statistics, manage gun/load profiles, track barrel life, log DOPE and cold-bore behavior, run a ballistic solver, and get AI-powered shooting advice. Mobile-first, designed for use at the range, installable from the browser.
+
+The app is **authenticated and cloud-backed**: users sign up with email/password (Supabase Auth) and all data is stored per-user in Supabase (Postgres + Storage). A read-only offline cache keeps profile data viewable without connectivity.
+
+Planned next: wrap the PWA with Capacitor for iOS/Android app-store distribution, and add subscription billing (free vs premium tiers). See "Build Principles for Future Work" in CLAUDE.md.
 
 ## Tech Stack
-- **Frontend:** Plain HTML, CSS, JavaScript (no frameworks)
-- **Storage:** IndexedDB (via a thin wrapper)
-- **Image handling:** HTML5 Canvas API
-- **PWA:** Service worker + manifest for offline support and home screen install
-- **AI (Phase 6):** Claude API (Anthropic)
-- **Ballistic solver (Phase 7):** Custom point-mass solver in JavaScript (G1/G7 drag models)
+- **Frontend:** Plain HTML, CSS, JavaScript (no frameworks, no build tools)
+- **Backend:** Supabase — email/password auth, Postgres tables (primary data store, row-level security by `user_id`), Storage bucket `session-images` for target photos, Postgres RPCs for the admin dashboard
+- **AI:** Claude API via a Vercel-style serverless proxy (`api/chat.js`); Anthropic API key lives in server env, never in the browser. Model: `claude-sonnet-4-5-20250929`
+- **Offline:** Service worker (`sw.js`) caches the app shell; `js/offline-cache.js` mirrors rifles/barrels/loads into IndexedDB for read-only offline access
+- **Image handling:** HTML5 Canvas API; ArUco fiducial detection via js-aruco2 (CDN, pinned commit SHA)
+- **Ballistic solver:** Custom point-mass solver in JavaScript (G1/G7 drag models, RK4 integration)
+- **localStorage:** lightweight settings, sunlight mode, beta flags only
 
 ---
 
-## Build Phases
+## Feature Status
+The original build phases, with current implementation status.
 
-### Phase 1 — Core Session Workflow (Build First)
+### Phase 1 — Core Session Workflow ✅ Implemented
 The heart of the app. A standalone flow that works without profiles.
 
 **Step-by-step UX flow:**
-1. **Load image** — Camera capture or pick from phone photo library
-2. **Set scale / calibration** — Primary path: app auto-detects the four ArUco fiducial markers printed on the yorT target (ARUCO_MIP_36h12 dictionary) and warps the image flat using perspective correction, setting `pixelsPerInch` from the known 6.0" grid geometry. Corner assignment is position-based (outermost by diagonal projection), not by marker ID, so it works across devices. Fallback path: user zooms into any known 1-inch reference and taps point A then point B; app calculates `pixelsPerInch = distance_in_pixels / 1.0`.
-3. **Input distance to target** — Numeric input, 1–1500 yards
-4. **Input bullet diameter** — Numeric input in inches (e.g., 0.308). In quick/misc mode this is manual; in profile mode it auto-fills from the load
-5. **Mark Point of Aim (POA)** — Single tap to place a blue/distinct marker where the shooter was aiming
-6. **Mark impacts sequentially** — Tap to place numbered markers (1, 2, 3... up to 10). Each marker is a circle sized to bullet diameter at the current scale. Markers are numbered and color-coded (green crosshair style, referencing Ballistic-X UX). User can tap an existing marker to delete/re-place it.
-7. **Calculate and display results** — Show overlay card on the annotated image
+1. **Select profile** — Pick a rifle + load, or use Quick/Misc mode. Buttons to print or share the blank yorT target PDF.
+2. **Load image** — Camera capture or pick from phone photo library
+3. **Set scale / calibration** — Primary path: app auto-detects the four ArUco fiducial markers printed on the yorT target (ARUCO_MIP_36h12 dictionary) and warps the image flat using perspective correction, setting `pixelsPerInch` from the known 6.0" grid geometry. Corner assignment is position-based (outermost by diagonal projection), not by marker ID, so it works across devices. Fallback path: user zooms into any known 1-inch reference and taps point A then point B; app calculates `pixelsPerInch = distance_in_pixels / 1.0`.
+4. **Input distance + bullet diameter** — Distance 1–1500 yards; bullet diameter in inches with common presets (.224–.338). Auto-fills from the load in profile mode. Optional: rounds fired, measured velocity, and weather (manual entry or auto-fetch from Open-Meteo via geolocation).
+5. **Mark Point of Aim (POA)** — Single tap to place a blue marker where the shooter was aiming
+6. **Mark impacts sequentially** — Tap to place numbered markers (1, 2, 3... up to 10), green crosshair style. Undo/clear supported.
+7. **Calculate and display results** — Overlay card on the annotated image; save session, crop, save image, or share
 
 **Calculations (impacts are tapped at hole centers, so all pixel distances are already center-to-center — no bullet-diameter subtraction):**
 
@@ -39,25 +45,22 @@ The heart of the app. A standalone flow that works without profiles.
 - **ATZ (Adjust to Zero):** The scope adjustment needed. E.g., "Down 0.60 MOA, Right 0.25 MOA". This is just the negation of the offset — if impacts are high-left, adjust down-right.
 
 **Annotated image output:**
-- Composite the original photo + all markers (numbered crosshairs) + POA marker + results overlay card
-- User can save this composite image to phone photo library or share it
-- The overlay card shows: group size (inches + MOA), distance, shot count, ATZ adjustments
-- Canvas export via `canvas.toBlob()` or `canvas.toDataURL()`
+- Composite the original photo + all markers + POA marker + results overlay card (`js/export.js`)
+- Full-size JPEG + 400px thumbnail uploaded to Supabase Storage on session save
+- User can save the composite to their photo library or share it (Web Share API)
 
-**Canvas interaction requirements:**
-- Pinch-to-zoom on mobile
-- Pan when zoomed in
-- Tap to place markers (must work accurately when zoomed)
-- Markers must scale correctly with zoom level
-- Image orientation must be handled (EXIF rotation from phone cameras)
+**Canvas interaction:** pinch-to-zoom (up to ~15x), pan, accurate tap placement while zoomed, markers scale with zoom.
 
----
+### Phase 2 — Data Model & Gun/Load Profiles ✅ Implemented (in Supabase, not IndexedDB)
 
-### Phase 2 — Data Model & Gun/Load Profiles
+Storage notes:
+- Tables are **snake_case in Postgres, camelCase in JS** — `js/db.js` (`BallisticDB`) maps both ways and is the ONLY module that touches Supabase data.
+- Every row carries `user_id`; queries are scoped to the logged-in user and tables use row-level security.
+- Session images live in the **`session-images` Storage bucket** at `{userId}/{sessionId}.jpg` and `{userId}/{sessionId}_thumb.jpg` — not as filenames on disk and not as blobs in the database.
 
-**Entities:**
+**Entities (Postgres tables):**
 
-#### Rifle
+#### Rifle (`rifles`)
 - `id` (UUID)
 - `name` (string, e.g., "Bergara B14 HMR")
 - `caliber` (string, e.g., ".308 Win")
@@ -65,10 +68,9 @@ The heart of the app. A standalone flow that works without profiles.
 - `zeroRange` (number, yards)
 - `angleUnit` (string, "MOA" — future: "MIL")
 - `notes` (string, optional)
-- `createdAt` (ISO datetime)
-- `updatedAt` (ISO datetime)
+- `createdAt` / `updatedAt` (ISO datetime)
 
-#### Barrel
+#### Barrel (`barrels`)
 - `id` (UUID)
 - `rifleId` (FK → Rifle)
 - `twistRate` (string, e.g., "1:10")
@@ -78,7 +80,7 @@ The heart of the app. A standalone flow that works without profiles.
 - `totalRounds` (number — manually tracked total round count)
 - `notes` (string, optional)
 
-#### Load (Ammo Profile)
+#### Load / Ammo Profile (`loads`)
 - `id` (UUID)
 - `rifleId` (FK → Rifle)
 - `name` (string, e.g., "Hornady 168gr ELD-M")
@@ -92,141 +94,140 @@ The heart of the app. A standalone flow that works without profiles.
 - `notes` (string, optional)
 - `createdAt` (ISO datetime)
 
-#### Session (Range Visit Record)
+#### Session (`sessions`)
 - `id` (UUID)
-- `rifleId` (FK → Rifle, nullable for quick/misc mode)
-- `loadId` (FK → Load, nullable for quick/misc mode)
-- `barrelId` (FK → Barrel, nullable)
+- `rifleId` / `loadId` / `barrelId` (FKs, nullable for quick/misc mode)
 - `date` (ISO datetime)
 - `distanceYards` (number)
 - `roundsFired` (number)
 - `measuredVelocity` (number, fps, optional — chrono reading)
 - `weather` (embedded WeatherSnapshot, optional)
-- `imageFilename` (string — reference to stored image file)
 - `calibrationData` (object: `{pointA: {x,y}, pointB: {x,y}, pixelsPerInch: number}`)
-- `bulletDiameter` (number — snapshot at time of session, in case load changes)
+- `bulletDiameter` (number — snapshot at time of session)
+- `rifleName` / `loadName` (denormalized snapshots for display)
 - `poaPoint` (object: `{x, y}` in image pixel coordinates)
 - `impacts` (array of `{id, number, x, y}` — ordered, in image pixel coordinates)
-- `results` (object: calculated group size, mean radius, offsets, ATZ, etc.)
+- `results` (object: calculated group size, mean radius, offsets, ATZ, advanced stats)
+- `coldBore` (object, optional — first-shot offset data)
 - `sightInComments` (string, optional)
-- `isZeroSession` (boolean — marks this as the zero confirmation session)
+- `isZeroSession` (boolean)
 - `createdAt` (ISO datetime)
 
 #### WeatherSnapshot (embedded, not a separate table)
-- `temperature` (number, °F, nullable)
-- `altitude` (number, feet, nullable)
-- `barometricPressure` (number, inHg, nullable)
-- `humidity` (number, %, nullable)
-- `windSpeed` (number, mph, nullable)
-- `windDirection` (string, e.g., "3 o'clock", nullable)
+- `temperature` (°F), `altitude` (ft), `barometricPressure` (inHg), `humidity` (%), `windSpeed` (mph), `windDirection` (string, e.g., "3 o'clock") — all nullable
 
-#### ZeroRecord
-- `id` (UUID)
-- `rifleId` (FK → Rifle)
-- `loadId` (FK → Load)
-- `sessionId` (FK → Session, optional — link to the session where zero was confirmed)
-- `date` (ISO date)
-- `rangeYards` (number)
-- `weather` (embedded WeatherSnapshot)
-- `notes` (string, optional)
+#### ZeroRecord (`zero_records`)
+- `id`, `rifleId`, `loadId`, `sessionId` (optional), `date`, `rangeYards`, `weather`, `notes`
 
-#### ScopeAdjustment
-- `id` (UUID)
-- `rifleId` (FK → Rifle)
-- `sessionId` (FK → Session, optional — link to associated session)
-- `date` (ISO datetime)
-- `elevationChange` (number, MOA — positive = up)
-- `windageChange` (number, MOA — positive = right)
-- `reason` (string, optional)
-- `notes` (string, optional)
+#### ScopeAdjustment (`scope_adjustments`)
+- `id`, `rifleId`, `sessionId` (optional), `date`, `elevationChange` (MOA, positive = up), `windageChange` (MOA, positive = right), `reason`, `notes`
 
-#### CleaningLog
-- `id` (UUID)
-- `rifleId` (FK → Rifle)
-- `barrelId` (FK → Barrel)
-- `date` (ISO datetime)
-- `roundCountAtCleaning` (number — barrel total rounds at time of cleaning, pre-filled from barrel)
-- `notes` (string, optional)
+#### CleaningLog (`cleaning_logs`)
+- `id`, `rifleId`, `barrelId`, `date`, `roundCountAtCleaning` (pre-filled from barrel), `notes`
+
+#### DopeEntry (`dope_entries`) — beta
+- Verified come-up log: rifle + load, distance, elevation dial (MOA), wind hold, result (hit/miss/high/low). Feeds BC truing.
+
+#### ColdBoreShot (`cold_bore_shots`)
+- Manual cold-bore entries: rifle + load, vertical/horizontal offset. Merged with auto-derived `session.coldBore` data.
+
+#### AIConversation (`ai_conversations`)
+- Persisted multi-turn "Ask yorT" chats per user.
+
+#### AIUsageLog (`ai_usage_logs`)
+- Per-message token counts and estimated cost; surfaced in the admin dashboard.
 
 **Profile limits:** Up to 50 rifle profiles. No hard limit on loads per rifle, sessions, or log entries.
 
 **Derived/computed values (not stored, calculated on read):**
 - Rounds since last cleaning = barrel `totalRounds` minus `roundCountAtCleaning` from most recent cleaning log
 - Velocity trend = ordered list of `measuredVelocity` from sessions over time
+- Trued BC (beta) = back-calculated from verified DOPE entries
+
+### Phase 3 — Session History & Logging ✅ Implemented
+- Sessions saved to profiles after calculation; per-rifle history lists + detail views (`js/history.js`)
+- "Misc" (no-rifle) session list
+- Cleaning log CRUD with rounds-since-last-clean
+- Scope adjustment log CRUD
+- Muzzle velocity tracking per session
+- Weather entry form (all fields optional) + auto-fetch
+- Thumbnails lazy-loaded from Supabase Storage
+
+### Phase 4 — Quick/Miscellaneous Mode ✅ Implemented
+- Full session workflow without profile association
+- Bullet diameter prompt with presets (.224, .243, .264, .277, .284, .308, .338)
+- Results saved as standalone "misc" session or discarded; annotated image always sharable
+
+### Phase 5 — Advanced Statistics ✅ Implemented (except POI Score)
+In `js/calculations.js`, shown on results/session detail:
+- **CEP (Circular Error Probable):** radius of smallest circle centered on centroid containing 50% of shots
+- **Radial SD, Vertical SD, Horizontal SD**
+- **Mean windage / mean elevation** offsets from POA (inches + MOA)
+- **POI Score:** not implemented — future work
+
+### Phase 6 — AI Assistant ✅ Implemented ("Ask yorT")
+Design changed from the original spec (no user-provided API key):
+- Chat UI in `js/ai-assistant.js`; browser POSTs to the **`api/chat.js` serverless proxy**, which holds `ANTHROPIC_API_KEY` in server env and calls the Claude API (model `claude-sonnet-4-5-20250929`, max_tokens 2048)
+- **Vision support:** attach or camera-capture a target photo (base64), or auto-attach a referenced session's image
+- **Context gathering** from Supabase: rifles, loads, session history, computed trajectories, weather (auto-fetched from Open-Meteo)
+- Conversations persisted to `ai_conversations`; per-message tokens + estimated cost logged to `ai_usage_logs`
+- No rate limiting or quota enforcement yet (cost is tracked, not capped)
+
+### Phase 7 — Ballistic Solver ✅ Implemented
+`js/ballistic-solver.js`:
+- Point-mass solver with published **G1 and G7 drag tables** (Mach → Cd)
+- **4th-order Runge-Kutta** integration; speed-of-sound and air-density from temperature/pressure/humidity; pressure-at-altitude estimate; iterative zero-angle finding
+- Inputs auto-filled from rifle + load profile; weather auto-fetch
+- Outputs: drop/come-up table (MOA + inches) and wind-drift table
+- Runs entirely locally; solver math is pure (module-exportable like calculations.js)
+- Note: **spin drift and Coriolis are in Wind Call** (`js/wind-call.js`), not the core solver
+
+### Phase 8 — Polish & PWA ✅ Largely implemented
+- Service worker (`sw.js`, `CACHE_VERSION` currently 54): network-first for app-shell code, cache-first for static assets and CDN libs, **Supabase requests never cached**; auto-reload on new version via postMessage
+- Manifest + icons (192/512/maskable); installable
+- High-contrast "sunlight mode" toggle
+- Touch handling: pinch-zoom, double-tap-zoom suppression, scroll prevention
 
 ---
 
-### Phase 3 — Session History & Logging
-- Save sessions to profiles after calculation
-- View session history per rifle (list, sorted by date)
-- Performance over time view: group size trend (chart or list)
-- Cleaning log CRUD: add cleaning events, show rounds since last clean
-- Scope adjustment log CRUD: add adjustments, view history
-- Round count dashboard per barrel
-- Muzzle velocity tracking per session, trend view
-- Weather entry form (all fields optional, nullable)
+## Authentication & Backend
+- **Auth:** Supabase email/password (`js/app.js`) — signup (min 6-char password, email confirmation), login, logout, session restore on load
+- **Data access layer:** `BallisticDB` (`js/db.js`) is the single gateway for all Supabase tables, Storage, and RPCs; injects/strips `user_id` and maps camelCase↔snake_case
+- **Storage:** bucket `session-images`, paths `{userId}/{sessionId}.jpg` + `_thumb.jpg`; image upload failure is non-fatal (doesn't block session save)
+- **Migrations:** SQL files in repo root — `admin-migration.sql` (admin RPCs), `beta-migration.sql` (`dope_entries`, `cold_bore_shots` + RLS), `cold-bore-migration.sql` (session-level cold-bore fields)
+
+## Admin Dashboard
+- Gated by a hard-coded `ADMIN_USER_ID` UUID (`js/admin.js`); matching users get an Admin nav tab
+- Shows database stats, per-user usage table, AI cost (month + all-time), and an all-users JSON export
+- Backed by Postgres RPCs: `admin_get_stats`, `admin_get_users`, `admin_get_usage_summary`, `admin_export_all`
+- **Known issue:** these RPCs are `SECURITY DEFINER` with no server-side admin check — gating is client-side only. Must be fixed before scaling users.
+
+## Beta Feature Flags
+- Registry in `js/beta-features.js`: `windCall`, `dopeLog`, `coldBore`, `quickStart`, `highContrast`, `offlineMode`, `sessionCompare` (localStorage-backed flags)
+- **Current state: `isBetaEnabled()` is hard-coded to return `false`** — all beta features are disabled for everyone, including admin. The Wind tab and Verified DOPE section do not appear in the current build.
+- Cold Bore is intentionally **not** gated and always visible in rifle detail.
+
+### Beta feature details
+- **Wind Call** (`js/wind-call.js`): compass heading (`DeviceOrientationEvent`, iOS permission flow) + GPS latitude; clock-face wind dial; computes wind drift (from solver trajectory), spin drift (from twist rate), Coriolis (horizontal + vertical), and total windage hold in inches/MOA
+- **Verified DOPE & BC Truing** (`js/dope-log.js`): log verified hits per rifle+load to `dope_entries`; back-calculates a "trued" BC by sweeping a 0.85–1.15 BC multiplier through the solver and minimizing come-up error; shows box BC vs trued BC
+- **Cold Bore Tracking** (`js/cold-bore.js`): merges auto first-shot offsets from `session.coldBore` with manual `cold_bore_shots` entries; per-load averages, history, and offset-trend target diagram
+
+## Offline Behavior
+Two independent layers:
+- **`sw.js`** caches the app shell (HTML/CSS/JS/icons/target PDF + Supabase UMD) so the app loads offline
+- **`js/offline-cache.js`** mirrors rifles/barrels/loads from Supabase into IndexedDB (`yort_offline`) for read-only access when offline; refreshes on init, `online`, and `visibilitychange`; drives the connection-status dot
+- **No offline write queue** — saving sessions, images, and AI chat require connectivity
 
 ---
 
-### Phase 4 — Quick/Miscellaneous Mode
-- Full session workflow (Phase 1) without any profile association
-- Must prompt for bullet diameter (with common presets: .224, .243, .264, .277, .284, .308, .338)
-- Results can be saved as a standalone "misc" session or discarded
-- Annotated image can always be saved/shared regardless
-
----
-
-### Phase 5 — Advanced Statistics
-Added to the results overlay and session detail view:
-- **CEP (Circular Error Probable):** Radius of the smallest circle centered on group centroid that contains 50% of shots
-- **Radial SD:** Standard deviation of each shot's distance from group centroid
-- **Vertical SD:** Standard deviation of Y-coordinates of impacts
-- **Horizontal SD:** Standard deviation of X-coordinates of impacts
-- **Mean windage:** Average horizontal offset from POA (inches + MOA)
-- **Mean elevation:** Average vertical offset from POA (inches + MOA)
-- **POI Score:** (Research specific scoring algorithm — placeholder)
-
----
-
-### Phase 6 — AI Assistant
-- Chat interface within the app
-- When user asks a question, app gathers relevant context from IndexedDB:
-  - Recent sessions for the selected rifle
-  - Group size trends
-  - Velocity trends
-  - Weather data from recent sessions vs. zero conditions
-  - Round count / barrel life
-  - Cleaning history
-  - Scope adjustment history
-- Context is packaged into a structured prompt and sent to Claude API (claude-sonnet-4-5-20250929)
-- Example queries:
-  - "My POI shifted 0.5 MOA left today, should I adjust?"
-  - "Why are my groups opening up?"
-  - "Is this wind or something else?"
-- Cost: fractions of a cent per query
-- Requires: user provides their own Anthropic API key (stored locally, never transmitted elsewhere)
-
----
-
-### Phase 7 — Ballistic Solver
-- Custom point-mass solver implemented in JavaScript
-- Uses G1 or G7 standard drag curves (published coefficients)
-- Inputs auto-filled from rifle + load profile: BC, muzzle velocity, scope height, zero range, bullet weight, atmospheric conditions
-- Outputs: drop table (MOA/MIL adjustments at each distance increment), wind drift table
-- Runs entirely locally, no API dependency
-- Integrated into the app as a tool alongside the AI assistant
-
----
-
-### Phase 8 — Polish & PWA
-- Service worker for offline functionality
-- Web app manifest (name, icon, theme color, display: standalone)
-- Home screen install prompt
-- App icon design
-- Mobile UX refinement (touch targets, scroll behavior, loading states)
-- EXIF orientation handling for camera photos
-- Edge case handling and error states
-- Performance optimization for large session histories
+## Future Work
+- **Capacitor wrap** for iOS/Android — see "Build Principles for Future Work" in CLAUDE.md (configurable API base URLs, no browser-only assumptions, standard web APIs for camera/GPS/sensors)
+- **Subscription billing** — free vs premium tiers; keep tier gating in a single entitlement layer
+- **Centralized network service layer** — consolidate the duplicated Open-Meteo fetches and other scattered network calls
+- **Server-side admin authorization** for the `admin_*` RPCs
+- **POI Score** metric (algorithm TBD)
+- **Offline write queue** (save sessions offline, sync later)
+- Re-enable beta features via proper per-user entitlements
 
 ---
 
@@ -234,28 +235,43 @@ Added to the results overlay and session detail view:
 
 ```
 ballistic-app/
-├── index.html                  # App shell, navigation
+├── index.html                  # SPA shell, auth screen, CDN + script loading
+├── aruco-test.html             # Standalone ArUco detection diagnostic page
 ├── manifest.json               # PWA manifest
-├── sw.js                       # Service worker
+├── sw.js                       # Service worker (CACHE_VERSION, shell caching)
+├── api/
+│   └── chat.js                 # Serverless Claude API proxy (server-side key)
 ├── css/
-│   ├── main.css                # Global styles, variables, layout
-│   └── canvas.css              # Canvas/overlay specific styles
+│   └── main.css                # Single stylesheet (incl. sunlight mode)
 ├── js/
-│   ├── app.js                  # App initialization, routing, navigation
-│   ├── db.js                   # IndexedDB wrapper (CRUD for all entities)
+│   ├── app.js                  # Supabase client init, auth, nav, bootstrap
+│   ├── db.js                   # BallisticDB — ALL Supabase CRUD/Storage/RPC
 │   ├── canvas-manager.js       # Image loading, zoom/pan, marker placement
-│   ├── calibration.js          # 1-inch reference calibration logic
-│   ├── calculations.js         # All math: group size, MOA, offsets, ATZ, stats
-│   ├── session-flow.js         # Step-by-step session workflow controller
-│   ├── profiles.js             # Rifle/load/barrel profile management UI
-│   ├── history.js              # Session history, trends, logs
-│   ├── export.js               # Annotated image rendering and sharing
-│   ├── ai-assistant.js         # Claude API integration (Phase 6)
-│   ├── ballistic-solver.js     # Point-mass solver (Phase 7)
-│   └── utils.js                # UUID generation, date formatting, helpers
+│   ├── calibration.js          # Manual 2-tap calibration
+│   ├── aruco-calibration.js    # ArUco detection + homography warp
+│   ├── calculations.js         # All group math (PURE FUNCTIONS)
+│   ├── session-flow.js         # 7-step session workflow controller
+│   ├── profiles.js             # Rifle/barrel/load profile management UI
+│   ├── history.js              # Session history, cleaning + scope logs
+│   ├── export.js               # Annotated image + thumbnail rendering
+│   ├── ai-assistant.js         # "Ask yorT" chat (vision, context, usage logs)
+│   ├── ballistic-solver.js     # G1/G7 RK4 point-mass solver + Solver UI
+│   ├── admin.js                # Admin dashboard (hard-coded ADMIN_USER_ID)
+│   ├── beta-features.js        # Feature-flag registry (currently all-off)
+│   ├── wind-call.js            # Wind/spin-drift/Coriolis holds (beta)
+│   ├── dope-log.js             # Verified DOPE + BC truing (beta)
+│   ├── cold-bore.js            # Cold-bore first-shot tracking
+│   ├── offline-cache.js        # IndexedDB read-only mirror (yort_offline)
+│   └── utils.js                # UUID, formatting, help tooltips, helpers
+├── tests/
+│   └── test-calculations.js    # Node unit tests (node tests/test-calculations.js)
+├── admin-migration.sql         # Admin RPC functions
+├── beta-migration.sql          # dope_entries + cold_bore_shots tables + RLS
+├── cold-bore-migration.sql     # Session-level cold-bore fields
+├── icons/                      # PWA icons (192/512/maskable)
 ├── assets/
-│   ├── icons/                  # PWA icons
-│   └── images/                 # Any static images
+│   ├── logo.png
+│   └── yorT-target.pdf         # Printable ArUco calibration target
 ├── SPEC.md                     # This file
 ├── CLAUDE.md                   # Instructions for Claude Code
 └── README.md                   # Project documentation
@@ -264,13 +280,14 @@ ballistic-app/
 ---
 
 ## Key Design Principles
-1. **Calculation engine is pure functions** — no DOM, no storage, no side effects. Takes coordinates in, returns measurements out. Fully testable.
-2. **Calibration data is stored per session** — different photos have different scales.
-3. **Images stored as files, referenced by path** — not blobs in the database.
-4. **All fields that could change over time are snapshotted in the session** — bullet diameter, velocity, weather. The session is a self-contained record.
-5. **Mobile-first design** — every interaction designed for thumb use on a phone screen at the range.
-6. **Offline-capable** — core functionality works without network. Only AI assistant requires connectivity.
-7. **Data exportable** — structured so future sync/export is straightforward.
+1. **Calculation engine is pure functions** — no DOM, no storage, no side effects. Takes coordinates in, returns measurements out. Fully testable (`tests/test-calculations.js`).
+2. **All Supabase access goes through `db.js`** — UI modules never touch the client directly; every query is user-scoped (`user_id` + RLS).
+3. **Calibration data is stored per session** — different photos have different scales.
+4. **Images live in Supabase Storage** — keyed by user + session id; never in IndexedDB or database rows.
+5. **All fields that could change over time are snapshotted in the session** — bullet diameter, velocity, weather, rifle/load names. The session is a self-contained record.
+6. **Mobile-first design** — every interaction designed for thumb use on a phone screen at the range.
+7. **Offline-tolerant, not offline-first** — the shell and profile data are viewable offline; saving sessions and AI chat require connectivity.
+8. **Built to be wrapped** — follow the "Build Principles for Future Work" in CLAUDE.md (service layer, no hard-coded URLs, standard web APIs, free/premium separation) so the Capacitor + subscription work lands cleanly.
 
 ---
 
