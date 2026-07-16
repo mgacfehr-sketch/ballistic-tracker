@@ -47,6 +47,7 @@
                 <button id="btn-sunlight-mode" class="utility-btn" title="Sunlight Mode" aria-label="Sunlight Mode">&#9788;</button>
             </div>
             <nav id="app-nav" class="nav-grid">
+                <button class="nav-tab" data-view="home">Home</button>
                 <button class="nav-tab active" data-view="session">Session</button>
                 <button class="nav-tab" data-view="profiles">Profiles</button>
                 <button class="nav-tab" data-view="ai">Ask yorT</button>
@@ -267,6 +268,9 @@
         </div>
 
         <!-- Profiles View -->
+        <!-- Home — action-first adaptive surface -->
+        <div id="view-home" class="app-view"></div>
+
         <div id="view-profiles" class="app-view"></div>
 
         <!-- AI Assistant View -->
@@ -323,6 +327,7 @@
     <script src="js/beta-features.js"></script>
     <script src="js/tools.js"></script>
     <script src="js/wizard-core.js"></script>
+    <script src="js/home.js"></script>
     <script src="js/wind-call.js"></script>
     <script src="js/dope-log.js"></script>
     <script src="js/cold-bore.js"></script>

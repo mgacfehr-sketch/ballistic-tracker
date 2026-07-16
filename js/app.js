@@ -237,6 +237,7 @@
         var adminManager = null;
         var windCallManager = null;
         var chronoManager = null;
+        var homeManager = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
@@ -250,6 +251,19 @@
             chronoManager.init();
             profileManager.reportManager = new RifleReportManager(db, profileManager);
             profileManager.certificateManager = new CertificateManager(db, profileManager);
+
+            // Foundation: tool activations + action-first Home
+            homeManager = new HomeManager(db);
+            homeManager.init();
+            if (typeof ToolRegistry !== 'undefined') {
+                ToolRegistry.init(db).then(function () {
+                    // Re-render if the user is already looking at Home
+                    var homeView = document.getElementById('view-home');
+                    if (homeView && homeView.classList.contains('active')) {
+                        homeManager.show();
+                    }
+                });
+            }
 
             // ── AppNav facade ──────────────────────────────────
             // The single string-addressable way to open closure-scoped
@@ -313,6 +327,7 @@
         // ── Navigation ─────────────────────────────────────
         var navTabs = document.querySelectorAll('.nav-tab');
         var views = {
+            home: document.getElementById('view-home'),
             session: document.getElementById('view-session'),
             profiles: document.getElementById('view-profiles'),
             ai: document.getElementById('view-ai'),
@@ -370,6 +385,11 @@
                 chronoManager.show();
             }
 
+            // Show Home when switching to the home tab
+            if (viewName === 'home' && homeManager) {
+                homeManager.show();
+            }
+
             // Show admin when switching to admin tab
             if (viewName === 'admin' && adminManager) {
                 adminManager.show();
@@ -396,7 +416,8 @@
             if (e.target.closest('#step-panel') || e.target.closest('#view-profiles') ||
                 e.target.closest('#view-ai') || e.target.closest('#view-solver') ||
                 e.target.closest('#view-wind') || e.target.closest('#view-admin') ||
-                e.target.closest('#view-chrono')) return;
+                e.target.closest('#view-chrono') ||
+                e.target.closest('#view-home')) return;
             e.preventDefault();
         }, { passive: false });
 
