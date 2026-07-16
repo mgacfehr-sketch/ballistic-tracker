@@ -2757,3 +2757,24 @@ html, body {
     cursor: pointer;
     min-height: 32px;
 }
+
+.chrono-member-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    cursor: pointer;
+}
+
+.chrono-member-cb {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary);
+    flex-shrink: 0;
+}
+
+.chrono-proposal-list li {
+    margin: 6px 0;
+    list-style: none;
+    margin-left: -18px;
+}

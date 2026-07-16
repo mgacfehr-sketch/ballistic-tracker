@@ -494,48 +494,38 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
     }
     loadOptions += '<option value="__new__">+ New load…</option>';
 
-    // Cluster cards (bulk confirm covers only unambiguous members)
+    // Proposal cards — NOTHING is combined or assigned automatically.
+    // Every string carries its own checkbox; the user reviews the
+    // proposed grouping and explicitly confirms membership + load.
+    if (result.clusters.length) {
+        out += '<p class="chrono-intro">These are <strong>proposals</strong> based on velocity — nothing is combined until you confirm. Untick any string that isn\'t the same ammo and assign it separately.</p>';
+    }
     for (var c = 0; c < result.clusters.length; c++) {
         var cluster = result.clusters[c];
-        var clean = cluster.members.filter(function (m) { return !ambiguousIds[m.id]; });
-        var cleanIds = clean.map(function (m) { return m.id; });
-
         out += '<div class="detail-card chrono-cluster">';
-        out += '<h4>Cluster ' + (c + 1) + ' — avg ~' + formatNum(cluster.meanFps, 0) + ' fps · ' +
+        out += '<h4>Proposed group ' + (c + 1) + ' — avg ~' + formatNum(cluster.meanFps, 0) + ' fps · ' +
             cluster.members.length + ' string' + (cluster.members.length === 1 ? '' : 's') +
             ' · ' + cluster.shotCount + ' shots</h4>';
-        out += '<ul class="chrono-string-list">';
+        out += '<ul class="chrono-string-list chrono-proposal-list">';
         for (var m = 0; m < cluster.members.length; m++) {
             var s = cluster.members[m];
-            out += '<li>' + this._escapeHtml(this._stringLabel(s)) +
-                ' ' + this._roundsEditHtml(s) +
-                (ambiguousIds[s.id] ? ' <span class="chrono-badge">needs your call</span>' : '') + '</li>';
+            var amb = !!ambiguousIds[s.id];
+            out += '<li><label class="chrono-member-row">';
+            out += '<input type="checkbox" class="chrono-member-cb" data-cluster="' + c + '" data-id="' +
+                this._escapeHtml(s.id) + '"' + (amb ? '' : ' checked') + '> ';
+            out += this._escapeHtml(this._stringLabel(s));
+            out += '</label> ' + this._roundsEditHtml(s);
+            if (amb) {
+                out += ' <span class="chrono-badge">needs your call — sits between velocity groups</span>';
+            }
+            out += '</li>';
         }
         out += '</ul>';
-        if (cleanIds.length) {
-            out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' +
-                loadOptions + '</select>';
-            out += '<button class="btn btn-primary chrono-cluster-confirm" data-ids="' +
-                this._escapeHtml(cleanIds.join(',')) + '" data-select="chrono-cluster-load-' + c + '">' +
-                'Confirm ' + cleanIds.length + ' string' + (cleanIds.length === 1 ? '' : 's') + '</button></div>';
-        }
-        out += '</div>';
-    }
-
-    // Individual cards for ambiguous strings — never bulk-assigned
-    var ambIdx = 0;
-    for (var a2 = 0; a2 < result.ambiguous.length; a2++) {
-        var amb = result.ambiguous[a2].string;
-        out += '<div class="detail-card chrono-cluster chrono-ambiguous">';
-        out += '<h4><span class="chrono-badge">needs your call</span> ' +
-            this._escapeHtml(this._stringLabel(amb)) + '</h4>';
-        out += '<p class="chrono-intro">This string sits between velocity groups — same-velocity ammo cannot be told apart automatically. Pick its load yourself.</p>';
-        out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-amb-load-' + ambIdx + '">' +
+        out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' +
             loadOptions + '</select>';
-        out += '<button class="btn btn-primary chrono-cluster-confirm" data-ids="' +
-            this._escapeHtml(amb.id) + '" data-select="chrono-amb-load-' + ambIdx + '">Confirm</button></div>';
+        out += '<button class="btn btn-primary chrono-cluster-confirm" data-cluster="' + c +
+            '" data-select="chrono-cluster-load-' + c + '"></button></div>';
         out += '</div>';
-        ambIdx++;
     }
 
     if (confirmed.length) {
@@ -580,10 +570,34 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
         });
     }
 
+    // Live "Assign selected (N)" labels + explicit membership on confirm
+    function checkedIdsFor(clusterIndex) {
+        var boxes = document.querySelectorAll('.chrono-member-cb[data-cluster="' + clusterIndex + '"]');
+        var ids = [];
+        for (var i = 0; i < boxes.length; i++) {
+            if (boxes[i].checked) ids.push(boxes[i].getAttribute('data-id'));
+        }
+        return ids;
+    }
+    function refreshButtonLabels() {
+        var btns = document.querySelectorAll('.chrono-cluster-confirm');
+        for (var i = 0; i < btns.length; i++) {
+            var n = checkedIdsFor(btns[i].getAttribute('data-cluster')).length;
+            btns[i].textContent = 'Assign selected (' + n + ')';
+            btns[i].disabled = n === 0;
+        }
+    }
+    var memberBoxes = document.querySelectorAll('.chrono-member-cb');
+    for (var mb = 0; mb < memberBoxes.length; mb++) {
+        memberBoxes[mb].addEventListener('change', refreshButtonLabels);
+    }
+    refreshButtonLabels();
+
     var buttons = document.querySelectorAll('.chrono-cluster-confirm');
     for (var b = 0; b < buttons.length; b++) {
         buttons[b].addEventListener('click', function () {
-            var ids = this.getAttribute('data-ids').split(',');
+            var ids = checkedIdsFor(this.getAttribute('data-cluster'));
+            if (!ids.length) return;
             var select = document.getElementById(this.getAttribute('data-select'));
             self._confirmAssignment(rifleId, ids, select.value, this);
         });
