@@ -259,6 +259,12 @@
                     chronoManager.showAssignmentReview(rifleId);
                 }
             };
+            window.ReportNav = {
+                open: function (rifleId) {
+                    switchView('profiles');
+                    profileManager.reportManager.show(rifleId);
+                }
+            };
 
             if (user && user.id === ADMIN_USER_ID) {
                 adminManager = new AdminManager(db);

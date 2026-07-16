@@ -27,20 +27,39 @@ ProfileManager.prototype.init = function () {
 ProfileManager.prototype.showRifleList = function () {
     this.currentRifleId = null;
     var self = this;
-    this.db.getAllRifles().then(function (rifles) {
+    Promise.all([
+        this.db.getAllRifles(),
+        this.db.getSetting('workflowCardDismissed')
+    ]).then(function (results) {
+        var rifles = results[0];
         rifles.sort(function (a, b) {
             return (a.name || '').localeCompare(b.name || '');
         });
-        self._renderRifleList(rifles);
+        self._renderRifleList(rifles, results[1] === true);
     });
 };
 
-ProfileManager.prototype._renderRifleList = function (rifles) {
+ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed) {
     var html = '<div class="profile-screen">';
     html += '<div class="profile-toolbar">';
     html += '<h2 class="profile-title">Rifles</h2>';
     html += '<button class="btn btn-primary btn-sm" id="btn-add-rifle">+ Add Rifle</button>';
     html += '</div>';
+
+    // One-time workflow pointer — the certificate chain spans four tabs
+    // and is otherwise undiscoverable (dismissible, never returns)
+    if (!workflowDismissed && typeof hasFeature === 'function' && hasFeature('certificate')) {
+        html += '<div class="detail-card workflow-card" id="workflow-card">';
+        html += '<button id="workflow-dismiss" class="workflow-dismiss" aria-label="Dismiss" title="Dismiss">×</button>';
+        html += '<h4>From ammo box to certificate</h4>';
+        html += '<ol class="workflow-steps">';
+        html += '<li>Create a rifle + load here</li>';
+        html += '<li><strong>Chrono</strong> tab — import your ShotView strings</li>';
+        html += '<li><strong>Session</strong> tab — shoot and save target groups</li>';
+        html += '<li>Rifle → <strong>Performance Report</strong> → Generate Certificate</li>';
+        html += '</ol>';
+        html += '</div>';
+    }
 
     if (rifles.length === 0) {
         html += '<div class="empty-state">';
@@ -96,6 +115,15 @@ ProfileManager.prototype._bindRifleListEvents = function () {
     if (addBtn) {
         addBtn.addEventListener('click', function () {
             self.showRifleForm(null);
+        });
+    }
+
+    var workflowDismiss = document.getElementById('workflow-dismiss');
+    if (workflowDismiss) {
+        workflowDismiss.addEventListener('click', function () {
+            self.db.setSetting('workflowCardDismissed', true);
+            var card = document.getElementById('workflow-card');
+            if (card) card.style.display = 'none';
         });
     }
 
@@ -495,6 +523,17 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         html += '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
     }
 
+    // Performance Report — the flagship entry, promoted above the fold
+    if (typeof hasFeature === 'function' && hasFeature('certificate')) {
+        html += '<div class="profile-card report-promo" id="btn-performance-report">';
+        html += '<div class="profile-card-main">';
+        html += '<span class="profile-card-name">Performance Report</span>';
+        html += '<span class="profile-card-sub">Best group &middot; velocity stats &middot; certificate</span>';
+        html += '</div>';
+        html += '<span class="profile-card-arrow">&rsaquo;</span>';
+        html += '</div>';
+    }
+
     // Loads section
     html += '<div class="detail-section">';
     html += '<div class="detail-section-header">';
@@ -538,12 +577,6 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     html += '<div class="profile-card-main"><span class="profile-card-name">Scope Adjustments</span></div>';
     html += '<span class="profile-card-arrow">&rsaquo;</span>';
     html += '</div>';
-    if (typeof hasFeature === 'function' && hasFeature('certificate')) {
-        html += '<div class="profile-card" id="btn-performance-report">';
-        html += '<div class="profile-card-main"><span class="profile-card-name">Performance Report</span></div>';
-        html += '<span class="profile-card-arrow">&rsaquo;</span>';
-        html += '</div>';
-    }
     html += '</div>';
     html += '</div>';
 
