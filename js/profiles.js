@@ -490,43 +490,13 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
 
     // (Build-info and barrel stats moved into cards — rifle-cards.js)
 
-    // Performance Report — the flagship entry, promoted above the fold
-    if (typeof hasFeature === 'function' && hasFeature('certificate')) {
-        html += '<div class="profile-card report-promo" id="btn-performance-report">';
-        html += '<div class="profile-card-main">';
-        html += '<span class="profile-card-name">Performance Report</span>';
-        html += '<span class="profile-card-sub">Best group &middot; velocity stats &middot; certificate</span>';
-        html += '</div>';
-        html += '<span class="profile-card-arrow">&rsaquo;</span>';
-        html += '</div>';
-    }
+    // (Report promo moved into the 'report-promo' card, prove slot)
 
     // Rifle cards — the seven-question stack. Legacy sections below
     // migrate into cards one commit at a time (foundation step 6).
     html += '<div id="rifle-cards"></div>';
 
-    // Session History link
-    html += '<div class="detail-section">';
-    html += '<div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">History &amp; Logs</h3>';
-    html += '</div>';
-    html += '<div class="profile-list" style="padding:0 16px;">';
-    html += '<div class="profile-card" id="btn-session-history">';
-    html += '<div class="profile-card-main"><span class="profile-card-name">Session History</span></div>';
-    html += '<span class="profile-card-arrow">&rsaquo;</span>';
-    html += '</div>';
-    if (activeBarrel) {
-        html += '<div class="profile-card" id="btn-cleaning-log" data-barrel-id="' + activeBarrel.id + '">';
-        html += '<div class="profile-card-main"><span class="profile-card-name">Cleaning Log</span></div>';
-        html += '<span class="profile-card-arrow">&rsaquo;</span>';
-        html += '</div>';
-    }
-    html += '<div class="profile-card" id="btn-scope-adjustments">';
-    html += '<div class="profile-card-main"><span class="profile-card-name">Scope Adjustments</span></div>';
-    html += '<span class="profile-card-arrow">&rsaquo;</span>';
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
+    // (History & log links moved into the 'history-links' card)
 
     // Beta feature sections (DOPE Log, Cold Bore) — placeholders injected here, populated after render
     html += '<div id="beta-dope-section"></div>';
@@ -588,36 +558,8 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
 
     // (Loads bindings moved into the 'loads' card — rifle-cards.js)
 
-    // History & log links
-    var historyBtn = document.getElementById('btn-session-history');
-    if (historyBtn && this.historyManager) {
-        historyBtn.addEventListener('click', function () {
-            self.historyManager.showSessionList(rifle.id);
-        });
-    }
-
-    var cleaningBtn = document.getElementById('btn-cleaning-log');
-    if (cleaningBtn && this.historyManager && activeBarrel) {
-        cleaningBtn.addEventListener('click', function () {
-            self.historyManager.showCleaningLog(rifle.id, activeBarrel.id);
-        });
-    }
-
-    var scopeBtn = document.getElementById('btn-scope-adjustments');
-    if (scopeBtn && this.historyManager) {
-        scopeBtn.addEventListener('click', function () {
-            self.historyManager.showScopeAdjustments(rifle.id);
-        });
-    }
-
-    var reportBtn = document.getElementById('btn-performance-report');
-    if (reportBtn && this.reportManager) {
-        reportBtn.addEventListener('click', function () {
-            self.reportManager.show(rifle.id);
-        });
-    }
-
-    // (Barrel round counts + inline editor moved into the 'barrel' card)
+    // (History links, report promo, and the barrel editor all live in
+    // their cards now — rifle-cards.js)
 };
 
 // ── Barrel Form ────────────────────────────────────────────────

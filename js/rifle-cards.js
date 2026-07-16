@@ -233,6 +233,86 @@ RifleCards.register({
     }
 });
 
+// ── records: history & log links ──────────────────────────────
+RifleCards.register({
+    id: 'history-links',
+    slot: 'records',
+    tool: null,
+    isVisible: function () { return true; },
+    render: function (el, ctx) {
+        var activeBarrel = ctx.activeBarrel;
+        var html = '<div class="detail-section">';
+        html += '<div class="detail-section-header">';
+        html += '<h3 class="detail-section-title">History &amp; Logs</h3>';
+        html += '</div>';
+        html += '<div class="profile-list" style="padding:0 16px;">';
+        html += '<div class="profile-card" id="btn-session-history">';
+        html += '<div class="profile-card-main"><span class="profile-card-name">Session History</span></div>';
+        html += '<span class="profile-card-arrow">&rsaquo;</span>';
+        html += '</div>';
+        if (activeBarrel) {
+            html += '<div class="profile-card" id="btn-cleaning-log" data-barrel-id="' + activeBarrel.id + '">';
+            html += '<div class="profile-card-main"><span class="profile-card-name">Cleaning Log</span></div>';
+            html += '<span class="profile-card-arrow">&rsaquo;</span>';
+            html += '</div>';
+        }
+        html += '<div class="profile-card" id="btn-scope-adjustments">';
+        html += '<div class="profile-card-main"><span class="profile-card-name">Scope Adjustments</span></div>';
+        html += '<span class="profile-card-arrow">&rsaquo;</span>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        el.innerHTML = html;
+
+        var history = ctx.managers.history;
+        var historyBtn = el.querySelector('#btn-session-history');
+        if (historyBtn && history) {
+            historyBtn.addEventListener('click', function () {
+                history.showSessionList(ctx.rifle.id);
+            });
+        }
+        var cleaningBtn = el.querySelector('#btn-cleaning-log');
+        if (cleaningBtn && history && activeBarrel) {
+            cleaningBtn.addEventListener('click', function () {
+                history.showCleaningLog(ctx.rifle.id, activeBarrel.id);
+            });
+        }
+        var scopeBtn = el.querySelector('#btn-scope-adjustments');
+        if (scopeBtn && history) {
+            scopeBtn.addEventListener('click', function () {
+                history.showScopeAdjustments(ctx.rifle.id);
+            });
+        }
+    }
+});
+
+// ── prove: performance report / certificate entry ─────────────
+RifleCards.register({
+    id: 'report-promo',
+    slot: 'prove',
+    tool: null,
+    isVisible: function () {
+        return typeof hasFeature === 'function' && hasFeature('certificate');
+    },
+    render: function (el, ctx) {
+        var html = '<div class="profile-card report-promo" id="btn-performance-report">';
+        html += '<div class="profile-card-main">';
+        html += '<span class="profile-card-name">Performance Report</span>';
+        html += '<span class="profile-card-sub">Best group &middot; velocity stats &middot; certificate</span>';
+        html += '</div>';
+        html += '<span class="profile-card-arrow">&rsaquo;</span>';
+        html += '</div>';
+        el.innerHTML = html;
+
+        var reportBtn = el.querySelector('#btn-performance-report');
+        if (reportBtn && ctx.managers.report) {
+            reportBtn.addEventListener('click', function () {
+                ctx.managers.report.show(ctx.rifle.id);
+            });
+        }
+    }
+});
+
 // Export for Node unit tests
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { RifleCards: RifleCards };
