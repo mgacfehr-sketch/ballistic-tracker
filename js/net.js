@@ -39,19 +39,23 @@ var NetService = (function () {
         });
     }
 
+    // Production origin — certificate QR codes must always point here,
+    // never at localhost, a Vercel preview URL, or (in a future native
+    // wrap) capacitor://localhost. Stage C finding C3.
+    var PROD_APP_URL = 'https://ballistic-tracker.vercel.app';
+
     /**
      * Public base URL of the app itself — used for QR deep links on
-     * certificates. Override via localStorage 'yort_app_base' (e.g. the
-     * production origin when generating from a dev machine, or the
-     * hosted URL from inside a Capacitor build).
+     * certificates. Defaults to the PRODUCTION origin regardless of
+     * where the certificate is generated. Override via localStorage
+     * 'yort_app_base' only for deliberate testing.
      */
     function appBaseUrl() {
         try {
             var stored = localStorage.getItem('yort_app_base');
             if (stored) return stored.replace(/\/+$/, '');
         } catch (e) { /* localStorage unavailable */ }
-        return window.location.origin +
-            window.location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '');
+        return PROD_APP_URL;
     }
 
     // ── Conditions (GPS + weather station) ────────────────────
