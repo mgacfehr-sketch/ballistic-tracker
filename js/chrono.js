@@ -498,6 +498,11 @@ ChronoManager.prototype.showAssignmentReview = function (rifleId) {
     var self = this;
     if (!rifleId) return;
     this._showError(null);
+
+    // Preserve the confirmed-section expand state across re-renders
+    // (deleting/editing several strings in a row shouldn't snap it shut)
+    var confirmedDetails = document.getElementById('chrono-confirmed-details');
+    if (confirmedDetails) this._confirmedOpen = confirmedDetails.hasAttribute('open');
     document.getElementById('chrono-results').innerHTML =
         '<p class="chrono-intro">Loading strings…</p>';
 
@@ -574,7 +579,8 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
     }
 
     if (confirmed.length) {
-        out += '<details class="chrono-shots"><summary>' + confirmed.length + ' already-confirmed string' +
+        out += '<details class="chrono-shots" id="chrono-confirmed-details"' +
+            (this._confirmedOpen ? ' open' : '') + '><summary>' + confirmed.length + ' already-confirmed string' +
             (confirmed.length === 1 ? '' : 's') + '</summary><ul class="chrono-string-list">';
         for (var cf = 0; cf < confirmed.length; cf++) {
             out += '<li>' + this._escapeHtml(this._stringLabel(confirmed[cf])) + ' → ' +

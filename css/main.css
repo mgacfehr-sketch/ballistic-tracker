@@ -2780,13 +2780,20 @@ html, body {
 }
 
 .chrono-delete-string {
-    background: var(--surface-raised);
+    background: rgba(244, 67, 54, 0.16);
+    color: var(--danger);
     border: 1px solid var(--danger);
     border-radius: 10px;
-    padding: 4px 10px;
-    font-size: 0.75rem;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
-    min-height: 32px;
+    min-height: 36px;
+    margin-left: 6px;
+}
+
+.chrono-delete-string:active {
+    background: rgba(244, 67, 54, 0.32);
 }
 
 .chrono-dup-badge {
