@@ -2836,3 +2836,94 @@ html, body {
     cursor: pointer;
     min-height: 32px;
 }
+
+/* ── Crowd Data Warehouse (admin-only) ─────────────────────── */
+
+.crowd-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.crowd-title {
+    margin: 0;
+    flex: 1;
+}
+
+.crowd-export-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.crowd-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 8px;
+}
+
+.crowd-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.crowd-filter-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.crowd-filter select,
+.crowd-filter input {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 13px;
+    min-height: 44px;
+    max-width: 180px;
+}
+
+.crowd-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 4px 0 8px;
+}
+
+.crowd-table-wrap {
+    max-height: 65vh;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.crowd-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    cursor: pointer;
+    user-select: none;
+    z-index: 1;
+}
+
+.crowd-table thead th:hover {
+    color: var(--primary);
+}
+
+.crowd-sort-ind {
+    color: var(--primary);
+}
+
+.crowd-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px !important;
+}
