@@ -1097,9 +1097,14 @@ SessionFlow.prototype._saveSession = function () {
         btn.textContent = 'Saved to History';
         self._storeAnnotatedImage(saved.id);
     }).catch(function (err) {
+        // Never lose the session silently: it stays on screen, and the
+        // user gets an immediate retry.
         btn.disabled = false;
         btn.textContent = 'Save Session';
-        alert('Failed to save: ' + err.message);
+        if (confirm('Save failed: ' + err.message +
+            '\n\nYour session is still on screen. Retry the save now?')) {
+            self._saveSession();
+        }
     });
 };
 

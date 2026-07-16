@@ -8,7 +8,7 @@
 var OfflineCache = {
     _db: null,
     DB_NAME: 'yort_offline',
-    DB_VERSION: 1,
+    DB_VERSION: 2, // v2: + velocityStrings store
 
     /**
      * Open the offline IndexedDB database.
@@ -31,6 +31,10 @@ var OfflineCache = {
                 if (!db.objectStoreNames.contains('loads')) {
                     var loadStore = db.createObjectStore('loads', { keyPath: 'id' });
                     loadStore.createIndex('rifleId', 'rifleId', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('velocityStrings')) {
+                    var vsStore = db.createObjectStore('velocityStrings', { keyPath: 'id' });
+                    vsStore.createIndex('rifleId', 'rifleId', { unique: false });
                 }
             };
 
@@ -56,24 +60,29 @@ var OfflineCache = {
             var promises = rifles.map(function (r) {
                 return Promise.all([
                     db.getBarrelsByRifle(r.id),
-                    db.getLoadsByRifle(r.id)
+                    db.getLoadsByRifle(r.id),
+                    typeof db.getVelocityStringsByRifle === 'function'
+                        ? db.getVelocityStringsByRifle(r.id).catch(function () { return []; })
+                        : Promise.resolve([])
                 ]).then(function (results) {
-                    return { rifle: r, barrels: results[0] || [], loads: results[1] || [] };
+                    return { rifle: r, barrels: results[0] || [], loads: results[1] || [], strings: results[2] || [] };
                 });
             });
             return Promise.all(promises);
         }).then(function (profiles) {
             return OfflineCache._openDB().then(function (idb) {
                 return new Promise(function (resolve, reject) {
-                    var tx = idb.transaction(['rifles', 'barrels', 'loads'], 'readwrite');
+                    var tx = idb.transaction(['rifles', 'barrels', 'loads', 'velocityStrings'], 'readwrite');
                     var rifleStore = tx.objectStore('rifles');
                     var barrelStore = tx.objectStore('barrels');
                     var loadStore = tx.objectStore('loads');
+                    var vsStore = tx.objectStore('velocityStrings');
 
                     // Clear existing data
                     rifleStore.clear();
                     barrelStore.clear();
                     loadStore.clear();
+                    vsStore.clear();
 
                     // Write fresh data
                     for (var i = 0; i < profiles.length; i++) {
@@ -88,6 +97,11 @@ var OfflineCache = {
                             var load = p.loads[l];
                             load.rifleId = load.rifleId || p.rifle.id;
                             loadStore.put(load);
+                        }
+                        for (var v = 0; v < p.strings.length; v++) {
+                            var vs = p.strings[v];
+                            vs.rifleId = vs.rifleId || p.rifle.id;
+                            vsStore.put(vs);
                         }
                     }
 
@@ -157,6 +171,21 @@ var OfflineCache = {
             return new Promise(function (resolve, reject) {
                 var tx = idb.transaction('loads', 'readonly');
                 var idx = tx.objectStore('loads').index('rifleId');
+                var req = idx.getAll(rifleId);
+                req.onsuccess = function () { resolve(req.result || []); };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).catch(function () { return []; });
+    },
+
+    /**
+     * Get cached velocity strings for a rifle (via rifleId index).
+     */
+    getCachedVelocityStrings: function (rifleId) {
+        return OfflineCache._openDB().then(function (idb) {
+            return new Promise(function (resolve, reject) {
+                var tx = idb.transaction('velocityStrings', 'readonly');
+                var idx = tx.objectStore('velocityStrings').index('rifleId');
                 var req = idx.getAll(rifleId);
                 req.onsuccess = function () { resolve(req.result || []); };
                 req.onerror = function () { reject(req.error); };

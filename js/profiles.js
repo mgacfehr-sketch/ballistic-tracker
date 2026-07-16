@@ -77,6 +77,14 @@ ProfileManager.prototype._renderRifleList = function (rifles) {
     html += '</div>';
     html += '</div>';
 
+    // Account (privacy + deletion — store compliance)
+    html += '<details class="account-section"><summary>Account</summary>';
+    html += '<div class="account-body">';
+    html += '<p><a href="privacy-policy.html">Privacy Policy</a></p>';
+    html += '<p class="account-warning">Deleting your account permanently removes every rifle, session, photo, and chrono string. This cannot be undone.</p>';
+    html += '<button class="btn btn-danger" id="btn-delete-account">Delete Account…</button>';
+    html += '</div></details>';
+
     html += '</div>';
     this.container.innerHTML = html;
     this._bindRifleListEvents();
@@ -96,6 +104,24 @@ ProfileManager.prototype._bindRifleListEvents = function () {
         cards[i].addEventListener('click', function () {
             var id = this.getAttribute('data-rifle-id');
             self.showRifleDetail(id);
+        });
+    }
+
+    var deleteAccountBtn = document.getElementById('btn-delete-account');
+    if (deleteAccountBtn) {
+        deleteAccountBtn.addEventListener('click', function () {
+            var typed = prompt('This permanently deletes your account and ALL data — rifles, sessions, photos, chrono strings.\n\nType DELETE to confirm:');
+            if (typed !== 'DELETE') return;
+            deleteAccountBtn.disabled = true;
+            deleteAccountBtn.textContent = 'Deleting…';
+            self.db.deleteMyAccount().then(function () {
+                alert('Your account and all data have been deleted.');
+                window.location.href = window.location.pathname;
+            }).catch(function (err) {
+                deleteAccountBtn.disabled = false;
+                deleteAccountBtn.textContent = 'Delete Account…';
+                alert('Account deletion failed: ' + err.message);
+            });
         });
     }
 

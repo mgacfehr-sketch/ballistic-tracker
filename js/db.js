@@ -780,12 +780,19 @@ BallisticDB.prototype.updateVelocityString = function (record) {
 
 BallisticDB.prototype.getVelocityStringsByRifle = function (rifleId) {
     var self = this;
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        return OfflineCache.getCachedVelocityStrings(rifleId);
+    }
     return self.supabase.from('velocity_strings').select()
         .eq('user_id', self.userId).eq('rifle_id', rifleId)
         .order('date', { ascending: false })
         .then(function (res) {
             if (res.error) throw res.error;
             return (res.data || []).map(_rowToJs);
+        })
+        .catch(function (err) {
+            console.warn('[DB] getVelocityStringsByRifle failed, trying cache:', err);
+            return OfflineCache.getCachedVelocityStrings(rifleId);
         });
 };
 
@@ -915,6 +922,25 @@ BallisticDB.prototype.adminExportAll = function () {
     return this.supabase.rpc('admin_export_all').then(function (res) {
         if (res.error) throw res.error;
         return res.data;
+    });
+};
+
+// ── Account deletion ───────────────────────────────────────────
+
+/**
+ * Permanently delete the CALLER's account: every table row, all Storage
+ * images, and the auth user itself — via the delete_my_account()
+ * SECURITY DEFINER RPC (parameterless; acts only on auth.uid()).
+ * Signs out afterwards. Irreversible.
+ */
+BallisticDB.prototype.deleteMyAccount = function () {
+    var self = this;
+    return self.supabase.rpc('delete_my_account').then(function (res) {
+        if (res.error) throw res.error;
+        // Auth row is gone — clear the local session too
+        return self.supabase.auth.signOut().catch(function () {
+            // Already-invalid session errors are fine
+        });
     });
 };
 

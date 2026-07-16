@@ -44,6 +44,21 @@ AIAssistantManager.prototype.show = function () {
         return;
     }
 
+    // One-time AI disclosure/consent (store compliance) — chat is
+    // disabled until the user explicitly accepts what gets sent where.
+    if (!this._consentChecked) {
+        var mgr = this;
+        this.db.getSetting('ai_consent').then(function (value) {
+            if (value === 'accepted') {
+                mgr._consentChecked = true;
+                mgr.show();
+            } else {
+                mgr._renderConsent(value === 'declined');
+            }
+        });
+        return;
+    }
+
     if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
         this.container.innerHTML =
             '<div class="ai-no-key">' +
@@ -262,6 +277,42 @@ AIAssistantManager.prototype._bindChatEvents = function () {
             }
         });
     }
+};
+
+/**
+ * AI disclosure/consent screen. Accepting is remembered; declining
+ * keeps the assistant disabled with a way to change your mind.
+ */
+AIAssistantManager.prototype._renderConsent = function (previouslyDeclined) {
+    var self = this;
+    var html = '<div class="ai-consent">';
+    html += '<h3>Before you use Ask yorT</h3>';
+    html += '<p>Ask yorT is powered by Anthropic’s Claude. When you use it, the following is sent to Anthropic through our server to generate answers:</p>';
+    html += '<ul>';
+    html += '<li>your questions and any photos you attach</li>';
+    html += '<li>shooting data for the rifle you select (sessions, stats, logs)</li>';
+    html += '</ul>';
+    html += '<p>Nothing is sent until you ask a question. Usage (token counts) is logged for cost tracking. See the <a href="privacy-policy.html">Privacy Policy</a>.</p>';
+    if (previouslyDeclined) {
+        html += '<p class="ai-consent-declined">You previously declined — Ask yorT is disabled until you accept.</p>';
+    }
+    html += '<div class="btn-row">';
+    html += '<button class="btn btn-secondary" id="ai-consent-decline">Not now</button>';
+    html += '<button class="btn btn-primary" id="ai-consent-accept">I understand — enable</button>';
+    html += '</div></div>';
+    this.container.innerHTML = html;
+
+    document.getElementById('ai-consent-accept').addEventListener('click', function () {
+        self.db.setSetting('ai_consent', 'accepted').then(function () {
+            self._consentChecked = true;
+            self.show();
+        });
+    });
+    document.getElementById('ai-consent-decline').addEventListener('click', function () {
+        self.db.setSetting('ai_consent', 'declined').then(function () {
+            self._renderConsent(true);
+        });
+    });
 };
 
 /**
