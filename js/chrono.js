@@ -718,7 +718,7 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
  */
 ChronoManager.prototype._deleteBtnHtml = function (s) {
     return '<button type="button" class="chrono-delete-string" data-id="' + this._escapeHtml(s.id) + '" ' +
-        'title="Delete this string permanently">🗑</button>';
+        'title="Delete this string permanently">🗑 Delete</button>';
 };
 
 /**
