@@ -708,7 +708,7 @@ BallisticSolverManager.prototype._render = function () {
     html += '</div>';
     html += '</div>';
     html += '</div>';
-    html += '<button class="btn btn-secondary btn-sm" id="solver-fetch-weather" style="margin-top:8px;">Get Current Weather</button>';
+    html += '<button class="btn btn-secondary btn-sm" id="solver-fetch-weather" style="margin-top:8px;">Get Weather</button>';
     html += '</details>';
 
     // Calculate button
@@ -833,9 +833,9 @@ BallisticSolverManager.prototype._fetchWeather = function () {
         // Auto-open the details section
         var details = document.getElementById('solver-atmo-details');
         if (details) details.setAttribute('open', '');
-        if (btn) { btn.disabled = false; btn.textContent = 'Get Current Weather'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Get Weather'; }
     }).catch(function (err) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Get Current Weather'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Get Weather'; }
         alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
             err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
             'Failed to fetch weather data.');

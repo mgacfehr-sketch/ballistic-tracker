@@ -178,7 +178,7 @@ SessionFlow.prototype.reset = function () {
     // Reset weather button
     if (this.els.btnFetchWeather) {
         this.els.btnFetchWeather.disabled = false;
-        this.els.btnFetchWeather.textContent = 'Get Current Weather';
+        this.els.btnFetchWeather.textContent = 'Get Weather';
     }
 
     // Reset button states
@@ -1478,11 +1478,11 @@ SessionFlow.prototype._fetchWeather = function () {
         btn.textContent = 'Conditions Updated';
         setTimeout(function () {
             btn.disabled = false;
-            btn.textContent = 'Get Current Weather';
+            btn.textContent = 'Get Weather';
         }, 2000);
     }).catch(function (err) {
         btn.disabled = false;
-        btn.textContent = 'Get Current Weather';
+        btn.textContent = 'Get Weather';
         alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
             err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
             'Failed to fetch weather data.');

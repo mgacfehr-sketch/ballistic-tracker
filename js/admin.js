@@ -173,13 +173,8 @@ AdminManager.prototype._render = function (stats, users, usage) {
         });
     }
 
-    // Bind beta feature toggles
-    var toggles = document.querySelectorAll('.admin-beta-toggle input[type="checkbox"]');
-    for (var ti = 0; ti < toggles.length; ti++) {
-        toggles[ti].addEventListener('change', function () {
-            setBetaFlag(this.getAttribute('data-feature'), this.checked);
-        });
-    }
+    // (Beta-toggle bindings removed — the section above is commented
+    // out, so the handlers bound to nothing. Restore them together.)
 };
 
 AdminManager.prototype._showCrowdData = function () {

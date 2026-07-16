@@ -93,7 +93,7 @@ AIAssistantManager.prototype._renderChat = function () {
                 '</option>';
         }
         html += '</select>';
-        html += '<button class="btn btn-secondary btn-sm" id="ai-weather-btn" title="Get current weather">Weather</button>';
+        html += '<button class="btn btn-secondary btn-sm" id="ai-weather-btn" title="Get current weather">Get Weather</button>';
         html += '</div>';
 
         // Conversation toolbar
@@ -121,7 +121,7 @@ AIAssistantManager.prototype._renderChat = function () {
                 '\u2022 Target image analysis<br>' +
                 '\u2022 General ballistics questions<br><br>' +
                 'Select a rifle above for personalized data. ' +
-                'Tap <b>Weather</b> to auto-fill current conditions.</div>';
+                'Tap <b>Get Weather</b> to auto-fill current conditions.</div>';
         } else {
             for (var j = 0; j < self.messages.length; j++) {
                 var msg = self.messages[j];
@@ -352,9 +352,9 @@ AIAssistantManager.prototype._fetchAndInsertWeather = function () {
             input.style.height = Math.min(input.scrollHeight, 120) + 'px';
             input.focus();
         }
-        if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Get Weather'; }
     }).catch(function (err) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Weather'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Get Weather'; }
         alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
             err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
             'Failed to fetch weather data.');
