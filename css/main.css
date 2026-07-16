@@ -2669,3 +2669,22 @@ html, body {
     padding: 8px 10px;
     min-height: 44px;
 }
+
+/* Onboarding: ammo-box scan */
+.onboarding-scan-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.onboarding-scan-row .btn {
+    min-height: 44px;
+    cursor: pointer;
+    line-height: 44px;
+    padding: 0 16px;
+}
+
+.onboarding-scan-status {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}

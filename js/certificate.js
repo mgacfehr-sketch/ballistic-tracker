@@ -373,6 +373,11 @@ CertificateManager.prototype._renderCertificate = function (session, loadRow, ta
         }
     }
 
+    // QR deep link to this rifle (empty square if lib/feature missing)
+    if (typeof Onboarding !== 'undefined') {
+        Onboarding.stampQR(ctx, c.rifle.id, CertificateManager.QR_BOX);
+    }
+
     // Footer: generated date + signature line (QR square stays reserved)
     var fy = CERT_H - M - 60;
     ctx.textAlign = 'left';

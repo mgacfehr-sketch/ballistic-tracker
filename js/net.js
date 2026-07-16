@@ -39,6 +39,21 @@ var NetService = (function () {
         });
     }
 
+    /**
+     * Public base URL of the app itself — used for QR deep links on
+     * certificates. Override via localStorage 'yort_app_base' (e.g. the
+     * production origin when generating from a dev machine, or the
+     * hosted URL from inside a Capacitor build).
+     */
+    function appBaseUrl() {
+        try {
+            var stored = localStorage.getItem('yort_app_base');
+            if (stored) return stored.replace(/\/+$/, '');
+        } catch (e) { /* localStorage unavailable */ }
+        return window.location.origin +
+            window.location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '');
+    }
+
     // ── Conditions (GPS + weather station) ────────────────────
 
     /**
@@ -133,6 +148,7 @@ var NetService = (function () {
     return {
         apiBase: apiBase,
         apiChat: apiChat,
+        appBaseUrl: appBaseUrl,
         getPosition: getPosition,
         getConditions: getConditions,
         getDevicePressure: getDevicePressure

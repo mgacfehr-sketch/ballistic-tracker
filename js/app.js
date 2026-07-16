@@ -221,6 +221,14 @@
             if (typeof OfflineCache !== 'undefined') {
                 OfflineCache.init(db);
             }
+
+            // Certificate-QR deep link (?rifle=<id>) — after auth only
+            if (typeof Onboarding !== 'undefined') {
+                Onboarding.handleDeepLink(db, function (rifleId) {
+                    switchView('profiles');
+                    profileManager.showRifleDetail(rifleId);
+                });
+            }
         } else {
             var profilesContainer = document.getElementById('view-profiles');
             if (profilesContainer) {

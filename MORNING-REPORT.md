@@ -15,7 +15,7 @@ Updated incrementally after each step. Session started 2026-07-15 (evening).
 | 7 — Certificate + PDF | ✅ Code done; render/export needs browser check | (see git log) |
 | 8 — Zero Guardian | ✅ Code done; headless-tested; banner needs browser check | (see git log) |
 | 9 — Auto-conditions | ✅ Code done; needs live GPS/browser check | (see git log) |
-| 10 — Onboarding (OCR + QR) | — | — |
+| 10 — Onboarding (OCR + QR) | ✅ Code done; OCR + QR scan need live checks | (see git log) |
 | 11 — Hardening + compliance | — | — |
 
 ## Migrations to run in the morning
@@ -64,6 +64,12 @@ Run `MORNING-migrations.sql` (project root) top-to-bottom in the Supabase SQL Ed
 3. Solver + Ask yorT "Weather" buttons still work — solver now also gets altitude, AI text now includes wind direction + elevation.
 4. Console: `NetService.getConditions()` resolves to a full snapshot.
 5. Tech debt paid: `grep open-meteo js/` hits only net.js now.
+
+**Step 10 — NEEDS MY VERIFICATION (browser + phone + real ammo box):**
+1. Profiles → a rifle → + Add load → "📷 Scan Ammo Box" → photograph a real box → fields prefill for your review (never auto-saves); a blurry/unreadable photo shows "couldn't read" text, form stays usable. (Uses your `/api/chat` proxy — costs a fraction of a cent per scan.)
+2. Regenerate a certificate → bottom-right now has a QR + "SCAN FOR RIFLE RECORD"; scan it with your phone camera → app opens on that rifle (log in first; the deep link resolves after auth).
+3. Manually visiting `<app-url>?rifle=<garbage>` lands safely on home.
+4. QR base URL: defaults to the app's own origin; from a dev machine set `localStorage.setItem('yort_app_base','https://<prod-url>')` before generating so printed QRs point at production.
 
 ## Decisions skipped for you
 
