@@ -1,12 +1,12 @@
 /**
- * db.js — Supabase wrapper for all Ballistic Tracker entities.
+ * db.js — BallisticDB: Supabase wrapper owning ALL database access.
  *
- * Promise-based CRUD operations for: Rifle, Barrel, Load, Session,
- * ZeroRecord, ScopeAdjustment, CleaningLog.
+ * Promise-based CRUD for: Rifle, Barrel, Load, Session, ZeroRecord,
+ * ScopeAdjustment, CleaningLog, DopeEntry, ColdBoreShot, VelocityString,
+ * AI Conversations/Usage — plus Storage (session images) and admin RPCs.
  *
- * Same public API as the original IndexedDB version — all callers
- * (session-flow.js, profiles.js, history.js, ai-assistant.js,
- * ballistic-solver.js) remain unchanged.
+ * UI modules never touch the Supabase client directly; this file owns
+ * camelCase↔snake_case row mapping and scopes every query by user_id.
  *
  * Usage:
  *   var db = new BallisticDB(supabaseClient, userId);
@@ -165,7 +165,8 @@ BallisticDB.prototype.deleteRifle = function (id) {
             self.supabase.from('scope_adjustments').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('cleaning_logs').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('dope_entries').delete().eq('rifle_id', id).eq('user_id', self.userId),
-            self.supabase.from('cold_bore_shots').delete().eq('rifle_id', id).eq('user_id', self.userId)
+            self.supabase.from('cold_bore_shots').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('velocity_strings').delete().eq('rifle_id', id).eq('user_id', self.userId)
         ]);
     }).then(function (results) {
         for (var i = 0; i < results.length; i++) {
@@ -723,6 +724,78 @@ BallisticDB.prototype.getColdBoreShots = function (rifleId) {
 BallisticDB.prototype.deleteColdBoreShot = function (id) {
     var self = this;
     return self.supabase.from('cold_bore_shots').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};
+
+// ── Velocity String CRUD ──────────────────────────────────────
+
+BallisticDB.prototype.addVelocityString = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId || null,
+        loadId: data.loadId || null,
+        barrelId: data.barrelId || null,
+        date: data.date || new Date().toISOString(),
+        source: data.source || 'manual',
+        sheetName: data.sheetName || '',
+        shots: data.shots || [],
+        avgFps: typeof data.avgFps === 'number' ? data.avgFps : null,
+        sdFps: typeof data.sdFps === 'number' ? data.sdFps : null,
+        esFps: typeof data.esFps === 'number' ? data.esFps : null,
+        roundCountAt: typeof data.roundCountAt === 'number' ? data.roundCountAt : null,
+        assignmentStatus: data.assignmentStatus || 'unassigned',
+        notes: data.notes || '',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('velocity_strings').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.updateVelocityString = function (record) {
+    var self = this;
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('velocity_strings').update(row)
+        .eq('id', record.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getVelocityStringsByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('velocity_strings').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.getUnassignedVelocityStrings = function () {
+    var self = this;
+    return self.supabase.from('velocity_strings').select()
+        .eq('user_id', self.userId).is('rifle_id', null)
+        .order('date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.deleteVelocityString = function (id) {
+    var self = this;
+    return self.supabase.from('velocity_strings').delete()
         .eq('id', id).eq('user_id', self.userId)
         .then(function (res) {
             if (res.error) throw res.error;
