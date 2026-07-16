@@ -124,6 +124,58 @@ HomeManager.prototype.show = function () {
     this._renderActions();
     this._renderRecent();
     this._renderAlerts();
+    this._renderDrawer();
+};
+
+/**
+ * The tool drawer: dormant capabilities phrased as user problems.
+ * One tap activates (Home action appears live via onChange); active
+ * non-core tools can be put back to sleep — data always preserved.
+ */
+HomeManager.prototype._renderDrawer = function () {
+    var self = this;
+    var el = document.getElementById('home-drawer');
+    if (!el || typeof ToolRegistry === 'undefined') return;
+
+    var dormant = ToolRegistry.getDormant();
+    var activeExtras = [];
+    for (var k in TOOLS) {
+        if (!TOOLS.hasOwnProperty(k)) continue;
+        if (!TOOLS[k].core && ToolRegistry.isVisible(k)) activeExtras.push(TOOLS[k]);
+    }
+    if (!dormant.length && !activeExtras.length) return; // nothing to manage
+
+    var html = '<details class="home-drawer"><summary>+ Add a tool</summary>';
+    html += '<div class="home-drawer-body">';
+    for (var d = 0; d < dormant.length; d++) {
+        html += '<button class="home-drawer-tool" data-tool="' + dormant[d].key + '" data-on="1">' +
+            '<span class="home-action-label">' + dormant[d].problem + '</span>' +
+            '<span class="home-drawer-add">Add</span>' +
+            '</button>';
+    }
+    for (var a = 0; a < activeExtras.length; a++) {
+        html += '<button class="home-drawer-tool home-drawer-active" data-tool="' + activeExtras[a].key + '" data-on="0">' +
+            '<span class="home-action-label">' + activeExtras[a].problem + '</span>' +
+            '<span class="home-drawer-remove">Hide</span>' +
+            '</button>';
+    }
+    html += '<p class="chrono-hint">Hiding a tool keeps all its data — it just leaves your way.</p>';
+    html += '</div></details>';
+    el.innerHTML = html;
+
+    var buttons = el.querySelectorAll('.home-drawer-tool');
+    for (var b = 0; b < buttons.length; b++) {
+        buttons[b].addEventListener('click', function () {
+            var key = this.getAttribute('data-tool');
+            if (this.getAttribute('data-on') === '1') {
+                ToolRegistry.activate(key);
+            } else {
+                ToolRegistry.deactivate(key);
+            }
+            // onChange listener re-renders Home (drawer stays open state
+            // is reset — acceptable; the changed action is the feedback)
+        });
+    }
 };
 
 HomeManager.prototype._counts = function () {

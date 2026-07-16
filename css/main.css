@@ -3228,3 +3228,47 @@ html, body {
 .home-recent-card .profile-card-arrow {
     margin-left: auto;
 }
+
+/* Tool drawer */
+.home-drawer {
+    margin-top: 20px;
+    color: var(--text-muted);
+}
+
+.home-drawer summary {
+    cursor: pointer;
+    min-height: 44px;
+    line-height: 44px;
+    font-weight: 600;
+}
+
+.home-drawer-tool {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 52px;
+    margin: 0 0 8px;
+    padding: 0 16px;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.home-drawer-add {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.home-drawer-remove {
+    color: var(--text-dim);
+}
+
+.home-drawer-active {
+    border-style: solid;
+}
