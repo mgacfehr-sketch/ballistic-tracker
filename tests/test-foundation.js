@@ -57,6 +57,66 @@ check('serialize→hydrate round-trip', ToolsCore.isActive(TOOLS.chrono, round),
 check('hydrate of garbage → empty map', Object.keys(ToolsCore.hydrate({ v: 99 })).length, 0);
 check('hydrate of null → empty map', Object.keys(ToolsCore.hydrate(null)).length, 0);
 
+// ── WizardCore ────────────────────────────────────────────────
+var W = require('../js/wizard-core.js');
+
+console.log('\nWizardCore:');
+
+var DEF = {
+    id: 'test', version: 2,
+    steps: [
+        { id: 'use', prompt: 'Main use?', type: 'choice', choices: [{ value: 'hunt', label: 'Hunt' }, { value: 'reload', label: 'Handload' }] },
+        { id: 'powder', prompt: 'Favorite powder?', type: 'text', skip: function (a) { return a.use !== 'reload'; } },
+        { id: 'range', prompt: 'Typical range?', type: 'number', optional: true,
+          validate: function (v) { return v > 0 && v <= 3000 ? null : 'Enter 1–3000 yards.'; } }
+    ]
+};
+
+var s0 = W.create(DEF);
+check('create starts at step 0', s0.index, 0);
+check('required step blocks empty Next', W.canNext(DEF, s0, '').ok, false);
+check('required step allows a value', W.canNext(DEF, s0, 'hunt').ok, true);
+
+var sHunt = W.next(DEF, s0, 'hunt');
+check('hunt path skips powder (index 2)', sHunt.index, 2);
+check('answer recorded', sHunt.answers.use, 'hunt');
+check('failed next returns same state', W.next(DEF, s0, ''), s0);
+
+var sReload = W.next(DEF, s0, 'reload');
+check('reload path lands on powder (index 1)', sReload.index, 1);
+
+check('optional step allows empty', W.canNext(DEF, sHunt, '').ok, true);
+check('validate rejects bad value', W.canNext(DEF, sHunt, 9999).ok, false);
+check('validate error text surfaces', W.canNext(DEF, sHunt, 9999).error, 'Enter 1–3000 yards.');
+check('validate accepts good value', W.canNext(DEF, sHunt, 600).ok, true);
+
+var sDone = W.next(DEF, sHunt, 600);
+check('completes past the last step', W.isComplete(DEF, sDone), true);
+check('progress complete = total', W.progress(DEF, sDone).current, W.progress(DEF, sDone).total);
+check('hunt path total excludes skipped step', W.progress(DEF, sHunt).total, 2);
+check('reload path total includes powder', W.progress(DEF, sReload).total, 3);
+
+var sBack = W.back(DEF, sHunt);
+check('back from range skips powder on hunt path', sBack.index, 0);
+check('back at first step is a no-op', W.back(DEF, s0).index, 0);
+check('immutability: back does not mutate forward state', sHunt.index, 2);
+
+// Answer overwrite on re-visit
+var sRevisit = W.next(DEF, sBack, 'reload');
+check('re-answer overwrites', sRevisit.answers.use, 'reload');
+check('re-answer reroutes (powder now visible)', sRevisit.index, 1);
+
+// serialize → hydrate identity
+var saved = W.serialize(sHunt);
+var restored = W.hydrate(DEF, saved);
+check('hydrate restores index', restored.index, sHunt.index);
+check('hydrate restores answers', restored.answers.use, 'hunt');
+
+// version + unknown-answer resets
+check('defVersion mismatch → fresh', W.hydrate(DEF, { v: 1, defVersion: 1, index: 2, answers: {} }).index, 0);
+check('unknown answer id → fresh', W.hydrate(DEF, { v: 1, defVersion: 2, index: 1, answers: { ghost: 1 } }).index, 0);
+check('garbage → fresh', W.hydrate(DEF, null).index, 0);
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
