@@ -255,6 +255,7 @@
             // Foundation: tool activations + action-first Home
             homeManager = new HomeManager(db);
             homeManager.init();
+            homeManager.show(); // Home is the default view — render core actions immediately
             if (typeof ToolRegistry !== 'undefined') {
                 ToolRegistry.init(db).then(function () {
                     // Re-render if the user is already looking at Home
