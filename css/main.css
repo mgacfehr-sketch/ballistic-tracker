@@ -2808,3 +2808,31 @@ html, body {
     line-height: 1.4;
     white-space: normal;
 }
+
+/* Split-out strings in assignment review */
+.chrono-split-heading {
+    margin: 16px 0 8px;
+    color: var(--text-muted);
+}
+
+.chrono-split-card {
+    border-style: dashed;
+}
+
+.chrono-split-row {
+    margin-bottom: 10px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 2;
+}
+
+.chrono-rejoin {
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    min-height: 32px;
+}

@@ -423,6 +423,16 @@ ChronoManager.prototype._importSelected = function () {
     var btn = document.getElementById('chrono-import-btn');
     var status = document.getElementById('chrono-status');
     var rifleId = document.getElementById('chrono-rifle').value || null;
+
+    // A rifle is required — bail BEFORE touching any state so every
+    // tick, base count, and edited field survives the blocked attempt.
+    if (!rifleId) {
+        status.textContent = 'Select a rifle first — nothing was imported. Your selections are unchanged.';
+        var rifleSelect = document.getElementById('chrono-rifle');
+        if (rifleSelect) rifleSelect.focus();
+        return;
+    }
+
     var addRounds = document.getElementById('chrono-add-rounds').checked;
     var base = this._baseRounds();
     var counts = this._computeRoundCounts();
@@ -536,8 +546,11 @@ ChronoManager.prototype._importSelected = function () {
 
 /**
  * Cluster a rifle's saved strings by velocity and let the user confirm
- * which load each cluster belongs to. Ambiguous strings are never part
- * of a bulk confirm — each gets its own "needs your call" card.
+ * which load each cluster belongs to. State-driven: unchecking a string
+ * SPLITS it into its own assignable card (own load + assign button) —
+ * two strings the app grouped together can be confirmed as two
+ * different loads. Ambiguous strings start split out. Nothing combines
+ * or assigns without an explicit Assign tap.
  */
 ChronoManager.prototype.showAssignmentReview = function (rifleId) {
     var self = this;
@@ -551,76 +564,140 @@ ChronoManager.prototype.showAssignmentReview = function (rifleId) {
     document.getElementById('chrono-results').innerHTML =
         '<p class="chrono-intro">Loading strings…</p>';
 
+    // Carry the user's split choices across data refreshes (assigning
+    // or deleting one string must not re-merge the others)
+    var prevSplits = (this._review && this._review.splitIds) || {};
+
     Promise.all([
         this.db.getVelocityStringsByRifle(rifleId),
         this.db.getLoadsByRifle(rifleId)
     ]).then(function (results) {
-        self._renderAssignmentReview(rifleId, results[0] || [], results[1] || []);
+        var strings = results[0] || [];
+        var pending = strings.filter(function (s) { return s.assignmentStatus !== 'confirmed'; });
+        var result = clusterStringsByVelocity(pending);
+
+        var ambiguousIds = {};
+        result.ambiguous.forEach(function (a) { ambiguousIds[a.string.id] = true; });
+
+        // splits = ambiguous (always individual) + surviving user splits
+        var splitIds = {};
+        pending.forEach(function (s) {
+            if (ambiguousIds[s.id] || prevSplits[s.id]) splitIds[s.id] = true;
+        });
+
+        self._review = {
+            rifleId: rifleId,
+            strings: strings,
+            loads: results[1] || [],
+            pending: pending,
+            confirmed: strings.filter(function (s) { return s.assignmentStatus === 'confirmed'; }),
+            clusters: result.clusters,
+            ambiguousIds: ambiguousIds,
+            splitIds: splitIds
+        };
+        self._renderAssignmentReview();
     }).catch(function (err) {
         self._showError('Could not load strings: ' + err.message);
     });
 };
 
-ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, loads) {
+ChronoManager.prototype._renderAssignmentReview = function () {
     var self = this;
-    var pending = strings.filter(function (s) { return s.assignmentStatus !== 'confirmed'; });
-    var confirmed = strings.filter(function (s) { return s.assignmentStatus === 'confirmed'; });
+    var r = this._review;
+    if (!r) return;
+    var rifleId = r.rifleId;
+    var strings = r.strings;
+    var confirmed = r.confirmed;
 
-    var result = clusterStringsByVelocity(pending);
-    var ambiguousIds = {};
-    for (var a = 0; a < result.ambiguous.length; a++) {
-        ambiguousIds[result.ambiguous[a].string.id] = true;
+    // Preserve dropdown picks + expand state across split re-renders
+    var savedSelects = {};
+    var liveSelects = document.querySelectorAll('.chrono-load-select');
+    for (var ls = 0; ls < liveSelects.length; ls++) {
+        savedSelects[liveSelects[ls].id] = liveSelects[ls].value;
     }
+    var cd = document.getElementById('chrono-confirmed-details');
+    if (cd) this._confirmedOpen = cd.hasAttribute('open');
 
     var loadNames = {};
-    for (var ln = 0; ln < loads.length; ln++) loadNames[loads[ln].id] = loads[ln].name;
+    for (var ln = 0; ln < r.loads.length; ln++) loadNames[r.loads[ln].id] = r.loads[ln].name;
 
     var out = '<button id="chrono-back-btn" class="btn btn-secondary">← Back to Import</button>';
     out += '<h3 class="chrono-review-title">Assign Strings to Ammo</h3>';
 
-    if (!pending.length) {
+    if (!r.pending.length) {
         out += '<p class="chrono-intro">No strings waiting for assignment.</p>';
     }
 
     var loadOptions = '<option value="">— Pick a load —</option>';
-    for (var lo = 0; lo < loads.length; lo++) {
-        loadOptions += '<option value="' + this._escapeHtml(loads[lo].id) + '">' +
-            this._escapeHtml(loads[lo].name) + '</option>';
+    for (var lo = 0; lo < r.loads.length; lo++) {
+        loadOptions += '<option value="' + this._escapeHtml(r.loads[lo].id) + '">' +
+            this._escapeHtml(r.loads[lo].name) + '</option>';
     }
     loadOptions += '<option value="__new__">+ New load…</option>';
 
     // Proposal cards — NOTHING is combined or assigned automatically.
-    // Every string carries its own checkbox; the user reviews the
-    // proposed grouping and explicitly confirms membership + load.
-    if (result.clusters.length) {
-        out += '<p class="chrono-intro">These are <strong>proposals</strong> based on velocity — nothing is combined until you confirm. Untick any string that isn\'t the same ammo and assign it separately.</p>';
+    // Unticking a string splits it into its own assignable card below.
+    var anyGroup = false;
+    for (var pc = 0; pc < r.clusters.length; pc++) {
+        if (r.clusters[pc].members.some(function (m) { return !r.splitIds[m.id]; })) anyGroup = true;
     }
-    for (var c = 0; c < result.clusters.length; c++) {
-        var cluster = result.clusters[c];
+    if (anyGroup) {
+        out += '<p class="chrono-intro">These are <strong>proposals</strong> based on velocity — nothing is combined until you confirm. Untick a string to split it out and give it its own load.</p>';
+    }
+
+    for (var c = 0; c < r.clusters.length; c++) {
+        var cluster = r.clusters[c];
+        var members = cluster.members.filter(function (m) { return !r.splitIds[m.id]; });
+        if (!members.length) continue; // fully split out — card disappears
+
+        var groupShots = members.reduce(function (a, m) {
+            return a + (m.shots && m.shots.length ? m.shots.length : 0);
+        }, 0);
+
         out += '<div class="detail-card chrono-cluster">';
         out += '<h4>Proposed group ' + (c + 1) + ' — avg ~' + formatNum(cluster.meanFps, 0) + ' fps · ' +
-            cluster.members.length + ' string' + (cluster.members.length === 1 ? '' : 's') +
-            ' · ' + cluster.shotCount + ' shots</h4>';
+            members.length + ' string' + (members.length === 1 ? '' : 's') +
+            ' · ' + groupShots + ' shots</h4>';
         out += '<ul class="chrono-string-list chrono-proposal-list">';
-        for (var m = 0; m < cluster.members.length; m++) {
-            var s = cluster.members[m];
-            var amb = !!ambiguousIds[s.id];
+        for (var m = 0; m < members.length; m++) {
+            var s = members[m];
             out += '<li><label class="chrono-member-row">';
-            out += '<input type="checkbox" class="chrono-member-cb" data-cluster="' + c + '" data-id="' +
-                this._escapeHtml(s.id) + '"' + (amb ? '' : ' checked') + '> ';
+            out += '<input type="checkbox" class="chrono-member-cb" data-id="' +
+                this._escapeHtml(s.id) + '" checked> ';
             out += this._escapeHtml(this._stringLabel(s));
             out += '</label> ' + this._roundsEditHtml(s) + ' ' + this._deleteBtnHtml(s);
-            if (amb) {
-                out += ' <span class="chrono-badge">needs your call — sits between velocity groups</span>';
-            }
             out += '</li>';
         }
         out += '</ul>';
         out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' +
             loadOptions + '</select>';
         out += '<button class="btn btn-primary chrono-cluster-confirm" data-cluster="' + c +
-            '" data-select="chrono-cluster-load-' + c + '"></button></div>';
+            '" data-select="chrono-cluster-load-' + c + '">Assign group (' + members.length + ')</button></div>';
         out += '</div>';
+    }
+
+    // Split-out strings — each gets its OWN load pick + assign button
+    var splitStrings = r.pending.filter(function (s) { return r.splitIds[s.id]; });
+    if (splitStrings.length) {
+        out += '<h4 class="chrono-split-heading">Assign separately</h4>';
+        for (var sp = 0; sp < splitStrings.length; sp++) {
+            var ss = splitStrings[sp];
+            out += '<div class="detail-card chrono-cluster chrono-split-card">';
+            out += '<div class="chrono-split-row">' + this._escapeHtml(this._stringLabel(ss)) +
+                ' ' + this._roundsEditHtml(ss) + ' ' + this._deleteBtnHtml(ss);
+            if (r.ambiguousIds[ss.id]) {
+                out += ' <span class="chrono-badge">needs your call — sits between velocity groups</span>';
+            } else {
+                out += ' <button type="button" class="chrono-rejoin" data-id="' + this._escapeHtml(ss.id) +
+                    '">↩ Back to group</button>';
+            }
+            out += '</div>';
+            out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-split-load-' +
+                this._escapeHtml(ss.id) + '">' + loadOptions + '</select>';
+            out += '<button class="btn btn-primary chrono-split-confirm" data-id="' + this._escapeHtml(ss.id) +
+                '" data-select="chrono-split-load-' + this._escapeHtml(ss.id) + '">Assign (1)</button></div>';
+            out += '</div>';
+        }
     }
 
     if (confirmed.length) {
@@ -667,36 +744,52 @@ ChronoManager.prototype._renderAssignmentReview = function (rifleId, strings, lo
         });
     }
 
-    // Live "Assign selected (N)" labels + explicit membership on confirm
-    function checkedIdsFor(clusterIndex) {
-        var boxes = document.querySelectorAll('.chrono-member-cb[data-cluster="' + clusterIndex + '"]');
-        var ids = [];
-        for (var i = 0; i < boxes.length; i++) {
-            if (boxes[i].checked) ids.push(boxes[i].getAttribute('data-id'));
-        }
-        return ids;
+    // Restore dropdown picks that survived the re-render
+    for (var selId in savedSelects) {
+        var selEl = document.getElementById(selId);
+        if (selEl && savedSelects[selId]) selEl.value = savedSelects[selId];
     }
-    function refreshButtonLabels() {
-        var btns = document.querySelectorAll('.chrono-cluster-confirm');
-        for (var i = 0; i < btns.length; i++) {
-            var n = checkedIdsFor(btns[i].getAttribute('data-cluster')).length;
-            btns[i].textContent = 'Assign selected (' + n + ')';
-            btns[i].disabled = n === 0;
-        }
-    }
+
+    // Unticking a member SPLITS it into its own assignable card
     var memberBoxes = document.querySelectorAll('.chrono-member-cb');
     for (var mb = 0; mb < memberBoxes.length; mb++) {
-        memberBoxes[mb].addEventListener('change', refreshButtonLabels);
+        memberBoxes[mb].addEventListener('change', function () {
+            if (!this.checked) {
+                r.splitIds[this.getAttribute('data-id')] = true;
+                self._renderAssignmentReview();
+            }
+        });
     }
-    refreshButtonLabels();
 
+    // "Back to group" rejoins the split string with its proposal
+    var rejoinBtns = document.querySelectorAll('.chrono-rejoin');
+    for (var rj = 0; rj < rejoinBtns.length; rj++) {
+        rejoinBtns[rj].addEventListener('click', function () {
+            delete r.splitIds[this.getAttribute('data-id')];
+            self._renderAssignmentReview();
+        });
+    }
+
+    // Group assign — exactly the members currently shown in the card
     var buttons = document.querySelectorAll('.chrono-cluster-confirm');
     for (var b = 0; b < buttons.length; b++) {
         buttons[b].addEventListener('click', function () {
-            var ids = checkedIdsFor(this.getAttribute('data-cluster'));
+            var c2 = parseInt(this.getAttribute('data-cluster'), 10);
+            var ids = r.clusters[c2].members.filter(function (m) {
+                return !r.splitIds[m.id];
+            }).map(function (m) { return m.id; });
             if (!ids.length) return;
             var select = document.getElementById(this.getAttribute('data-select'));
             self._confirmAssignment(rifleId, ids, select.value, this);
+        });
+    }
+
+    // Split assign — one string, its own load
+    var splitBtns = document.querySelectorAll('.chrono-split-confirm');
+    for (var sb = 0; sb < splitBtns.length; sb++) {
+        splitBtns[sb].addEventListener('click', function () {
+            var select = document.getElementById(this.getAttribute('data-select'));
+            self._confirmAssignment(rifleId, [this.getAttribute('data-id')], select.value, this);
         });
     }
 
