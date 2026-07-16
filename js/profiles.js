@@ -536,32 +536,9 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         html += '</div>';
     }
 
-    // Loads section
-    html += '<div class="detail-section">';
-    html += '<div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Loads</h3>';
-    html += '<button class="btn btn-sm btn-secondary" id="btn-add-load">+ Add Load</button>';
-    html += '</div>';
-
-    if (loads.length === 0) {
-        html += '<p class="empty-state-sub">No loads yet</p>';
-    } else {
-        for (var i = 0; i < loads.length; i++) {
-            var ld = loads[i];
-            html += '<div class="profile-card load-card" data-load-id="' + ld.id + '">';
-            html += '<div class="profile-card-main">';
-            html += '<span class="profile-card-name">' + escapeHtml(ld.name) + '</span>';
-            var subParts = [];
-            if (ld.bulletName) subParts.push(escapeHtml(ld.bulletName));
-            if (ld.bulletWeight) subParts.push(formatNum(ld.bulletWeight, 1) + 'gr');
-            if (ld.muzzleVelocity) subParts.push(formatNum(ld.muzzleVelocity, 0) + ' fps');
-            html += '<span class="profile-card-sub">' + (subParts.join(' &middot; ') || '&mdash;') + '</span>';
-            html += '</div>';
-            html += '<span class="profile-card-arrow">&rsaquo;</span>';
-            html += '</div>';
-        }
-    }
-    html += '</div>';
+    // Rifle cards — the seven-question stack. Legacy sections below
+    // migrate into cards one commit at a time (foundation step 6).
+    html += '<div id="rifle-cards"></div>';
 
     // Session History link
     html += '<div class="detail-section">';
@@ -595,6 +572,23 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     this.container.innerHTML = html;
     this._bindRifleDetailEvents(rifle, activeBarrel);
 
+    // Render the card stack (cards carry their own bindings)
+    if (typeof RifleCards !== 'undefined') {
+        RifleCards.render(document.getElementById('rifle-cards'), {
+            db: this.db,
+            rifle: rifle,
+            loads: loads,
+            barrels: barrels,
+            activeBarrel: activeBarrel,
+            managers: {
+                profile: this,
+                history: this.historyManager,
+                report: this.reportManager,
+                certificate: this.certificateManager
+            }
+        });
+    }
+
     // Cold Bore — real feature for all users
     if (typeof ColdBoreManager !== 'undefined') {
         var cbContainer = document.getElementById('beta-cold-bore-section');
@@ -627,17 +621,7 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
         self.showRifleForm(rifle.id);
     });
 
-    document.getElementById('btn-add-load').addEventListener('click', function () {
-        self.showLoadForm(rifle.id, null);
-    });
-
-    var loadCards = this.container.querySelectorAll('.load-card');
-    for (var i = 0; i < loadCards.length; i++) {
-        loadCards[i].addEventListener('click', function () {
-            var loadId = this.getAttribute('data-load-id');
-            self.showLoadDetail(rifle.id, loadId);
-        });
-    }
+    // (Loads bindings moved into the 'loads' card — rifle-cards.js)
 
     // History & log links
     var historyBtn = document.getElementById('btn-session-history');

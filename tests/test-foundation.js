@@ -140,6 +140,27 @@ check('bump immutable', c0.x, undefined);
 check('bump increments', HomeCore.bumpCount(c1, 'x').x, 2);
 check('bump caps at 999', HomeCore.bumpCount({ x: 999 }, 'x').x, 999);
 
+// ── RifleCards.orderCards ─────────────────────────────────────
+// (rifle-cards.js needs DOM globals only at render; orderCards is pure)
+global.document = { createElement: function () { return {}; }, getElementById: function () { return null; } };
+var RC = require('../js/rifle-cards.js').RifleCards;
+
+console.log('\nRifleCards.orderCards:');
+
+function fakeCard(id, slot) { return { id: id, slot: slot, isVisible: function () { return true; }, render: function () {} }; }
+
+var orderedCards = RC.orderCards([
+    fakeCard('prove1', 'prove'), fakeCard('ready1', 'ready'),
+    fakeCard('prog1', 'progress'), fakeCard('ammo1', 'ammo'), fakeCard('prog2', 'progress')
+]);
+check('seven-question slot order', orderedCards.map(function (c) { return c.id; }).join(','), 'ready1,ammo1,prog1,prog2,prove1');
+check('registration order within slot', orderedCards[2].id, 'prog1');
+
+var threw = false;
+try { RC.register({ id: 'bad', slot: 'nonsense', isVisible: function () {}, render: function () {} }); }
+catch (e) { threw = true; }
+check('unknown slot rejected by register', threw, true);
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
