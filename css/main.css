@@ -2372,3 +2372,117 @@ html, body {
         margin-bottom: 6px;
     }
 }
+
+/* ── Chrono Import (Garmin ShotView) ─────────────────────── */
+
+.chrono-screen {
+    padding: 16px;
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.chrono-intro {
+    color: var(--text-muted);
+    margin: 8px 0 16px;
+}
+
+.chrono-file-input {
+    display: none;
+}
+
+.chrono-file-label {
+    display: inline-block;
+    min-height: 44px;
+    line-height: 44px;
+    padding: 0 20px;
+    cursor: pointer;
+}
+
+.chrono-error {
+    margin: 16px 0;
+    padding: 12px 14px;
+    background: rgba(244, 67, 54, 0.12);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    color: var(--danger);
+}
+
+.chrono-session {
+    margin: 0 0 12px;
+    position: relative;
+}
+
+.chrono-session h3 {
+    margin: 0 0 6px;
+    padding-right: 90px;
+}
+
+.chrono-include {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    min-height: 44px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.chrono-include input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary);
+}
+
+.chrono-stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+.chrono-stats-row strong {
+    color: var(--text);
+}
+
+.chrono-shots summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    min-height: 44px;
+    line-height: 44px;
+}
+
+.chrono-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.chrono-table th,
+.chrono-table td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.chrono-table th {
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.chrono-warnings {
+    margin: 16px 0;
+    padding: 12px 14px;
+    background: rgba(255, 152, 0, 0.12);
+    border: 1px solid var(--calibration-color);
+    border-radius: var(--radius);
+    color: var(--calibration-color);
+}
+
+.chrono-warnings ul {
+    margin: 6px 0 0;
+    padding-left: 20px;
+}

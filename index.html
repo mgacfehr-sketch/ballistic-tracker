@@ -42,6 +42,7 @@
                 <button class="nav-tab" data-view="profiles">Profiles</button>
                 <button class="nav-tab" data-view="ai">Ask yorT</button>
                 <button class="nav-tab" data-view="solver">Solver</button>
+                <button id="nav-chrono" class="nav-tab" data-view="chrono" style="display:none">Chrono</button>
                 <button id="btn-logout" class="nav-logout">Log Out</button>
             </nav>
         </header>
@@ -261,6 +262,9 @@
         <!-- Wind Call View (beta feature) -->
         <div id="view-wind" class="app-view"></div>
 
+        <!-- Chrono import view (Garmin ShotView) -->
+        <div id="view-chrono" class="app-view"></div>
+
         <!-- Admin View (admin-only, injected via JS) -->
         <div id="view-admin" class="app-view"></div>
 
@@ -279,6 +283,8 @@
     <script src="https://cdn.jsdelivr.net/gh/damianofalcioni/js-aruco2@0491d5d228746411d0e9dd602b98f48636a644ba/src/cv.js" onerror="window.__arucoLoadFailed=true"></script>
     <script src="https://cdn.jsdelivr.net/gh/damianofalcioni/js-aruco2@0491d5d228746411d0e9dd602b98f48636a644ba/src/aruco.js" onerror="window.__arucoLoadFailed=true"></script>
     <script src="https://cdn.jsdelivr.net/gh/damianofalcioni/js-aruco2@0491d5d228746411d0e9dd602b98f48636a644ba/src/dictionaries/aruco_default.js" onerror="window.__arucoLoadFailed=true"></script>
+    <!-- SheetJS — XLSX parsing for Garmin ShotView import (optional; CSV import works without it) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" onerror="window.__sheetjsLoadFailed=true"></script>
     <script src="js/utils.js"></script>
     <script src="js/net.js"></script>
     <script src="js/db.js"></script>
@@ -297,6 +303,8 @@
     <script src="js/wind-call.js"></script>
     <script src="js/dope-log.js"></script>
     <script src="js/cold-bore.js"></script>
+    <script src="js/garmin-import.js"></script>
+    <script src="js/chrono.js"></script>
     <script src="js/offline-cache.js"></script>
     <script src="js/app.js"></script>
     <script>

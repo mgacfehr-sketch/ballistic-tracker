@@ -1,0 +1,339 @@
+{
+ "source": "TEST SHOTVIEW SHEET.xlsx",
+ "sheets": [
+  {
+   "name": "Rifle sessio_2026-06-26_15-07_1",
+   "rows": [
+    [
+     "Rifle session started at 15:07"
+    ],
+    [
+     "#",
+     "Speed (FPS)",
+     "Δ AVG (FPS)",
+     "KE (FT-LB)",
+     "Power Factor (kgr⋅ft/s)",
+     "Time",
+     "Clean Bore",
+     "Cold Bore",
+     "Shot Notes"
+    ],
+    [
+     "1",
+     "2691.5",
+     "-51.9",
+     null,
+     null,
+     "3:09:32 PM"
+    ],
+    [
+     "2",
+     "2800.3",
+     "56.9",
+     null,
+     null,
+     "3:10:27 PM"
+    ],
+    [
+     "3",
+     "2769.3",
+     "25.9",
+     null,
+     null,
+     "3:11:23 PM"
+    ],
+    [
+     "4",
+     "2723.8",
+     "-19.6",
+     null,
+     null,
+     "3:11:45 PM"
+    ],
+    [
+     "5",
+     "2759.6",
+     "16.2",
+     null,
+     null,
+     "3:12:07 PM"
+    ],
+    [
+     "6",
+     "2738.9",
+     "-4.5",
+     null,
+     null,
+     "3:12:51 PM"
+    ],
+    [
+     "7",
+     "2731.3",
+     "-12.1",
+     null,
+     null,
+     "3:13:14 PM"
+    ],
+    [
+     "8",
+     "2732.4",
+     "-11.0",
+     null,
+     null,
+     "3:13:32 PM"
+    ],
+    [],
+    [
+     "AVERAGE SPEED",
+     "2743.4"
+    ],
+    [
+     "STD DEV",
+     "30.7"
+    ],
+    [
+     "SPREAD",
+     "108.8"
+    ],
+    [
+     "SESSION NOTE"
+    ],
+    [
+     "DATE",
+     "June 26, 2026 at 3:07 PM"
+    ],
+    [
+     "All shots included in the calculations"
+    ]
+   ]
+  },
+  {
+   "name": "Rifle sessio_2026-06-26_14-48_2",
+   "rows": [
+    [
+     "Rifle session started at 14:48"
+    ],
+    [
+     "#",
+     "Speed (FPS)",
+     "Δ AVG (FPS)",
+     "KE (FT-LB)",
+     "Power Factor (kgr⋅ft/s)",
+     "Time",
+     "Clean Bore",
+     "Cold Bore",
+     "Shot Notes"
+    ],
+    [
+     "1",
+     "2994.2",
+     "17.2",
+     null,
+     null,
+     "2:51:29 PM"
+    ],
+    [
+     "2",
+     "2971.3",
+     "-5.7",
+     null,
+     null,
+     "2:57:40 PM"
+    ],
+    [
+     "3",
+     "2960.3",
+     "-16.7",
+     null,
+     null,
+     "2:58:53 PM"
+    ],
+    [
+     "4",
+     "2972.1",
+     "-4.9",
+     null,
+     null,
+     "2:59:58 PM"
+    ],
+    [
+     "5",
+     "2974.1",
+     "-2.9",
+     null,
+     null,
+     "3:01:47 PM"
+    ],
+    [
+     "6",
+     "2969.2",
+     "-7.8",
+     null,
+     null,
+     "3:03:22 PM"
+    ],
+    [
+     "7",
+     "2949.1",
+     "-27.9",
+     null,
+     null,
+     "3:03:43 PM"
+    ],
+    [
+     "8",
+     "2947.4",
+     "-29.6",
+     null,
+     null,
+     "3:04:00 PM"
+    ],
+    [
+     "9",
+     "3019.8",
+     "42.8",
+     null,
+     null,
+     "3:05:33 PM"
+    ],
+    [
+     "10",
+     "2980.0",
+     "3.0",
+     null,
+     null,
+     "3:06:08 PM"
+    ],
+    [
+     "11",
+     "3009.4",
+     "32.4",
+     null,
+     null,
+     "3:06:33 PM"
+    ],
+    [],
+    [
+     "AVERAGE SPEED",
+     "2977.0"
+    ],
+    [
+     "STD DEV",
+     "21.8"
+    ],
+    [
+     "SPREAD",
+     "72.4"
+    ],
+    [
+     "SESSION NOTE"
+    ],
+    [
+     "DATE",
+     "June 26, 2026 at 2:48 PM"
+    ],
+    [
+     "All shots included in the calculations"
+    ]
+   ]
+  },
+  {
+   "name": "Rifle sessio_2026-06-26_14-39_3",
+   "rows": [
+    [
+     "Rifle session started at 14:39"
+    ],
+    [
+     "#",
+     "Speed (FPS)",
+     "Δ AVG (FPS)",
+     "KE (FT-LB)",
+     "Power Factor (kgr⋅ft/s)",
+     "Time",
+     "Clean Bore",
+     "Cold Bore",
+     "Shot Notes"
+    ],
+    [
+     "1",
+     "2934.3",
+     "-25.0",
+     null,
+     null,
+     "2:39:55 PM"
+    ],
+    [
+     "2",
+     "2957.4",
+     "-1.9",
+     null,
+     null,
+     "2:41:19 PM"
+    ],
+    [
+     "3",
+     "2947.2",
+     "-12.1",
+     null,
+     null,
+     "2:41:41 PM"
+    ],
+    [
+     "4",
+     "2956.7",
+     "-2.6",
+     null,
+     null,
+     "2:42:07 PM"
+    ],
+    [
+     "5",
+     "3004.2",
+     "44.9",
+     null,
+     null,
+     "2:46:45 PM"
+    ],
+    [
+     "6",
+     "2957.7",
+     "-1.6",
+     null,
+     null,
+     "2:47:14 PM"
+    ],
+    [
+     "7",
+     "2957.6",
+     "-1.7",
+     null,
+     null,
+     "2:47:57 PM"
+    ],
+    [],
+    [
+     "AVERAGE SPEED",
+     "2959.3"
+    ],
+    [
+     "STD DEV",
+     "20.0"
+    ],
+    [
+     "SPREAD",
+     "69.8"
+    ],
+    [
+     "SESSION NOTE"
+    ],
+    [
+     "DATE",
+     "June 26, 2026 at 2:39 PM"
+    ],
+    [
+     "All shots included in the calculations"
+    ]
+   ]
+  }
+ ]
+}

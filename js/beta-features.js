@@ -53,6 +53,24 @@ function isBetaEnabled(featureName) {
 }
 
 /**
+ * Stage A / entitlement features — the single gate point for tiered
+ * features (CLAUDE.md Build Principle #4). UI modules call hasFeature()
+ * and never inline tier logic. When subscription billing arrives, this
+ * function becomes the entitlement check; for now Stage A ships enabled.
+ */
+var STAGE_A_FEATURES = {
+    chronoImport:   { label: 'Garmin Chrono Import',      desc: 'Import ShotView velocity exports (CSV/XLSX)' },
+    certificate:    { label: 'Certificate of Performance', desc: 'Per-rifle performance report and PDF certificate' },
+    zeroGuardian:   { label: 'Zero Guardian',             desc: 'Plain-English zero confirmed / clicks-needed verdict' },
+    autoConditions: { label: 'Auto Conditions',           desc: 'Automatic GPS + weather station conditions' },
+    onboarding:     { label: 'Smart Onboarding',          desc: 'Ammo-box photo OCR and certificate QR deep links' }
+};
+
+function hasFeature(featureName) {
+    return Object.prototype.hasOwnProperty.call(STAGE_A_FEATURES, featureName);
+}
+
+/**
  * Set whether a beta feature is released to all users.
  */
 function setBetaFlag(featureName, enabled) {

@@ -11,7 +11,7 @@
  *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 55;
+var CACHE_VERSION = 56;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
@@ -36,6 +36,8 @@ var APP_SHELL = [
     './js/wind-call.js',
     './js/dope-log.js',
     './js/cold-bore.js',
+    './js/garmin-import.js',
+    './js/chrono.js',
     './js/offline-cache.js',
     './js/app.js',
     './manifest.json',

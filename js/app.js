@@ -182,6 +182,7 @@
         var solverManager = null;
         var adminManager = null;
         var windCallManager = null;
+        var chronoManager = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
@@ -191,6 +192,8 @@
             aiAssistant.init();
             solverManager = new BallisticSolverManager(db);
             solverManager.init();
+            chronoManager = new ChronoManager(db);
+            chronoManager.init();
 
             if (user && user.id === ADMIN_USER_ID) {
                 adminManager = new AdminManager(db);
@@ -226,6 +229,7 @@
             ai: document.getElementById('view-ai'),
             solver: document.getElementById('view-solver'),
             wind: document.getElementById('view-wind'),
+            chrono: document.getElementById('view-chrono'),
             admin: document.getElementById('view-admin')
         };
         function switchView(viewName) {
@@ -272,6 +276,11 @@
                 windCallManager.cleanup();
             }
 
+            // Show chrono import when switching to chrono tab
+            if (viewName === 'chrono' && chronoManager) {
+                chronoManager.show();
+            }
+
             // Show admin when switching to admin tab
             if (viewName === 'admin' && adminManager) {
                 adminManager.show();
@@ -294,10 +303,11 @@
 
         // ── Touch Prevention ───────────────────────────────
         document.getElementById('app').addEventListener('touchmove', function (e) {
-            // Allow scrolling inside the step panel, profiles, AI, solver, and wind views
+            // Allow scrolling inside the step panel, profiles, AI, solver, wind, and chrono views
             if (e.target.closest('#step-panel') || e.target.closest('#view-profiles') ||
                 e.target.closest('#view-ai') || e.target.closest('#view-solver') ||
-                e.target.closest('#view-wind') || e.target.closest('#view-admin')) return;
+                e.target.closest('#view-wind') || e.target.closest('#view-admin') ||
+                e.target.closest('#view-chrono')) return;
             e.preventDefault();
         }, { passive: false });
 
