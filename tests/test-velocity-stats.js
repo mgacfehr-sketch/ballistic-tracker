@@ -152,6 +152,89 @@ var rOne = V.clusterStringsByVelocity([str(2800, 10, 5, 'solo')]);
 check('single string → 1 cluster', rOne.clusters.length, 1);
 check('strings without avgFps excluded', V.clusterStringsByVelocity([{ sdFps: 5 }, str(2800, 10, 5)]).clusters.length, 1);
 
+// ── Per-rifle aggregation ─────────────────────────────────────
+console.log('\naggregateRifle:');
+
+function makeSession(id, loadId, nShots, moa, dist) {
+    var impacts = [];
+    for (var i = 0; i < nShots; i++) impacts.push({ id: 'i' + i, x: i, y: i });
+    return {
+        id: id, loadId: loadId, distanceYards: dist || 100, date: '2026-07-01',
+        impacts: impacts,
+        results: { groupSizeMOA: moa, groupSizeInches: moa * 1.047 }
+    };
+}
+function makeString(loadId, status, fpsArr) {
+    return {
+        id: 'vs-' + loadId + '-' + status + '-' + fpsArr[0],
+        loadId: loadId, assignmentStatus: status,
+        avgFps: null, sdFps: null,
+        shots: fpsArr.map(function (v, i) { return { shot: i + 1, fps: v }; })
+    };
+}
+
+var loadA = { id: 'A', name: 'Load A' };
+var loadB = { id: 'B', name: 'Load B' };
+var loadC = { id: 'C', name: 'Load C (velocity only)' };
+
+var agg = V.aggregateRifle({
+    loads: [loadA, loadB, loadC],
+    sessions: [
+        makeSession('s1', 'A', 5, 0.8),
+        makeSession('s2', 'B', 5, 0.6),
+        makeSession('s3', 'B', 3, 0.4),   // tiny 3-shot group must NOT outrank 5-shot
+        makeSession('s4', 'A', 2, 0.1)    // 2 shots — not an eligible group at all
+    ],
+    strings: [
+        makeString('A', 'confirmed', [2800, 2810, 2790]),
+        makeString('B', 'confirmed', [2900, 2910, 2890, 2905, 2895]),
+        makeString('C', 'confirmed', [3000, 3001, 2999]),
+        makeString('A', 'suggested', [2805, 2815]),
+        { id: 'vs-x', loadId: null, assignmentStatus: 'unassigned', avgFps: 2700, shots: [{ shot: 1, fps: 2700 }] },
+        { id: 'vs-y', loadId: null, assignmentStatus: 'ambiguous', avgFps: 2805, shots: [{ shot: 1, fps: 2805 }] }
+    ]
+});
+
+check('recommended load = B (best 5-shot group wins)', agg.recommendedLoadId, 'B');
+check('best group session = s2 (5-shot 0.6 beats 3-shot 0.4)', agg.bestGroup.sessionId, 's2');
+check('best group shots', agg.bestGroup.shots, 5);
+check('best group MOA', agg.bestGroup.moa, 0.6);
+var rowA = agg.loads.filter(function (r) { return r.loadId === 'A'; })[0];
+var rowB = agg.loads.filter(function (r) { return r.loadId === 'B'; })[0];
+var rowC = agg.loads.filter(function (r) { return r.loadId === 'C'; })[0];
+check('load A: only confirmed strings counted', rowA.stringCount, 1);
+check('load A: shots from confirmed strings only', rowA.shotCount, 3);
+check('load A: stats avg', rowA.stats.avg, 2800);
+check('load A: 2-shot session still listed in sessionCount', rowA.sessionCount, 2);
+check('load A: bestGroup ignores 2-shot session', rowA.bestGroupMOA, 0.8);
+check('load B: bestGroup prefers 5-shot (0.6) over 3-shot (0.4)', rowB.bestGroupMOA, 0.6);
+check('load C (no groups) has stats but no bestGroup', rowC.bestGroupMOA, null);
+check('pending: unassigned', agg.pendingStrings.unassigned, 1);
+check('pending: suggested', agg.pendingStrings.suggested, 1);
+check('pending: ambiguous', agg.pendingStrings.ambiguous, 1);
+check('pending: confirmed', agg.pendingStrings.confirmed, 3);
+
+// Tie-break: equal groups → lower SD wins
+var aggTie = V.aggregateRifle({
+    loads: [loadA, loadB],
+    sessions: [makeSession('t1', 'A', 5, 0.7), makeSession('t2', 'B', 5, 0.7)],
+    strings: [
+        makeString('A', 'confirmed', [2800, 2830, 2770]),          // SD ~24.5
+        makeString('B', 'confirmed', [2900, 2905, 2895])           // SD ~4.1
+    ]
+});
+check('tie on group MOA → lower velocity SD recommended', aggTie.recommendedLoadId, 'B');
+
+// No group data at all → no recommendation (never guess for the certificate)
+var aggNone = V.aggregateRifle({
+    loads: [loadC],
+    sessions: [makeSession('n1', 'C', 2, 0.2)],
+    strings: [makeString('C', 'confirmed', [3000, 3001])]
+});
+check('no eligible groups → recommendedLoadId null', aggNone.recommendedLoadId, null);
+check('no eligible groups → bestGroup null', aggNone.bestGroup, null);
+check('empty input safe', V.aggregateRifle({}).loads.length, 0);
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

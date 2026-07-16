@@ -466,6 +466,12 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     html += '<div class="profile-card-main"><span class="profile-card-name">Scope Adjustments</span></div>';
     html += '<span class="profile-card-arrow">&rsaquo;</span>';
     html += '</div>';
+    if (typeof hasFeature === 'function' && hasFeature('certificate')) {
+        html += '<div class="profile-card" id="btn-performance-report">';
+        html += '<div class="profile-card-main"><span class="profile-card-name">Performance Report</span></div>';
+        html += '<span class="profile-card-arrow">&rsaquo;</span>';
+        html += '</div>';
+    }
     html += '</div>';
     html += '</div>';
 
@@ -541,6 +547,13 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
     if (scopeBtn && this.historyManager) {
         scopeBtn.addEventListener('click', function () {
             self.historyManager.showScopeAdjustments(rifle.id);
+        });
+    }
+
+    var reportBtn = document.getElementById('btn-performance-report');
+    if (reportBtn && this.reportManager) {
+        reportBtn.addEventListener('click', function () {
+            self.reportManager.show(rifle.id);
         });
     }
 

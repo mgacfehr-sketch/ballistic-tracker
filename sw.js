@@ -39,6 +39,7 @@ var APP_SHELL = [
     './js/garmin-import.js',
     './js/velocity-stats.js',
     './js/chrono.js',
+    './js/rifle-report.js',
     './js/offline-cache.js',
     './js/app.js',
     './manifest.json',

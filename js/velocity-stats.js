@@ -220,6 +220,127 @@ function clusterStringsByVelocity(strings) {
     return { clusters: clusters, ambiguous: ambiguous };
 }
 
+// ── Per-rifle aggregation ─────────────────────────────────────
+
+var MIN_GROUP_SHOTS = 3;      // sessions below this never count as a "group"
+var PREFERRED_GROUP_SHOTS = 5; // 5+ shot groups outrank smaller ones
+var GROUP_TIE_EPSILON_MOA = 0.01;
+
+function _sessionShotCount(session) {
+    return session && session.impacts && session.impacts.length ? session.impacts.length : 0;
+}
+
+function _isEligibleGroup(session) {
+    return session && session.results &&
+        typeof session.results.groupSizeMOA === 'number' &&
+        isFinite(session.results.groupSizeMOA) &&
+        _sessionShotCount(session) >= MIN_GROUP_SHOTS;
+}
+
+/**
+ * Best group among sessions: smallest groupSizeMOA, but 5+ shot groups
+ * always outrank 3-4 shot groups (a tiny 3-shot group proves less).
+ * Returns the session or null.
+ */
+function _bestGroupSession(sessions) {
+    var eligible = (sessions || []).filter(_isEligibleGroup);
+    if (!eligible.length) return null;
+    var preferred = eligible.filter(function (s) {
+        return _sessionShotCount(s) >= PREFERRED_GROUP_SHOTS;
+    });
+    var pool = preferred.length ? preferred : eligible;
+    return pool.reduce(function (best, s) {
+        return s.results.groupSizeMOA < best.results.groupSizeMOA ? s : best;
+    });
+}
+
+/**
+ * Aggregate everything known about one rifle for the report/certificate.
+ *
+ * PURE: takes plain records, returns plain data. Recommended-load rule
+ * (documented, deterministic): only loads with at least one eligible
+ * group (≥3 marked shots) can be recommended; rank by best group MOA,
+ * ties within 0.01 MOA broken by lower velocity SD (population).
+ *
+ * @param {Object} input - { sessions, strings, loads }
+ * @returns {Object} {
+ *   loads: [{ loadId, load, stringCount, shotCount, stats,
+ *             sessionCount, bestGroupMOA, bestGroupSessionId }],
+ *   bestGroup: { sessionId, loadId, moa, inches, shots, distanceYards, date } | null,
+ *   recommendedLoadId: string | null,
+ *   pendingStrings: { unassigned, suggested, ambiguous, confirmed }
+ * }
+ */
+function aggregateRifle(input) {
+    var sessions = (input && input.sessions) || [];
+    var strings = (input && input.strings) || [];
+    var loads = (input && input.loads) || [];
+
+    var pendingStrings = { unassigned: 0, suggested: 0, ambiguous: 0, confirmed: 0 };
+    for (var s = 0; s < strings.length; s++) {
+        var st = strings[s].assignmentStatus;
+        if (pendingStrings.hasOwnProperty(st)) pendingStrings[st]++;
+        else pendingStrings.unassigned++;
+    }
+
+    var loadRows = loads.map(function (load) {
+        var loadStrings = strings.filter(function (v) {
+            return v.loadId === load.id && v.assignmentStatus === 'confirmed';
+        });
+        var allShots = [];
+        for (var i = 0; i < loadStrings.length; i++) {
+            allShots = allShots.concat(loadStrings[i].shots || []);
+        }
+        var loadSessions = sessions.filter(function (sess) { return sess.loadId === load.id; });
+        var best = _bestGroupSession(loadSessions);
+
+        return {
+            loadId: load.id,
+            load: load,
+            stringCount: loadStrings.length,
+            shotCount: allShots.length,
+            stats: velocityStats(allShots), // population SD over the raw shots
+            sessionCount: loadSessions.length,
+            bestGroupMOA: best ? best.results.groupSizeMOA : null,
+            bestGroupSessionId: best ? best.id : null
+        };
+    });
+
+    // Overall best group across the whole rifle
+    var overallBest = _bestGroupSession(sessions);
+    var bestGroup = null;
+    if (overallBest) {
+        bestGroup = {
+            sessionId: overallBest.id,
+            loadId: overallBest.loadId || null,
+            moa: overallBest.results.groupSizeMOA,
+            inches: typeof overallBest.results.groupSizeInches === 'number'
+                ? overallBest.results.groupSizeInches : null,
+            shots: _sessionShotCount(overallBest),
+            distanceYards: overallBest.distanceYards || null,
+            date: overallBest.date || null
+        };
+    }
+
+    // Recommended load: best group first, velocity SD as tie-break
+    var candidates = loadRows.filter(function (r) { return r.bestGroupMOA !== null; });
+    candidates.sort(function (a, b) {
+        if (Math.abs(a.bestGroupMOA - b.bestGroupMOA) > GROUP_TIE_EPSILON_MOA) {
+            return a.bestGroupMOA - b.bestGroupMOA;
+        }
+        var sdA = a.stats.sd === null ? Infinity : a.stats.sd;
+        var sdB = b.stats.sd === null ? Infinity : b.stats.sd;
+        return sdA - sdB;
+    });
+
+    return {
+        loads: loadRows,
+        bestGroup: bestGroup,
+        recommendedLoadId: candidates.length ? candidates[0].loadId : null,
+        pendingStrings: pendingStrings
+    };
+}
+
 // Export for use in other modules and testing
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -227,6 +348,7 @@ if (typeof module !== 'undefined' && module.exports) {
         parseTimeOfDay,
         splitByTimeGap,
         clusterStringsByVelocity,
+        aggregateRifle,
         DEFAULT_STRING_SD
     };
 }

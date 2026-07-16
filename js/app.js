@@ -194,6 +194,16 @@
             solverManager.init();
             chronoManager = new ChronoManager(db);
             chronoManager.init();
+            profileManager.reportManager = new RifleReportManager(db, profileManager);
+
+            // Bridge so other views (rifle report) can open chrono's
+            // assignment review directly (switchView is hoisted below)
+            window.ChronoNav = {
+                openReview: function (rifleId) {
+                    switchView('chrono');
+                    chronoManager.showAssignmentReview(rifleId);
+                }
+            };
 
             if (user && user.id === ADMIN_USER_ID) {
                 adminManager = new AdminManager(db);
