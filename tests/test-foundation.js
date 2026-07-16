@@ -117,6 +117,29 @@ check('defVersion mismatch → fresh', W.hydrate(DEF, { v: 1, defVersion: 1, ind
 check('unknown answer id → fresh', W.hydrate(DEF, { v: 1, defVersion: 2, index: 1, answers: { ghost: 1 } }).index, 0);
 check('garbage → fresh', W.hydrate(DEF, null).index, 0);
 
+// ── HomeCore ──────────────────────────────────────────────────
+var H = require('../js/home.js');
+var HomeCore = H.HomeCore;
+
+console.log('\nHomeCore:');
+
+function fakeAction(id) { return { homeAction: { id: id } }; }
+var ACTIONS = [fakeAction('a'), fakeAction('b'), fakeAction('c')];
+
+var ordered = HomeCore.orderActions(ACTIONS, { b: 5, c: 2 });
+check('descending by count', ordered.map(function (x) { return x.homeAction.id; }).join(','), 'b,c,a');
+check('missing counts treated as 0 (a last)', ordered[2].homeAction.id, 'a');
+check('ties keep registry order', HomeCore.orderActions(ACTIONS, {}).map(function (x) { return x.homeAction.id; }).join(','), 'a,b,c');
+check('partial tie stable', HomeCore.orderActions(ACTIONS, { c: 1 }).map(function (x) { return x.homeAction.id; }).join(','), 'c,a,b');
+check('input array not mutated', ACTIONS[0].homeAction.id, 'a');
+
+var c0 = {};
+var c1 = HomeCore.bumpCount(c0, 'x');
+check('bump creates entry', c1.x, 1);
+check('bump immutable', c0.x, undefined);
+check('bump increments', HomeCore.bumpCount(c1, 'x').x, 2);
+check('bump caps at 999', HomeCore.bumpCount({ x: 999 }, 'x').x, 999);
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

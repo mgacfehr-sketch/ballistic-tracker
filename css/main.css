@@ -3199,3 +3199,32 @@ html, body {
     cursor: pointer;
     min-height: 44px;
 }
+
+.home-recent-label {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    margin: 16px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.home-recent-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 56px;
+    padding: 0 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.home-recent-card .profile-card-arrow {
+    margin-left: auto;
+}

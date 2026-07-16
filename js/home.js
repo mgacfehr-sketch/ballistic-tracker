@@ -39,6 +39,47 @@ var HomeCore = {
     }
 };
 
+// ── Recents (device-local, snapshot names per CLAUDE.md rule 7) ──
+
+var Recents = {
+    KEY: 'yort_recent',
+
+    _read: function () {
+        try {
+            var raw = localStorage.getItem(Recents.KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+    },
+
+    _write: function (data) {
+        try { localStorage.setItem(Recents.KEY, JSON.stringify(data)); } catch (e) { /* best effort */ }
+    },
+
+    touchRifle: function (rifle) {
+        if (!rifle || !rifle.id) return;
+        var cur = Recents._read() || {};
+        cur.rifleId = rifle.id;
+        cur.rifleName = rifle.name || 'Rifle';
+        cur.ts = new Date().toISOString();
+        Recents._write(cur);
+    },
+
+    touchSession: function (sessionId, rifle) {
+        var cur = Recents._read() || {};
+        cur.sessionId = sessionId;
+        if (rifle && rifle.id) {
+            cur.rifleId = rifle.id;
+            cur.rifleName = rifle.name || 'Rifle';
+        }
+        cur.ts = new Date().toISOString();
+        Recents._write(cur);
+    },
+
+    get: function () {
+        return Recents._read();
+    }
+};
+
 // ── Manager ───────────────────────────────────────────────────
 
 function HomeManager(db) {
@@ -81,7 +122,15 @@ HomeManager.prototype.show = function () {
     this.container.innerHTML = html;
 
     this._renderActions();
+    this._renderRecent();
     this._renderAlerts();
+};
+
+HomeManager.prototype._counts = function () {
+    try {
+        var raw = localStorage.getItem('yort_home_counts');
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
 };
 
 HomeManager.prototype._renderActions = function () {
@@ -89,7 +138,8 @@ HomeManager.prototype._renderActions = function () {
     var el = document.getElementById('home-actions');
     if (!el || typeof ToolRegistry === 'undefined') return;
 
-    var actions = ToolRegistry.getHomeActions();
+    // Adaptive: the actions this user actually uses float to the top
+    var actions = HomeCore.orderActions(ToolRegistry.getHomeActions(), this._counts());
     var html = '';
     for (var i = 0; i < actions.length; i++) {
         var a = actions[i].homeAction;
@@ -104,10 +154,39 @@ HomeManager.prototype._renderActions = function () {
     var buttons = el.querySelectorAll('.home-action');
     for (var b = 0; b < buttons.length; b++) {
         buttons[b].addEventListener('click', function () {
+            var id = this.getAttribute('data-action-id');
             var view = this.getAttribute('data-view');
+            try {
+                localStorage.setItem('yort_home_counts',
+                    JSON.stringify(HomeCore.bumpCount(self._counts(), id)));
+            } catch (e) { /* adaptivity is best-effort */ }
             if (window.AppNav) window.AppNav.go(view);
         });
     }
+};
+
+HomeManager.prototype._renderRecent = function () {
+    var el = document.getElementById('home-recent');
+    if (!el) return;
+    var recent = Recents.get();
+    if (!recent || !recent.rifleId) return; // nothing yet — render nothing
+
+    el.innerHTML = '<div class="home-recent-label">Recent</div>' +
+        '<button class="home-recent-card" id="home-recent-rifle">' +
+        '<span class="home-action-icon">🔭</span>' +
+        '<span class="home-action-label">' + this._escapeHtml(recent.rifleName) + '</span>' +
+        '<span class="profile-card-arrow">&rsaquo;</span>' +
+        '</button>';
+
+    document.getElementById('home-recent-rifle').addEventListener('click', function () {
+        if (window.AppNav) window.AppNav.openRifle(recent.rifleId);
+    });
+};
+
+HomeManager.prototype._escapeHtml = function (text) {
+    var div = document.createElement('div');
+    div.textContent = text === null || text === undefined ? '' : String(text);
+    return div.innerHTML;
 };
 
 HomeManager.prototype._renderAlerts = function () {

@@ -468,6 +468,8 @@ ProfileManager.prototype.showRifleDetail = function (rifleId) {
 };
 
 ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
+    // Feed the Home "Recent" strip (guarded — home.js may not be loaded)
+    if (typeof Recents !== 'undefined') Recents.touchRifle(rifle);
     var activeBarrel = null;
     for (var b = 0; b < barrels.length; b++) {
         if (barrels[b].isActive) { activeBarrel = barrels[b]; break; }

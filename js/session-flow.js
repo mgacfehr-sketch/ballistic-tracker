@@ -1131,6 +1131,7 @@ SessionFlow.prototype._saveSession = function () {
     this.db.addSession(sessionData).then(function (saved) {
         self.savedSessionId = saved.id;
         btn.textContent = 'Saved to History';
+        if (typeof Recents !== 'undefined') Recents.touchSession(saved.id, self.selectedRifle);
         self._storeAnnotatedImage(saved.id);
     }).catch(function (err) {
         // Never lose the session silently: it stays on screen, and the
