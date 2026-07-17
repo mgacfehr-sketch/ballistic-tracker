@@ -204,16 +204,23 @@ img { max-width: 100%; }
 .backline {
     display: inline-flex;
     align-items: center;
-    min-height: 32px;
+    min-height: var(--tap-min);
     font: var(--type-label);
     color: var(--text-secondary);
-    margin-bottom: 6px;
 }
 .pagetitle { font: var(--type-title); }
 .pagesub { font: var(--type-label); color: var(--text-secondary); margin-top: var(--space-xs); }
 .pagehead-row { display: flex; align-items: baseline; gap: 10px; }
 .pagehead-row .pagetitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.pagehead-act { font: var(--type-label); color: var(--brand-gold-strong); min-height: 32px; }
+.pagehead-act {
+    font: var(--type-label);
+    color: var(--brand-gold-strong);
+    min-height: var(--tap-min);
+    min-width: var(--tap-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+}
 
 /* legacy view toolbar (sub-screens rendered by managers) */
 .view-toolbar {
@@ -977,6 +984,13 @@ button.rowlink:active { background: var(--brand-subtle); }
     color: var(--text-secondary);
     font: var(--type-label);
     flex: none;
+    position: relative;
+}
+/* visual stays a quiet 28px circle; the tap target meets the minimum */
+.hint-btn::before {
+    content: "";
+    position: absolute;
+    inset: calc((28px - var(--tap-min)) / 2);
 }
 .hint-btn:active { color: var(--text-primary); border-color: var(--text-secondary); }
 
@@ -1180,8 +1194,8 @@ button.rowlink:active { background: var(--brand-subtle); }
     padding: var(--space-md) var(--edge) 0;
 }
 .wiz-close {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1336,8 +1350,8 @@ button.rowlink:active { background: var(--brand-subtle); }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: var(--tap-min);
+    height: var(--tap-min);
     margin-left: calc(-1 * var(--space-sm));
     border-radius: var(--radius-md);
     color: var(--text-secondary);
@@ -1492,8 +1506,8 @@ button.rowlink:active { background: var(--brand-subtle); }
     position: sticky;
     top: 0;
     float: right;
-    width: 44px;
-    height: 44px;
+    width: var(--tap-min);
+    height: var(--tap-min);
     margin: calc(-1 * var(--space-sm)) calc(-1 * var(--space-xs)) 0 0;
     display: inline-flex;
     align-items: center;
