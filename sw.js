@@ -11,13 +11,14 @@
  *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 89;
+var CACHE_VERSION = 90;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
     './',
     './index.html',
     './privacy-policy.html',
+    './css/tokens.css',
     './css/ui.css',
     './js/utils.js',
     './js/icons.js',

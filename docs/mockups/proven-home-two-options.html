@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROVEN — Home: two concepts</title>
+<style>
+:root, [data-theme="light"]{
+  --surface-background:#F7F6F3;--surface-card:#FFFFFF;
+  --text-primary:#16181B;--text-secondary:#4A4E54;--text-onbrand:#FFFFFF;
+  --border-default:#D8D5CF;--border-strong:#B9B5AC;
+  --brand-primary:#16181B;--brand-gold:#B08D2F;--brand-gold-strong:#8F711F;--brand-subtle:#F3EEDF;
+  --status-ready:#2E7D32;--status-ready-subtle:#E3F0E4;
+  --status-caution:#B26A00;--status-caution-subtle:#F6EBD9;--status-caution-on:#FFFFFF;
+  --status-problem:#C62828;--status-problem-subtle:#F8E2E2;
+  --dial-track:#E7E4DD;
+}
+[data-theme="dark"]{
+  --surface-background:#0D0F12;--surface-card:#171A1F;
+  --text-primary:#EDEEF0;--text-secondary:#AAB1B9;--text-onbrand:#171105;
+  --border-default:#272D35;--border-strong:#3B434D;
+  --brand-primary:#C9A24B;--brand-gold:#C9A24B;--brand-gold-strong:#D9B564;--brand-subtle:#2A2415;
+  --status-ready:#57B87A;--status-ready-subtle:#1C2B21;
+  --status-caution:#E0A63C;--status-caution-subtle:#2F2715;--status-caution-on:#201705;
+  --status-problem:#E36A5C;--status-problem-subtle:#331D1A;
+  --dial-track:#262C34;
+}
+:root{
+  --font-ui:-apple-system,'Segoe UI',Roboto,system-ui,sans-serif;
+  --font-mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --type-title:700 26px/1.2 var(--font-ui);
+  --type-heading:600 20px/1.3 var(--font-ui);
+  --type-body:400 18px/1.45 var(--font-ui);
+  --type-body-strong:600 18px/1.45 var(--font-ui);
+  --type-label:600 15px/1.4 var(--font-ui);
+  --edge:20px;--radius-md:12px;--radius-lg:16px;
+  --tap-min:52px;--tap-primary:58px;--row-min:64px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{background:#CFCDC6;font:var(--type-body);color:var(--text-primary);padding:40px 24px}
+.stage{display:flex;gap:36px;justify-content:center;align-items:flex-start;overflow-x:auto}
+.frame{width:392px;flex:0 0 392px;background:var(--surface-background);border:1px solid var(--border-strong);border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(20,20,18,.25);display:flex;flex-direction:column}
+.screen{height:740px;overflow-y:auto;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.frame-label{text-align:center;font:var(--type-label);color:#6B6961;margin:12px 0 10px;letter-spacing:.12em;text-transform:uppercase}
+.toolbar{max-width:900px;margin:0 auto 28px;display:flex;justify-content:center}
+.theme-btn{font:var(--type-body-strong);padding:14px 28px;border-radius:12px;border:1px solid var(--border-strong);background:#fff;cursor:pointer}
+
+.brandbar{display:flex;align-items:center;gap:10px;padding:22px var(--edge) 6px}
+.mark{width:28px;height:28px;color:var(--brand-gold)}
+.mark svg{width:100%;height:100%;stroke:currentColor;fill:none}
+.name{font:700 21px/1 var(--font-ui);letter-spacing:.06em}
+.name i{font-style:normal;color:var(--brand-gold)}
+
+.section-head{font:var(--type-heading);padding:22px var(--edge) 8px;display:flex;align-items:center;gap:10px}
+.section-head::after{content:'';flex:1;height:2px;background:var(--brand-gold);opacity:.35}
+.card{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-md);margin:0 var(--edge)}
+.rowlink{display:flex;align-items:center;min-height:var(--row-min);padding:0 16px;border-bottom:1px solid var(--border-default);gap:12px}
+.rowlink:last-child{border-bottom:none}
+.rowlink .txt{flex:1}
+.rowlink .txt b{font:var(--type-body-strong);display:block}
+.rowlink .txt span{font:var(--type-label);color:var(--text-secondary)}
+.chev{color:var(--text-secondary);font:var(--type-body-strong)}
+.chip{font:var(--type-label);padding:6px 12px;border-radius:999px}
+.chip-ready{background:var(--status-ready-subtle);color:var(--status-ready)}
+.chip-caution{background:var(--status-caution-subtle);color:var(--status-caution)}
+.chip-problem{background:var(--status-problem-subtle);color:var(--status-problem)}
+.banner{display:flex;gap:12px;border-radius:var(--radius-md);padding:16px;font:var(--type-body-strong);background:var(--status-caution);color:var(--status-caution-on);margin:0 var(--edge)}
+
+.cat{display:flex;align-items:center;gap:14px;background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);margin:0 var(--edge) 10px;padding:16px;min-height:76px}
+.cat .ic{width:40px;height:40px;flex:0 0 40px;border-radius:10px;background:var(--brand-subtle);display:flex;align-items:center;justify-content:center;color:var(--brand-gold-strong)}
+.cat .ic svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cat .txt{flex:1}
+.cat .txt b{font:var(--type-body-strong);display:block}
+.cat .txt span{font:var(--type-label);color:var(--text-secondary)}
+
+.fleetline{display:flex;gap:8px;padding:8px var(--edge) 4px;flex-wrap:wrap}
+
+.tabbar{display:flex;border-top:1px solid var(--border-default);background:var(--surface-card)}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 14px;color:var(--text-secondary);font:600 11px/1 var(--font-ui);letter-spacing:.1em;text-transform:uppercase}
+.tab.active{color:var(--brand-gold-strong)}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+
+<div class="toolbar"><button class="theme-btn" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='light'?'dark':'light'">Toggle light / dark</button></div>
+
+<div class="stage">
+
+<!-- ============ OPTION 1: ACTION-FIRST ============ -->
+<div>
+<div class="frame-label">Option 1 · Action-first (pick the job, then the rifle)</div>
+<div class="frame">
+<div class="screen">
+  <div class="brandbar">
+    <div class="mark"><svg viewBox="0 0 48 48" stroke-width="2.4"><circle cx="24" cy="24" r="20"/><line x1="24" y1="4" x2="24" y2="10"/><line x1="24" y1="38" x2="24" y2="44"/><line x1="4" y1="24" x2="10" y2="24"/><line x1="38" y1="24" x2="44" y2="24"/><path d="M14 24l6-9 4 6 2-3 6 8" stroke-width="2.2"/><text x="24" y="34" text-anchor="middle" font-family="Arial Black,Arial" font-size="13" font-weight="900" fill="currentColor" stroke="none">W</text></svg></div>
+    <div class="name">PROVEN<i>.</i></div>
+  </div>
+
+  <div class="section-head">Alerts</div>
+  <div class="banner">New Federal lot on TB 6.5 PRC runs 45 fps fast — confirm zero.</div>
+
+  <div class="section-head">What do you want to do?</div>
+
+  <div class="cat">
+    <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="22"/><line x1="2" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="22" y2="12"/></svg></div>
+    <div class="txt"><b>Check &amp; zero</b><span>Photograph a target, confirm you're ready</span></div>
+    <span class="chev">›</span>
+  </div>
+  <div class="cat">
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 1 9 9"/><path d="M12 7a5 5 0 0 1 5 5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M3 12a9 9 0 0 0 9 9"/></svg></div>
+    <div class="txt"><b>Shoot</b><span>Firing solution, DOPE cards, log field shots</span></div>
+    <span class="chev">›</span>
+  </div>
+  <div class="cat">
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg></div>
+    <div class="txt"><b>Ammo &amp; loads</b><span>Chrono data, ladder tests, recipes, lots</span></div>
+    <span class="chev">›</span>
+  </div>
+  <div class="cat">
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 21L21 3"/><path d="M7 17l-1 1M11 13l-1 1M15 9l-1 1M19 5l-1 1"/></svg></div>
+    <div class="txt"><b>Verify equipment</b><span>Scope tracking, suppressor shift, lot drift</span></div>
+    <span class="chev">›</span>
+  </div>
+  <div class="cat">
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><circle cx="12" cy="13" r="3"/></svg></div>
+    <div class="txt"><b>Records &amp; proof</b><span>History, reports, certificates</span></div>
+    <span class="chev">›</span>
+  </div>
+
+  <div class="section-head">Recent</div>
+  <div class="card">
+    <div class="rowlink"><div class="txt"><b>Test · .308</b><span>Checked 7/16 · needs 6 clicks down</span></div><span class="chip chip-caution">Adjust</span></div>
+  </div>
+</div>
+<div class="tabbar">
+  <div class="tab active"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg>Home</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="4" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="20" y2="12"/></svg>Rifles</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M21 5l-9 9-2-4"/></svg>Ask yorT</div>
+</div>
+</div>
+</div>
+
+<!-- ============ OPTION 2: RIFLE-FIRST ============ -->
+<div>
+<div class="frame-label">Option 2 · Rifle-first (your rifles are the home page)</div>
+<div class="frame">
+<div class="screen">
+  <div class="brandbar">
+    <div class="mark"><svg viewBox="0 0 48 48" stroke-width="2.4"><circle cx="24" cy="24" r="20"/><line x1="24" y1="4" x2="24" y2="10"/><line x1="24" y1="38" x2="24" y2="44"/><line x1="4" y1="24" x2="10" y2="24"/><line x1="38" y1="24" x2="44" y2="24"/><path d="M14 24l6-9 4 6 2-3 6 8" stroke-width="2.2"/><text x="24" y="34" text-anchor="middle" font-family="Arial Black,Arial" font-size="13" font-weight="900" fill="currentColor" stroke="none">W</text></svg></div>
+    <div class="name">PROVEN<i>.</i></div>
+  </div>
+
+  <div class="fleetline">
+    <span class="chip chip-ready">4 ready</span>
+    <span class="chip chip-caution">2 need adjustment</span>
+    <span class="chip chip-problem">1 not checked</span>
+  </div>
+
+  <div class="section-head">Alerts</div>
+  <div class="banner">New Federal lot on TB 6.5 PRC runs 45 fps fast — confirm zero.</div>
+
+  <div class="section-head">Your rifles</div>
+  <div class="card">
+    <div class="rowlink"><div class="txt"><b>TB 6.5 PRC</b><span>.264 · zero confirmed 6/25</span></div><span class="chip chip-ready">Ready</span></div>
+    <div class="rowlink"><div class="txt"><b>Test</b><span>.308 · 6 clicks down needed</span></div><span class="chip chip-caution">Adjust</span></div>
+    <div class="rowlink"><div class="txt"><b>TS 300 Norma</b><span>300 Norma · checked 34 days ago</span></div><span class="chip chip-caution">Stale</span></div>
+    <div class="rowlink"><div class="txt"><b>7 SAUM</b><span>7mm SAUM · zero confirmed 7/02</span></div><span class="chip chip-ready">Ready</span></div>
+    <div class="rowlink"><div class="txt"><b>Trainer 22</b><span>.22 LR · zero confirmed 7/10</span></div><span class="chip chip-ready">Ready</span></div>
+    <div class="rowlink"><div class="txt"><b>New build</b><span>6.5 CM · never checked</span></div><span class="chip chip-problem">Not checked</span></div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin:16px var(--edge) 0">
+    <div style="flex:1;min-height:52px;display:flex;align-items:center;justify-content:center;background:var(--brand-primary);color:var(--text-onbrand);border-radius:12px;font:var(--type-body-strong)">Add rifle</div>
+    <div style="flex:1;min-height:52px;display:flex;align-items:center;justify-content:center;background:var(--surface-card);border:1px solid var(--border-default);border-radius:12px;font:var(--type-body-strong)">Scan certificate</div>
+  </div>
+</div>
+<div class="tabbar">
+  <div class="tab active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="4" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="20" y2="12"/></svg>Rifles</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 1 9 9"/><path d="M12 7a5 5 0 0 1 5 5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M3 12a9 9 0 0 0 9 9"/></svg>Tools</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M21 5l-9 9-2-4"/></svg>Ask yorT</div>
+</div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

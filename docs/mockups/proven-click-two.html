@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROVEN — One click deeper</title>
+<style>
+:root, [data-theme="light"]{
+  --surface-background:#F7F6F3;--surface-card:#FFFFFF;
+  --text-primary:#16181B;--text-secondary:#4A4E54;--text-onbrand:#FFFFFF;
+  --border-default:#D8D5CF;--border-strong:#B9B5AC;
+  --brand-primary:#16181B;--brand-gold:#B08D2F;--brand-gold-strong:#8F711F;--brand-subtle:#F3EEDF;
+  --status-ready:#2E7D32;--status-ready-subtle:#E3F0E4;
+  --status-caution:#B26A00;--status-caution-subtle:#F6EBD9;--status-caution-on:#FFFFFF;
+  --status-problem:#C62828;--status-problem-subtle:#F8E2E2;
+  --dial-track:#E7E4DD;
+}
+[data-theme="dark"]{
+  --surface-background:#0D0F12;--surface-card:#171A1F;
+  --text-primary:#EDEEF0;--text-secondary:#AAB1B9;--text-onbrand:#171105;
+  --border-default:#272D35;--border-strong:#3B434D;
+  --brand-primary:#C9A24B;--brand-gold:#C9A24B;--brand-gold-strong:#D9B564;--brand-subtle:#2A2415;
+  --status-ready:#57B87A;--status-ready-subtle:#1C2B21;
+  --status-caution:#E0A63C;--status-caution-subtle:#2F2715;--status-caution-on:#201705;
+  --status-problem:#E36A5C;--status-problem-subtle:#331D1A;
+  --dial-track:#262C34;
+}
+:root{
+  --font-ui:-apple-system,'Segoe UI',Roboto,system-ui,sans-serif;
+  --font-mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --type-title:700 26px/1.2 var(--font-ui);
+  --type-heading:600 20px/1.3 var(--font-ui);
+  --type-body:400 18px/1.45 var(--font-ui);
+  --type-body-strong:600 18px/1.45 var(--font-ui);
+  --type-label:600 15px/1.4 var(--font-ui);
+  --type-mono-big:700 32px/1.1 var(--font-mono);
+  --edge:20px;--radius-md:12px;--radius-lg:16px;
+  --tap-min:52px;--tap-primary:58px;--row-min:64px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{background:#CFCDC6;font:var(--type-body);color:var(--text-primary);padding:40px 24px}
+.stage{display:flex;gap:36px;justify-content:center;align-items:flex-start;overflow-x:auto}
+.frame{width:392px;flex:0 0 392px;background:var(--surface-background);border:1px solid var(--border-strong);border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(20,20,18,.25);display:flex;flex-direction:column}
+.screen{height:760px;overflow-y:auto;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.frame-label{text-align:center;font:var(--type-label);color:#6B6961;margin:12px 0 10px;letter-spacing:.12em;text-transform:uppercase}
+.toolbar{max-width:900px;margin:0 auto 28px;display:flex;justify-content:center}
+.theme-btn{font:var(--type-body-strong);padding:14px 28px;border-radius:12px;border:1px solid var(--border-strong);background:#fff;cursor:pointer}
+
+.pagehead{padding:22px var(--edge) 4px}
+.backline{font:var(--type-label);color:var(--text-secondary);margin-bottom:6px}
+.pagetitle{font:var(--type-title)}
+.pagesub{font:var(--type-label);color:var(--text-secondary);margin-top:4px}
+.section-head{font:var(--type-heading);padding:22px var(--edge) 8px;display:flex;align-items:center;gap:10px}
+.section-head::after{content:'';flex:1;height:2px;background:var(--brand-gold);opacity:.35}
+.card{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-md);margin:0 var(--edge)}
+.rowlink{display:flex;align-items:center;min-height:var(--row-min);padding:0 16px;border-bottom:1px solid var(--border-default);gap:12px}
+.rowlink:last-child{border-bottom:none}
+.rowlink .txt{flex:1}
+.rowlink .txt b{font:var(--type-body-strong);display:block}
+.rowlink .txt span{font:var(--type-label);color:var(--text-secondary)}
+.chev{color:var(--text-secondary);font:var(--type-body-strong)}
+.chip{font:var(--type-label);padding:6px 12px;border-radius:999px}
+.chip-ready{background:var(--status-ready-subtle);color:var(--status-ready)}
+.chip-gold{background:var(--brand-subtle);color:var(--brand-gold-strong)}
+.banner{display:flex;gap:12px;border-radius:var(--radius-md);padding:16px;font:var(--type-body-strong);background:var(--status-caution);color:var(--status-caution-on);margin:0 var(--edge)}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:var(--tap-primary);border-radius:var(--radius-md);font:var(--type-body-strong);background:var(--brand-primary);color:var(--text-onbrand);width:calc(100% - 2*var(--edge));margin:10px var(--edge) 0;border:none}
+.mono{font-family:var(--font-mono)}
+.stat{flex:1;text-align:center;padding:16px 0;border-right:1px solid var(--border-default)}
+.stat:last-child{border-right:none}
+.stat b{font:var(--type-mono-big);display:block}
+.stat span{font:var(--type-label);color:var(--text-secondary)}
+.seg{display:flex;background:var(--surface-background);border:1px solid var(--border-default);border-radius:12px;padding:3px;margin:14px 16px}
+.seg button{flex:1;min-height:46px;border:none;border-radius:9px;background:none;font:var(--type-body-strong);color:var(--text-secondary)}
+.seg button.on{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-default)}
+.riflepick{display:flex;align-items:center;gap:12px;background:var(--surface-card);border:2px solid var(--brand-gold);border-radius:var(--radius-lg);margin:12px var(--edge) 0;padding:14px 16px}
+.riflepick .txt{flex:1}
+.riflepick .txt b{font:var(--type-body-strong);display:block}
+.riflepick .txt span{font:var(--type-label);color:var(--text-secondary)}
+.riflepick .change{font:var(--type-label);color:var(--brand-gold-strong)}
+.tabbar{display:flex;border-top:1px solid var(--border-default);background:var(--surface-card)}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 14px;color:var(--text-secondary);font:600 11px/1 var(--font-ui);letter-spacing:.1em;text-transform:uppercase}
+.tab.active{color:var(--brand-gold-strong)}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+
+<div class="toolbar"><button class="theme-btn" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='light'?'dark':'light'">Toggle light / dark</button></div>
+
+<div class="stage">
+
+<!-- ========= OPTION 1, CLICK 2: "SHOOT" ========= -->
+<div>
+<div class="frame-label">Option 1 → tapped “Shoot”</div>
+<div class="frame">
+<div class="screen">
+  <div class="pagehead">
+    <div class="backline">‹ Home</div>
+    <div class="pagetitle">Shoot</div>
+  </div>
+
+  <div class="riflepick">
+    <div class="txt"><b>TB 6.5 PRC</b><span>.264 · Federal 143 ELD-X · READY</span></div>
+    <span class="change">Change ›</span>
+  </div>
+
+  <div class="section-head">Tools</div>
+  <div class="card">
+    <div class="rowlink"><div class="txt"><b>Get a firing solution</b><span>Dial for any distance · conditions current</span></div><span class="chev">›</span></div>
+    <div class="rowlink"><div class="txt"><b>Print a DOPE card</b><span>Range card for your pocket or stock</span></div><span class="chev">›</span></div>
+    <div class="rowlink"><div class="txt"><b>Log field shots</b><span>Hits on steel — builds your effective range</span></div><span class="chev">›</span></div>
+    <div class="rowlink"><div class="txt"><b>Make a wind call</b><span>Grade your calls, learn your bias</span></div><span class="chev">›</span></div>
+  </div>
+
+  <div class="section-head">For this rifle</div>
+  <div class="card">
+    <div class="rowlink"><div class="txt"><b>Effective range</b><span class="mono">90% on 10″: prone 612 · seated 380</span></div></div>
+    <div class="rowlink"><div class="txt"><b>Cold bore</b><span class="mono">First shot 0.2 high — hold under</span></div></div>
+  </div>
+</div>
+<div class="tabbar">
+  <div class="tab active"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg>Home</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="4" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="20" y2="12"/></svg>Rifles</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M21 5l-9 9-2-4"/></svg>Ask yorT</div>
+</div>
+</div>
+</div>
+
+<!-- ========= OPTION 2, CLICK 2: RIFLE HUB ========= -->
+<div>
+<div class="frame-label">Option 2 → tapped “Test” (Rifle Hub)</div>
+<div class="frame">
+<div class="screen">
+  <div class="pagehead">
+    <div class="backline">‹ Your rifles</div>
+    <div class="pagetitle">Test</div>
+    <div class="pagesub mono">.308 · 1:8 · Proof · SN 123456 &nbsp;·&nbsp; Edit</div>
+  </div>
+
+  <div class="section-head">Am I ready?</div>
+  <div class="banner">ADJUST — 6 clicks DOWN · 1 click LEFT, then confirm.</div>
+  <button class="btn">Confirm zero</button>
+
+  <div class="section-head">What do I dial?</div>
+  <div class="card">
+    <div class="rowlink"><div class="txt"><b>Firing solution</b><span>Conditions current · trued</span></div><span class="chev">›</span></div>
+    <div class="rowlink"><div class="txt"><b>Print a DOPE card</b><span>Last: stock pack · 4,100 ft</span></div><span class="chev">›</span></div>
+  </div>
+
+  <div class="section-head">Which ammo?</div>
+  <div class="card">
+    <div class="rowlink"><div class="txt"><b>Federal 175</b><span class="mono">0.76 MOA · SD 22.8 · 18 shots</span></div><span class="chip chip-gold">★ Match</span></div>
+    <div class="rowlink"><div class="txt"><b>Hornady 175</b><span class="mono">2743 fps · SD 30.7 · 8 shots</span></div><span class="chev">›</span></div>
+    <div class="rowlink"><div class="txt"><b style="color:var(--brand-gold-strong)">＋ Add load · Scan ammo box</b></div></div>
+  </div>
+
+  <div class="section-head">Is my equipment honest?</div>
+  <div class="card">
+    <div class="seg"><button class="on">Bare</button><button>Suppressed</button></div>
+    <div class="rowlink"><div class="txt"><b>Scope tracking</b><span>Clicks 4.2% small — auto-corrected · 7/16</span></div><span class="chip chip-ready">Corrected</span></div>
+  </div>
+
+  <div class="section-head">Am I getting better?</div>
+  <div class="card"><div style="display:flex">
+    <div class="stat"><b>26</b><span>Rounds</span></div>
+    <div class="stat"><b>0.76</b><span>Best MOA</span></div>
+    <div class="stat"><b>540</b><span>90% yd</span></div>
+  </div></div>
+
+  <div class="section-head">Records &amp; proof</div>
+  <div class="card">
+    <div class="rowlink"><div class="txt"><b>Session history</b><span>14 sessions</span></div><span class="chev">›</span></div>
+    <div class="rowlink"><div class="txt"><b>Logs</b><span>Cleaning · scope adjustments · cold bore</span></div><span class="chev">›</span></div>
+    <div class="rowlink"><div class="txt"><b>Performance report &amp; certificate</b><span>Proven by Workhorse</span></div><span class="chev">›</span></div>
+  </div>
+  <div style="height:20px"></div>
+</div>
+<div class="tabbar">
+  <div class="tab active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="4" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="20" y2="12"/></svg>Rifles</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 1 9 9"/><path d="M12 7a5 5 0 0 1 5 5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M3 12a9 9 0 0 0 9 9"/></svg>Tools</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M21 5l-9 9-2-4"/></svg>Ask yorT</div>
+</div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

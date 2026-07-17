@@ -1,0 +1,85 @@
+/* ============================================================
+   PROVEN · by Workhorse — DESIGN TOKENS (single source of truth)
+   Transcribed verbatim from docs/mockups/proven-templates-v2.html.
+   Light = field paper + ink, gold for brand/state moments.
+   Dark  = graphite + brass (the instrument).
+   Theme switching: [data-theme] on <html>. Light is the default.
+   Every color/size/space in the app comes from these variables —
+   no hardcoded values anywhere else.
+   ============================================================ */
+
+:root, [data-theme="light"] {
+    --surface-background: #F7F6F3;
+    --surface-card: #FFFFFF;
+    --text-primary: #16181B;
+    --text-secondary: #4A4E54;
+    --text-onbrand: #FFFFFF;
+    --border-default: #D8D5CF;
+    --border-strong: #B9B5AC;
+    /* brand: ink primary actions (from the wordmark), gold for the mark, rules, active accents */
+    --brand-primary: #16181B;
+    --brand-primary-press: #000000;
+    --brand-gold: #B08D2F;
+    --brand-gold-strong: #8F711F;
+    --brand-subtle: #F3EEDF;
+    --status-ready: #2E7D32;
+    --status-ready-subtle: #E3F0E4;
+    --status-ready-on: #FFFFFF;
+    --status-caution: #B26A00;
+    --status-caution-subtle: #F6EBD9;
+    --status-caution-on: #FFFFFF;
+    --status-problem: #C62828;
+    --status-problem-subtle: #F8E2E2;
+    --status-problem-on: #FFFFFF;
+    --dial-track: #E7E4DD;
+}
+
+[data-theme="dark"] {
+    --surface-background: #0D0F12;
+    --surface-card: #171A1F;
+    --text-primary: #EDEEF0;
+    --text-secondary: #AAB1B9;
+    --text-onbrand: #171105;
+    --border-default: #272D35;
+    --border-strong: #3B434D;
+    /* brand: brass carries the instrument in dark */
+    --brand-primary: #C9A24B;
+    --brand-primary-press: #B8913A;
+    --brand-gold: #C9A24B;
+    --brand-gold-strong: #D9B564;
+    --brand-subtle: #2A2415;
+    --status-ready: #57B87A;
+    --status-ready-subtle: #1C2B21;
+    --status-ready-on: #0E1B12;
+    --status-caution: #E0A63C;
+    --status-caution-subtle: #2F2715;
+    --status-caution-on: #201705;
+    --status-problem: #E36A5C;
+    --status-problem-subtle: #331D1A;
+    --status-problem-on: #260C09;
+    --dial-track: #262C34;
+}
+
+:root {
+    --font-ui: -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, monospace;
+    --type-display: 700 34px/1.15 var(--font-ui);
+    --type-title: 700 26px/1.2 var(--font-ui);
+    --type-heading: 600 20px/1.3 var(--font-ui);
+    --type-body: 400 18px/1.45 var(--font-ui);
+    --type-body-strong: 600 18px/1.45 var(--font-ui);
+    --type-label: 600 15px/1.4 var(--font-ui);
+    --type-mono-big: 700 34px/1.1 var(--font-mono);
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --edge: 20px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --tap-min: 52px;
+    --tap-primary: 58px;
+    --row-min: 64px;
+}
