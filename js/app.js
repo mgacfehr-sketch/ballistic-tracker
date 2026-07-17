@@ -315,7 +315,7 @@
             var profilesContainer = document.getElementById('view-profiles');
             if (profilesContainer) {
                 profilesContainer.innerHTML =
-                    '<div style="padding:2rem;text-align:center;color:#ff6b6b;">' +
+                    '<div style="padding:2rem;text-align:center;color:var(--danger);">' +
                     '<h3>Database Unavailable</h3>' +
                     '<p>Close other tabs using this app and reload.</p>' +
                     '</div>';

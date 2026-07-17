@@ -240,7 +240,7 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     html += '<div class="form-group form-group-half">';
     html += '<label for="rf-twist">Barrel Twist</label>';
     html += '<div style="display:flex;align-items:center;gap:4px;">';
-    html += '<span style="font-size:1rem;color:#ccc;white-space:nowrap;">1:</span>';
+    html += '<span style="font-size:1rem;color:var(--ink-2);white-space:nowrap;">1:</span>';
     html += '<input type="number" id="rf-twist" min="1" max="20" step="0.5" inputmode="decimal" placeholder="8" value="' + escapeAttr(twistNum) + '">';
     html += '</div>';
     html += '</div>';
@@ -268,7 +268,7 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
         html += '</div>';
         html += '<div class="form-group form-group-half">';
         html += '<label>Since Cleaned</label>';
-        html += '<span id="rf-since-cleaned" class="form-static-value" style="display:block;padding:8px 0;color:#aaa;">&mdash;</span>';
+        html += '<span id="rf-since-cleaned" class="form-static-value" style="display:block;padding:8px 0;color:var(--ink-2);">&mdash;</span>';
         html += '</div>';
         html += '</div>';
 

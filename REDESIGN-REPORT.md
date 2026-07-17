@@ -107,3 +107,34 @@ live on Home).
 **Judgment call:** slot labels use the questions verbatim rather than
 one-word headers ("TRUTH", "PROVE") — the Master Plan's law is that the
 app speaks the user's language, and the questions ARE that language.
+
+## Step 4 — The flows (CACHE v83)
+
+Most of the flow re-skin shipped with the token system itself, because
+every flow emits the shared component classes:
+- **Session / target check:** step panel is now a rounded sheet over the
+  canvas with a 3px accent progress bar; steps keep the one-primary-action
+  rule; the results card leads with the Zero Guardian status light, then
+  the group size as the huge number, stats in quiet rows, advanced stats
+  folded — verdict first, numbers underneath, unchanged logic.
+- **Wizards (onboarding, scope check, DOPE, ladder, field logger):** the
+  shared `WizardShell` skin is a bottom sheet with 56px answer rows and
+  an accent progress bar — every Budget-C flow inherits it from one place.
+- **Chrono import + review:** cards, checkboxes at 24px, badges as quiet
+  pills, warnings in amber text — no layout logic touched.
+- **Solver:** styled entirely from CSS (sticky table header, tabular
+  numerals, accent zero-row).
+
+**Fixed in this step:** the last DOM hard-coded colors in flow/manager
+files (`#ccc`/`#aaa` in the rifle form, `#ff6b6b` in app.js's fatal card)
+— they would have broken Sunlight mode.
+
+**Judgment calls:**
+- `ballistic-solver.js` is engine-protected, so the solver redesign is
+  CSS-only; its one inline `#ff6b6b` fallback div stays (DB-unavailable
+  message). The "dial number huge" ideal needs a UI split of that file —
+  deferred, noted as future work.
+- Canvas-drawn colors (target markers, cold-bore plot, ladder chart,
+  DOPE/certificate PDFs) are deliberately unchanged: they draw onto
+  photos/paper, not themed UI. Green impacts / blue POA / amber
+  calibration on a photograph is a visibility system that works.
