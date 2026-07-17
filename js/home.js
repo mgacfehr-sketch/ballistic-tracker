@@ -1,11 +1,13 @@
 /**
- * home.js — HomeManager: the action-first adaptive Home (Surface 1).
+ * home.js — HomeManager: Home as a STATUS INSTRUMENT (Surface 1).
  *
- * Not a dashboard: a short stack of ACTION buttons phrased as user
- * intentions, sourced from ToolRegistry.getHomeActions(). Layout, top
- * to bottom: alerts slot (Budget-A, empty renders nothing) → actions
- * (adaptively ordered, Step 5) → Recent strip (Step 5) → "+ Add a tool"
- * drawer (Step 7).
+ * Not a menu. Top to bottom (REDESIGN-SPEC III.1):
+ *   HERO      — the last-used rifle with its readiness verdict as the
+ *               dominant element (lamp + verdict word, one glance, one truth)
+ *   ALERTS    — Budget-A attention strips; silence is a feature
+ *   PRIMARY   — the ONE brass action (highest usage count)
+ *   SECONDARY — remaining actions as a quiet, subordinate tile row
+ *   BELOW     — recent activity + "+ Add a tool", whisper-quiet
  *
  * Pure ordering logic lives in HomeCore (Node-testable).
  */
@@ -103,7 +105,7 @@ HomeManager.prototype.init = function () {
 
 /**
  * Budget-A alerts: providers return Promise<[{id, text, onTap?}]>.
- * Foundation ships the slot with zero providers — silence is a feature.
+ * Ships with zero providers — silence is a feature.
  */
 HomeManager.prototype.registerAlertProvider = function (fn) {
     this._alertProviders.push(fn);
@@ -111,71 +113,133 @@ HomeManager.prototype.registerAlertProvider = function (fn) {
 
 HomeManager.prototype.show = function () {
     if (!this.container) return;
+
+    this.container.innerHTML =
+        '<div class="screen">' +
+        '<div class="zone-hero" id="home-hero"></div>' +
+        '<div id="home-alerts"></div>' +
+        '<div id="home-actions"></div>' +
+        '<div class="zone-secondary" id="home-recent"></div>' +
+        '<div id="home-drawer"></div>' +
+        '</div>';
+
     var self = this;
-
-    var html = '<div class="home-screen">';
-    html += '<div id="home-alerts"></div>';
-    html += '<div id="home-actions"></div>';
-    html += '<div id="home-recent"></div>';
-    html += '<div id="home-drawer"></div>';
-    html += '</div>';
-    this.container.innerHTML = html;
-
-    this._renderActions();
+    // The one-brass-object law: with no rifle yet, the hero's "set up my
+    // rifle" is the screen's primary — every action demotes to a tile.
+    this._renderHero().then(function (hasRifles) {
+        self._renderActions(hasRifles !== false);
+    });
     this._renderRecent();
     this._renderAlerts();
     this._renderDrawer();
 };
 
 /**
- * The tool drawer: dormant capabilities phrased as user problems.
- * One tap activates (Home action appears live via onChange); active
- * non-core tools can be put back to sleep — data always preserved.
+ * HERO — the shooter's situation at a glance. Most-recent rifle with
+ * its readiness verdict dominant: one lamp, one word, one truth.
  */
-HomeManager.prototype._renderDrawer = function () {
+HomeManager.prototype._renderHero = function () {
+    var el = document.getElementById('home-hero');
+    if (!el || !this.db) return Promise.resolve(true);
     var self = this;
-    var el = document.getElementById('home-drawer');
-    if (!el || typeof ToolRegistry === 'undefined') return;
 
-    var dormant = ToolRegistry.getDormant();
-    var activeExtras = [];
-    for (var k in TOOLS) {
-        if (!TOOLS.hasOwnProperty(k)) continue;
-        if (!TOOLS[k].core && ToolRegistry.isVisible(k)) activeExtras.push(TOOLS[k]);
-    }
-    if (!dormant.length && !activeExtras.length) return; // nothing to manage
+    return this.db.getAllRifles().then(function (rifles) {
+        if (!el.isConnected) return true;
 
-    var html = '<details class="home-drawer"><summary>+ Add a tool</summary>';
-    html += '<div class="home-drawer-body">';
-    for (var d = 0; d < dormant.length; d++) {
-        html += '<button class="home-drawer-tool" data-tool="' + dormant[d].key + '" data-on="1">' +
-            '<span class="home-action-label">' + dormant[d].problem + '</span>' +
-            '<span class="home-drawer-add">Add</span>' +
-            '</button>';
-    }
-    for (var a = 0; a < activeExtras.length; a++) {
-        html += '<button class="home-drawer-tool home-drawer-active" data-tool="' + activeExtras[a].key + '" data-on="0">' +
-            '<span class="home-action-label">' + activeExtras[a].problem + '</span>' +
-            '<span class="home-drawer-remove">Hide</span>' +
-            '</button>';
-    }
-    html += '<p class="chrono-hint">Hiding a tool keeps all its data — it just leaves your way.</p>';
-    html += '</div></details>';
-    el.innerHTML = html;
+        if (!rifles || !rifles.length) {
+            // First run: teach in one sentence + one button
+            el.innerHTML =
+                '<div class="plate empty-teach">' +
+                '<p>Your rifle is the hub everything lands on. Two minutes to set one up, and it answers instantly for life.</p>' +
+                '<button class="action-primary" id="home-first-rifle">' + Icon('plus', 20) + ' Set up my rifle</button>' +
+                '</div>';
+            var btn = document.getElementById('home-first-rifle');
+            if (btn) btn.addEventListener('click', function () {
+                if (window.AppNav) window.AppNav.go('profiles');
+            });
+            return false; // no rifles: the hero owns the screen's primary
+        }
 
-    var buttons = el.querySelectorAll('.home-drawer-tool');
-    for (var b = 0; b < buttons.length; b++) {
-        buttons[b].addEventListener('click', function () {
-            var key = this.getAttribute('data-tool');
-            if (this.getAttribute('data-on') === '1') {
-                ToolRegistry.activate(key);
-            } else {
-                ToolRegistry.deactivate(key);
+        var recent = Recents.get();
+        var rifle = null;
+        if (recent && recent.rifleId) {
+            for (var i = 0; i < rifles.length; i++) {
+                if (rifles[i].id === recent.rifleId) { rifle = rifles[i]; break; }
             }
-            // onChange listener re-renders Home (drawer stays open state
-            // is reset — acceptable; the changed action is the feedback)
+        }
+        if (!rifle) rifle = rifles[0];
+
+        // Verdict + evidence assemble from the rifle's own record
+        return Promise.all([
+            self.db.getSessionsByRifle(rifle.id).catch(function () { return []; }),
+            self.db.getBarrelsByRifle(rifle.id).catch(function () { return []; })
+        ]).then(function (res) {
+            if (!el.isConnected) return;
+            var sessions = (res[0] || []).slice().sort(function (a, b) {
+                return (b.date || '').localeCompare(a.date || '');
+            });
+            var barrels = res[1] || [];
+            var barrel = null;
+            for (var b = 0; b < barrels.length; b++) {
+                if (barrels[b].isActive) { barrel = barrels[b]; break; }
+            }
+            if (!barrel && barrels.length) barrel = barrels[0];
+
+            // latest session that carries a POA verdict
+            var latest = null;
+            for (var s = 0; s < sessions.length; s++) {
+                if (sessions[s].results && typeof sessions[s].results.atzElevationMOA === 'number') {
+                    latest = sessions[s];
+                    break;
+                }
+            }
+
+            var verdict = null;
+            if (latest && typeof ZeroGuardian !== 'undefined') {
+                verdict = ZeroGuardian.verdictFor(latest.results, rifle.scopeCorrectionFactor);
+            }
+
+            var lampCls, wordCls, word, sub;
+            var dateStr = latest && latest.date ? new Date(latest.date).toLocaleDateString() : '';
+            if (verdict && verdict.confirmed) {
+                lampCls = 'is-go'; wordCls = 'is-go'; word = 'READY';
+                sub = 'Zero confirmed ' + dateStr;
+            } else if (verdict) {
+                lampCls = 'is-hold'; wordCls = 'is-hold'; word = 'CHECK ZERO';
+                var parts = [];
+                if (verdict.elevClicks > 0) parts.push(verdict.elevClicks + ' click' + (verdict.elevClicks === 1 ? '' : 's') + ' ' + verdict.elevDir.toUpperCase());
+                if (verdict.windClicks > 0) parts.push(verdict.windClicks + ' click' + (verdict.windClicks === 1 ? '' : 's') + ' ' + verdict.windDir.toUpperCase());
+                sub = parts.length
+                    ? 'Adjust ' + parts.join(', ') + ' &mdash; last check ' + dateStr
+                    : 'Almost there — confirm with one more group';
+            } else {
+                lampCls = 'is-off'; wordCls = 'is-off'; word = 'NOT CHECKED';
+                sub = 'Photograph a target and yorT confirms your zero';
+            }
+
+            var meta = [];
+            if (rifle.caliber) meta.push(self._escapeHtml(rifle.caliber));
+            if (barrel && barrel.totalRounds) meta.push(Number(barrel.totalRounds).toLocaleString() + ' rounds');
+
+            el.innerHTML =
+                '<button class="plate plate-tap" id="home-hero-card">' +
+                '<span class="instrument-label">Rifle</span>' +
+                '<span class="t-title">' + self._escapeHtml(rifle.name || 'Rifle') + '</span>' +
+                (meta.length ? '<span class="t-micro">' + meta.join(' &middot; ') + '</span>' : '') +
+                '<div class="verdict u-mt-14">' +
+                '<span class="verdict-lamp lamp-lg ' + lampCls + '"></span>' +
+                '<div>' +
+                '<div class="verdict-word ' + wordCls + '">' + word + '</div>' +
+                '<div class="verdict-sub">' + sub + '</div>' +
+                '</div></div>' +
+                '</button>';
+
+            var card = document.getElementById('home-hero-card');
+            if (card) card.addEventListener('click', function () {
+                if (window.AppNav) window.AppNav.openRifle(rifle.id);
+            });
         });
-    }
+    }).catch(function () { /* hero is best-effort; actions still render */ });
 };
 
 HomeManager.prototype._counts = function () {
@@ -185,26 +249,48 @@ HomeManager.prototype._counts = function () {
     } catch (e) { return {}; }
 };
 
-HomeManager.prototype._renderActions = function () {
+/**
+ * ONE visually primary action (what they most likely came to do, from
+ * usage data); the rest as a compact, subordinate tile row.
+ */
+HomeManager.prototype._renderActions = function (withPrimary) {
     var self = this;
     var el = document.getElementById('home-actions');
     if (!el || typeof ToolRegistry === 'undefined') return;
 
-    // Adaptive: the actions this user actually uses float to the top
     var actions = HomeCore.orderActions(ToolRegistry.getHomeActions(), this._counts());
+    if (!actions.length) return;
+
     var html = '';
-    for (var i = 0; i < actions.length; i++) {
-        var a = actions[i].homeAction;
-        html += '<button class="home-action" data-action-id="' + a.id + '"' +
-            (a.view ? ' data-view="' + a.view + '"' : '') +
-            (a.run ? ' data-run="' + a.run + '"' : '') + '>' +
-            '<span class="home-action-icon">' + a.icon + '</span>' +
-            '<span class="home-action-label">' + a.label + '</span>' +
+    var rest;
+    if (withPrimary === false) {
+        rest = actions.map(function (t) { return t.homeAction; });
+    } else {
+        var primary = actions[0].homeAction;
+        rest = actions.slice(1).map(function (t) { return t.homeAction; });
+        html +=
+            '<button class="action-primary" data-action-id="' + primary.id + '"' +
+            (primary.view ? ' data-view="' + primary.view + '"' : '') +
+            (primary.run ? ' data-run="' + primary.run + '"' : '') + '>' +
+            Icon(primary.icon, 22) + '<span>' + primary.label + '</span>' +
             '</button>';
+    }
+
+    if (rest.length) {
+        var cols = (rest.length === 2 || rest.length === 4) ? ' is-2' : '';
+        html += '<div class="tile-row u-mt-10' + cols + '">';
+        for (var i = 0; i < rest.length; i++) {
+            html += '<button class="tile-action" data-action-id="' + rest[i].id + '"' +
+                (rest[i].view ? ' data-view="' + rest[i].view + '"' : '') +
+                (rest[i].run ? ' data-run="' + rest[i].run + '"' : '') + '>' +
+                Icon(rest[i].icon, 22) + '<span>' + rest[i].label + '</span>' +
+                '</button>';
+        }
+        html += '</div>';
     }
     el.innerHTML = html;
 
-    var buttons = el.querySelectorAll('.home-action');
+    var buttons = el.querySelectorAll('[data-action-id]');
     for (var b = 0; b < buttons.length; b++) {
         buttons[b].addEventListener('click', function () {
             var id = this.getAttribute('data-action-id');
@@ -223,22 +309,38 @@ HomeManager.prototype._renderActions = function () {
     }
 };
 
+/** RECENT — whisper-quiet, below the fold. */
 HomeManager.prototype._renderRecent = function () {
     var el = document.getElementById('home-recent');
     if (!el) return;
+    var self = this;
     var recent = Recents.get();
-    if (!recent || !recent.rifleId) return; // nothing yet — render nothing
+    if (!recent || !recent.sessionId || !this.db) return; // nothing yet — render nothing
 
-    el.innerHTML = '<div class="home-recent-label">Recent</div>' +
-        '<button class="home-recent-card" id="home-recent-rifle">' +
-        '<span class="home-action-icon">🔭</span>' +
-        '<span class="home-action-label">' + this._escapeHtml(recent.rifleName) + '</span>' +
-        '<span class="profile-card-arrow">&rsaquo;</span>' +
-        '</button>';
+    this.db.getSession(recent.sessionId).then(function (session) {
+        if (!session || !el.isConnected) return;
+        var bits = [];
+        if (session.impacts && session.impacts.length) bits.push(session.impacts.length + '-shot group');
+        if (session.results && session.results.groupSizeMOA != null) {
+            bits.push(formatFixed(session.results.groupSizeMOA, 2) + ' MOA');
+        }
+        var when = session.date ? new Date(session.date).toLocaleDateString() : '';
+        if (!bits.length) return;
 
-    document.getElementById('home-recent-rifle').addEventListener('click', function () {
-        if (window.AppNav) window.AppNav.openRifle(recent.rifleId);
-    });
+        el.innerHTML =
+            '<hr class="divider">' +
+            '<div class="qcard-kicker">Recent</div>' +
+            '<button class="action-ghost u-full drawer-tool" id="home-recent-session">' +
+            '<span class="u-quiet">' + bits.join(' &middot; ') +
+            (when ? ' <span class="t-micro">&mdash; ' + when + '</span>' : '') + '</span>' +
+            Icon('chevron-right', 18) +
+            '</button>';
+
+        var row = document.getElementById('home-recent-session');
+        if (row) row.addEventListener('click', function () {
+            if (window.AppNav && recent.rifleId) window.AppNav.openRifle(recent.rifleId);
+        });
+    }).catch(function () { /* quiet */ });
 };
 
 HomeManager.prototype._escapeHtml = function (text) {
@@ -259,17 +361,66 @@ HomeManager.prototype._renderAlerts = function () {
         if (!alerts.length || !el.isConnected) return;
         var html = '';
         for (var i = 0; i < alerts.length; i++) {
-            html += '<div class="home-alert" data-alert-id="' + alerts[i].id + '">' +
-                alerts[i].text + '</div>';
+            html += '<button class="alert-strip u-mb-12" data-alert-id="' + alerts[i].id + '">' +
+                Icon('alert', 18) + '<span>' + alerts[i].text + '</span></button>';
         }
         el.innerHTML = html;
-        var nodes = el.querySelectorAll('.home-alert');
+        var nodes = el.querySelectorAll('.alert-strip');
         for (var n = 0; n < nodes.length; n++) {
             (function (node, alert) {
                 if (alert.onTap) node.addEventListener('click', alert.onTap);
             })(nodes[n], alerts[n]);
         }
     });
+};
+
+/**
+ * "+ Add a tool" — the tool drawer, phrased as user problems.
+ * One tap wakes a dormant tool; hiding keeps all its data.
+ */
+HomeManager.prototype._renderDrawer = function () {
+    var el = document.getElementById('home-drawer');
+    if (!el || typeof ToolRegistry === 'undefined') return;
+
+    var dormant = ToolRegistry.getDormant();
+    var activeExtras = [];
+    for (var k in TOOLS) {
+        if (!TOOLS.hasOwnProperty(k)) continue;
+        if (!TOOLS[k].core && ToolRegistry.isVisible(k)) activeExtras.push(TOOLS[k]);
+    }
+    if (!dormant.length && !activeExtras.length) return; // nothing to manage
+
+    var html = '<details class="fold u-mt-14"><summary>' + Icon('plus', 18) + '&nbsp; Add a tool</summary>';
+    html += '<div class="fold-body">';
+    for (var d = 0; d < dormant.length; d++) {
+        html += '<button class="action-ghost u-full drawer-tool" data-tool="' + dormant[d].key + '" data-on="1">' +
+            '<span>' + dormant[d].problem + '</span>' +
+            '<span class="chip">Add</span>' +
+            '</button>';
+    }
+    for (var a = 0; a < activeExtras.length; a++) {
+        html += '<button class="action-ghost u-full drawer-tool" data-tool="' + activeExtras[a].key + '" data-on="0">' +
+            '<span>' + activeExtras[a].problem + '</span>' +
+            '<span class="chip">Hide</span>' +
+            '</button>';
+    }
+    html += '<p class="t-micro u-mt-10">Hiding a tool keeps all its data &mdash; it just leaves your way.</p>';
+    html += '</div></details>';
+    el.innerHTML = html;
+
+    var buttons = el.querySelectorAll('.drawer-tool[data-tool]');
+    for (var b = 0; b < buttons.length; b++) {
+        buttons[b].addEventListener('click', function () {
+            var key = this.getAttribute('data-tool');
+            if (this.getAttribute('data-on') === '1') {
+                ToolRegistry.activate(key);
+            } else {
+                ToolRegistry.deactivate(key);
+            }
+            // onChange listener re-renders Home (drawer open state resets —
+            // acceptable; the changed action row is the feedback)
+        });
+    }
 };
 
 // Export for Node unit tests

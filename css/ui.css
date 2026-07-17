@@ -359,6 +359,20 @@ img { max-width: 100%; }
     border-radius: var(--r-overlay);
     box-shadow: var(--shadow-overlay);
 }
+/* a plate that is itself the tap target (Home hero) */
+.plate-tap {
+    display: block;
+    width: 100%;
+    text-align: left;
+}
+.plate-tap:active { background: var(--g2); }
+.plate-tap > .instrument-label { display: block; margin-bottom: 4px; }
+.plate-tap > .t-title { display: block; }
+.plate-tap > .t-micro { display: block; margin-top: 3px; }
+
+/* quiet full-width row with trailing affordance (drawer, recent) */
+.drawer-tool { justify-content: space-between; min-height: 48px; }
+
 .strip {
     display: flex;
     align-items: center;

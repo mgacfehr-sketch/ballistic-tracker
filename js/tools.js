@@ -18,41 +18,41 @@ var TOOLS = {
     checkTarget: {
         key: 'checkTarget', core: true, feature: null,
         problem: 'Check a target',
-        homeAction: { id: 'check-target', icon: '📷', label: 'Check a target', view: 'session' }
+        homeAction: { id: 'check-target', icon: 'camera', label: 'Check a target', view: 'session' }
     },
     solver: {
         key: 'solver', core: true, feature: null,
         problem: 'Get a firing solution',
-        homeAction: { id: 'firing-solution', icon: '🎯', label: 'Get a firing solution', view: 'solver' }
+        homeAction: { id: 'firing-solution', icon: 'gauge', label: 'Get a firing solution', view: 'solver' }
     },
     chrono: {
         key: 'chrono', core: false, feature: 'chronoImport',
         problem: 'Track my velocities',
-        homeAction: { id: 'import-chrono', icon: '📥', label: 'Import chrono data', view: 'chrono' },
+        homeAction: { id: 'import-chrono', icon: 'import', label: 'Import chrono data', view: 'chrono' },
         rifleCards: []
     },
     scopeTruth: {
         key: 'scopeTruth', core: false, feature: null,
         problem: 'Verify my scope dials true',
-        homeAction: { id: 'scope-check', icon: '📐', label: 'Verify scope tracking', run: 'scopeCheck' },
+        homeAction: { id: 'scope-check', icon: 'ruler', label: 'Verify scope tracking', run: 'scopeCheck' },
         rifleCards: ['scope-truth']
     },
     dopeCards: {
         key: 'dopeCards', core: false, feature: null,
         problem: 'Put my dope on paper (range cards)',
-        homeAction: { id: 'dope-cards', icon: '🗒️', label: 'Print a DOPE card', run: 'dopeCards' },
+        homeAction: { id: 'dope-cards', icon: 'table', label: 'Print a DOPE card', run: 'dopeCards' },
         rifleCards: []
     },
     field: {
         key: 'field', core: false, feature: null,
         problem: 'Know my ethical range',
-        homeAction: { id: 'field-log', icon: '🪵', label: 'Log field shots', run: 'fieldLog' },
+        homeAction: { id: 'field-log', icon: 'mountain', label: 'Log field shots', run: 'fieldLog' },
         rifleCards: ['effective-range']
     },
     bench: {
         key: 'bench', core: false, feature: null,
         problem: 'Track my handloads',
-        homeAction: { id: 'ladder-info', icon: '🧪', label: 'Run a ladder test', run: 'ladderInfo' },
+        homeAction: { id: 'ladder-info', icon: 'flask', label: 'Run a ladder test', run: 'ladderInfo' },
         rifleCards: []
     }
     // Feature waves add entries here — never a new registry, never a nav tab.
