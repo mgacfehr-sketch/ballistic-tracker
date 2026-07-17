@@ -94,30 +94,20 @@ WizardShell.prototype._render = function () {
 
     var progress = WizardCore.progress(this.def, this.state);
     var saved = this.state.answers[step.id];
+    this._pending = saved; // choice selection buffer; Next commits it
 
-    // ── bar: back · ticks · close ─────────────────────────────
-    var html = '<div class="wiz-bar">';
-    html += this.state.index > 0
-        ? '<button class="toolbar-back" id="wizard-back" aria-label="Back">' + Icon('chevron-left', 20) + '</button>'
-        : '<span></span>';
-    if (progress.total > 1) {
-        html += '<div class="wiz-ticks">';
-        for (var t = 1; t <= progress.total; t++) {
-            html += '<span class="wiz-tick' + (t <= progress.current ? ' is-done' : '') + '"></span>';
-        }
-        html += '</div>';
-    } else {
-        html += '<span></span>';
-    }
-    html += this.opts.onCancel
-        ? '<button class="toolbar-act" id="wizard-close" aria-label="Close">' + Icon('x', 20) + '</button>'
-        : '<span></span>';
-    html += '</div>';
+    // ── Template D shell: progress bar · step · question ──────
+    var pct = progress.total ? Math.round(100 * progress.current / progress.total) : 100;
+    var html = '<div class="wiz-bar">' +
+        '<div class="wiz-progress"><i style="width:' + pct + '%"></i></div>' +
+        (this.opts.onCancel
+            ? '<button class="wiz-close" id="wizard-close" aria-label="Close">' + Icon('x', 20) + '</button>'
+            : '') +
+        '</div>';
 
-    // ── body: kicker · question · answer UI · error ───────────
     html += '<div class="wiz-body">';
     if (progress.total > 1) {
-        html += '<div class="wiz-kicker">QUESTION ' + progress.current + ' OF ' + progress.total + '</div>';
+        html += '<div class="wiz-step">Step ' + progress.current + ' of ' + progress.total + '</div>';
     }
     html += '<h2 class="wiz-question">' + step.prompt + '</h2>';
 
@@ -126,19 +116,16 @@ WizardShell.prototype._render = function () {
         // step.mount(bodyEl, state, api) is called after the shell renders.
         html += '<div id="wizard-custom-body"></div>';
     } else if (step.type === 'choice') {
-        html += '<div class="choice-stack">';
         for (var c = 0; c < step.choices.length; c++) {
             var ch = step.choices[c];
             var selected = saved !== undefined && saved !== null && String(saved) === String(ch.value);
-            html += '<button class="choice-plate' + (selected ? ' is-selected' : '') +
+            html += '<button class="option-row' + (selected ? ' on' : '') +
                 '" data-value="' + ch.value + '">' +
                 '<span>' + ch.label +
                 (ch.desc ? '<span class="choice-desc">' + ch.desc + '</span>' : '') +
                 '</span>' +
-                (selected ? Icon('check', 18) : '') +
                 '</button>';
         }
-        html += '</div>';
     } else {
         html += '<div class="field">' +
             '<input id="wizard-input" type="' + (step.type === 'number' ? 'number' : 'text') + '"' +
@@ -150,13 +137,15 @@ WizardShell.prototype._render = function () {
     html += '<div class="wiz-error"></div>';
     html += '</div>';
 
-    // ── foot: one brass Next for typed answers only ───────────
-    // (choice plates advance on tap; custom steps advance via api.submit)
-    if (step.type !== 'choice' && step.type !== 'custom') {
-        html += '<div class="wiz-foot">' +
-            '<button class="wiz-next action-primary" id="wizard-next">Next</button>' +
-            '</div>';
+    // ── fixed actions: Next + Back (custom steps own their advance) ──
+    html += '<div class="wiz-actions">';
+    if (step.type !== 'custom') {
+        html += '<button class="wiz-next btn-primary" id="wizard-next">Next</button>';
     }
+    if (this.state.index > 0) {
+        html += '<button class="wiz-back" id="wizard-back">&lsaquo; Back</button>';
+    }
+    html += '</div>';
 
     this._root.innerHTML = html;
 
@@ -167,20 +156,28 @@ WizardShell.prototype._render = function () {
         });
     }
 
-    // Choice taps answer AND advance — one decision per screen
-    var choices = this._root.querySelectorAll('.choice-plate');
+    // Option taps select; the fixed Next commits (Template D)
+    var choices = this._root.querySelectorAll('.option-row');
     for (var i = 0; i < choices.length; i++) {
         choices[i].addEventListener('click', function () {
-            self._advance(this.getAttribute('data-value'));
+            self._pending = this.getAttribute('data-value');
+            var rows = self._root.querySelectorAll('.option-row');
+            for (var r = 0; r < rows.length; r++) rows[r].classList.remove('on');
+            this.classList.add('on');
+            self._setError('');
         });
     }
     var nextBtn = this._root.querySelector('#wizard-next');
     if (nextBtn) {
         nextBtn.addEventListener('click', function () {
+            var stepNow = self.def.steps[self.state.index];
+            if (stepNow.type === 'choice') {
+                self._advance(self._pending);
+                return;
+            }
             var input = self._root.querySelector('#wizard-input');
             var v = input ? input.value : '';
-            self._advance(self.def.steps[self.state.index].type === 'number' && v !== ''
-                ? parseFloat(v) : v);
+            self._advance(stepNow.type === 'number' && v !== '' ? parseFloat(v) : v);
         });
     }
     var backBtn = this._root.querySelector('#wizard-back');

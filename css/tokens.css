@@ -60,6 +60,27 @@
     --dial-track: #262C34;
 }
 
+/* ── EXTENSIONS (not in the mockup block; same system) ──────
+   App-level tokens the mockups don't need: overlay scrims,
+   the single overlay shadow, and canvas marker conventions.
+   These are the ONLY additions — everything else is verbatim. */
+:root, [data-theme="light"] {
+    --overlay-scrim: rgba(22, 24, 27, 0.45);
+    --shadow-overlay: 0 16px 48px rgba(22, 24, 27, 0.22);
+    --canvas-pill: rgba(255, 255, 255, 0.88);
+}
+[data-theme="dark"] {
+    --overlay-scrim: rgba(0, 0, 0, 0.6);
+    --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.5);
+    --canvas-pill: rgba(13, 15, 18, 0.82);
+}
+:root {
+    /* canvas marker conventions (existing app convention, kept) */
+    --poa: #4D9FD6;
+    --impact: #46B268;
+    --calibration-color: var(--brand-gold);
+}
+
 :root {
     --font-ui: -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
     --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, monospace;

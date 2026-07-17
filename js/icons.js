@@ -17,7 +17,14 @@
     /* Inner SVG content per icon (24x24 coordinate space). */
     var PATHS = {
         /* ── navigation / shell ─────────────────────────── */
-        'home': '<path d="M3 10.8 12 3l9 7.8"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+        'home': '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
+        /* the five job categories (traced from the Proven mockups) */
+        'cat-check': '<circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="22"/><line x1="2" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="22" y2="12"/>',
+        'cat-shoot': '<path d="M12 3a9 9 0 0 1 9 9"/><path d="M12 7a5 5 0 0 1 5 5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M3 12a9 9 0 0 0 9 9"/>',
+        'cat-ammo': '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
+        'cat-verify': '<path d="M3 21L21 3"/><path d="M7 17l-1 1M11 13l-1 1M15 9l-1 1M19 5l-1 1"/>',
+        'cat-records': '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><circle cx="12" cy="13" r="3"/>',
+        'send': '<path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M21 5l-9 9-2-4"/>',
         'crosshair': '<circle cx="12" cy="12" r="7.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/>',
         'target': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>',
         'message': '<path d="M21 12a9 9 0 1 0-3.9 7.4L21 21l-1.1-3.6A8.96 8.96 0 0 0 21 12Z"/>',
