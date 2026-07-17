@@ -105,7 +105,7 @@ ColdBoreManager.prototype._loadData = function (rifleId) {
             // Teaching empty state: one sentence; manual logging stays
             // reachable for shooters transcribing a paper cold-bore log.
             contentEl.innerHTML = '<div class="empty-teach">' +
-                '<p>Mark shot #1 in your next session and yorT tracks your cold bore automatically.</p>' +
+                '<p>Mark shot #1 in your next session and Proven tracks your cold bore automatically.</p>' +
                 '</div>' +
                 '<div class="action-row"><button class="action-ghost" id="btn-add-cold-bore">' + Icon('plus', 16) + ' Log a shot by hand</button></div>';
             var emptyAdd = document.getElementById('btn-add-cold-bore');
@@ -294,7 +294,7 @@ ColdBoreManager.prototype._tutorialText = function () {
         'Knowing your cold bore offset lets you compensate on your critical first shot &mdash; which is often the only shot that matters in the field.' +
         '</p>' +
         '<p class="t-body u-quiet u-mt-10">' +
-        '<strong>How yorT collects this:</strong> Whenever you mark your impacts in fire order, shot #1 is treated as the cold-bore shot. Its offset from POA is saved with the session automatically.' +
+        '<strong>How Proven collects this:</strong> Whenever you mark your impacts in fire order, shot #1 is treated as the cold-bore shot. Its offset from POA is saved with the session automatically.' +
         '</p>' +
         '<p class="t-body u-quiet u-mt-10">' +
         '<strong>Tip:</strong> Tap your holes in fire order (shot #1 first). 10+ data points reveal a reliable trend.' +

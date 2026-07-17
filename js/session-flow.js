@@ -673,7 +673,7 @@ SessionFlow.prototype._tryAutoCalibration = function (img) {
         return;
     }
 
-    self.els.calibrationStatus.textContent = 'Looking for yorT target markers…';
+    self.els.calibrationStatus.textContent = 'Looking for Proven target markers…';
     self._hideEl(self.els.btnRedoCalibration);
     self._hideEl(self.els.btnNextCalibration);
     self._hideEl(self.els.btnManualCalibration);
@@ -690,7 +690,7 @@ SessionFlow.prototype._tryAutoCalibration = function (img) {
         }
 
         if (!result.success) {
-            self._fallbackToManual('No yorT target detected — set scale manually.');
+            self._fallbackToManual('No Proven target detected — set scale manually.');
             return;
         }
 
@@ -712,7 +712,7 @@ SessionFlow.prototype._tryAutoCalibration = function (img) {
             self.canvas.calibrationLine = null;
             self.canvas.render();
 
-            self.els.calibrationStatus.innerHTML = '<span class="chip is-go">' + Icon('check', 14) + 'Verified</span> yorT target detected &mdash; auto-scaled (' + warp.pixelsPerInch.toFixed(0) + ' px/in)';
+            self.els.calibrationStatus.innerHTML = '<span class="chip is-go">' + Icon('check', 14) + 'Verified</span> Proven target detected &mdash; auto-scaled (' + warp.pixelsPerInch.toFixed(0) + ' px/in)';
             self._showEl(self.els.btnRedoCalibration);
             self._showEl(self.els.btnNextCalibration);
             self._showEl(self.els.btnManualCalibration);
@@ -1418,7 +1418,7 @@ SessionFlow.prototype._shareBlankTarget = function () {
         return res.blob();
     }).then(function (blob) {
         var file = new File([blob], BLANK_TARGET_FILENAME, { type: 'application/pdf' });
-        var shareData = { files: [file], title: 'yorT Target', text: 'yorT printable target' };
+        var shareData = { files: [file], title: 'Proven Target', text: 'Proven printable target' };
 
         if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
             return navigator.share(shareData).catch(function (err) {

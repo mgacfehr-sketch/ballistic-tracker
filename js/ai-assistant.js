@@ -63,7 +63,7 @@ AIAssistantManager.prototype.show = function () {
         this.container.innerHTML =
             '<div class="screen"><div class="plate">' +
             '<div class="t-head">No connection</div>' +
-            '<p class="t-body u-mt-10">yorT requires an internet connection.</p>' +
+            '<p class="t-body u-mt-10">Ask yorT requires an internet connection.</p>' +
             '</div></div>';
         return;
     }
@@ -714,7 +714,7 @@ AIAssistantManager.prototype._buildSystemPrompt = function (context) {
     lines.push('When a shooter says they are zeroed at 100 yards but hitting low (or high) at longer distances beyond 500 yards, do NOT tell them to adjust their scope. The problem is almost certainly that their muzzle velocity or ballistic coefficient in their calculator does not match reality. Tell them: if they don\'t have a verified muzzle velocity from a chronograph, adjust the MV in their calculator until the predicted impact matches where they\'re actually hitting. If they are confident in their MV, then adjust the BC. This is called \'truing\' the gun. The BC printed on the bullet box is an average and may not match their specific rifle, barrel length, or conditions. Every gun shoots slightly differently and the BC needs to be trued for precise long-range work.');
     lines.push('');
     lines.push('SCENARIO 2b - Cold bore question:');
-    lines.push('When asked about cold bore for a rifle (e.g., "where does my cold bore land", "what should I hold for my first shot"), check the COLD BORE DATA section below. If present, give a direct answer using the average MOA offset, then state the hold (opposite of average). If multiple loads exist, give per-load numbers. Mention how many data points the average is based on. If no cold-bore data is recorded, tell the shooter to mark shot #1 first when tapping impacts so yorT can build the trend.');
+    lines.push('When asked about cold bore for a rifle (e.g., "where does my cold bore land", "what should I hold for my first shot"), check the COLD BORE DATA section below. If present, give a direct answer using the average MOA offset, then state the hold (opposite of average). If multiple loads exist, give per-load numbers. Mention how many data points the average is based on. If no cold-bore data is recorded, tell the shooter to mark shot #1 first when tapping impacts so the app can build the trend.');
     lines.push('');
     lines.push('SCENARIO 3 - POI change after switching ammo lots:');
     lines.push('When a shooter switches to a new box of the same ammo and notices point of impact has changed, explain that lot-to-lot variation in factory ammunition is real and common. Different production lots can have slight differences in powder charge, bullet concentricity, and other factors. If the shift is consistent over 10 rounds, they should re-zero for that lot. This is one reason serious long-range shooters buy ammo in bulk from the same lot or handload their own ammunition for consistency.');

@@ -455,7 +455,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
     // Measure all text widths to determine card width (centered layout)
     var heroLineHeight = heroFontSize * 1.3;
     var textItems = [
-        { font: 'bold ' + Math.round(titleFontSize) + 'px sans-serif', text: 'yorT' },
+        { font: 'bold ' + Math.round(titleFontSize) + 'px sans-serif', text: 'PROVEN' },
         { font: Math.round(smallFontSize) + 'px sans-serif', text: results.distanceYards + ' Yards / ' + results.shotCount + ' Shot group' },
         { font: 'bold ' + Math.round(heroFontSize) + 'px sans-serif', text: formatFixed(results.groupSizeMOA, 2) + ' MOA' },
         { font: Math.round(fontSize) + 'px sans-serif', text: formatFixed(results.groupSizeInches, 3) + '"' },
@@ -473,7 +473,7 @@ CanvasManager.prototype._drawLiveOverlay = function () {
 
     // Calculate total height
     var totalHeight = padding * 2;
-    totalHeight += lineHeight;          // yorT title
+    totalHeight += lineHeight;          // PROVEN title
     totalHeight += lineHeight * 0.2;    // gap
     totalHeight += lineHeight;          // distance/shots
     totalHeight += dividerGap * 2 + 1 * sf; // divider with gaps

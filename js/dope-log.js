@@ -50,7 +50,7 @@ DopeLogManager.prototype._loadEntries = function (rifleId, loads) {
     self.db.getDopeEntries(rifleId).then(function (entries) {
         if (!entries || entries.length === 0) {
             contentEl.innerHTML = '<div class="empty-teach">' +
-                '<p>Log a confirmed hit at distance and yorT builds your verified DOPE chart and trues your BC.</p>' +
+                '<p>Log a confirmed hit at distance and Proven builds your verified DOPE chart and trues your BC.</p>' +
                 '</div>';
             return;
         }

@@ -246,7 +246,7 @@ var LadderManager = (function () {
         overlay.className = 'overlay';
         overlay.innerHTML = '<div class="overlay-card">' +
             '<h3 class="overlay-title">Run a ladder test</h3>' +
-            '<p class="t-body u-quiet u-mb-12">Shoot it like a normal target session: one photo of the multi-bull target, then tap every hole <strong>in fire order</strong>. On the results step, tap "Split into ladder groups" — yorT charts the POI and finds your stable window.</p>' +
+            '<p class="t-body u-quiet u-mb-12">Shoot it like a normal target session: one photo of the multi-bull target, then tap every hole <strong>in fire order</strong>. On the results step, tap "Split into ladder groups" — Proven charts the POI and finds your stable window.</p>' +
             '<button class="action-primary u-mt-10" id="ladder-go">Start a session</button></div>';
         document.body.appendChild(overlay);
         overlay.querySelector('#ladder-go').addEventListener('click', function () {

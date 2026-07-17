@@ -316,7 +316,7 @@ HistoryManager.prototype._renderCleaningLog = function (rifle, barrelId, logs, t
 
     if (logs.length === 0) {
         html += '<div class="empty-teach">';
-        html += '<p>Log each cleaning and yorT keeps an honest count of rounds since.</p>';
+        html += '<p>Log each cleaning and Proven keeps an honest count of rounds since.</p>';
         html += '<button class="action-primary" id="btn-add-cleaning">' + Icon('plus', 20) + 'Add cleaning</button>';
         html += '</div>';
     } else {
@@ -471,7 +471,7 @@ HistoryManager.prototype._renderScopeAdjustments = function (rifle, adjustments)
 
     if (adjustments.length === 0) {
         html += '<div class="empty-teach">';
-        html += '<p>Log every turret change and yorT keeps a paper trail of where your zero has moved.</p>';
+        html += '<p>Log every turret change and Proven keeps a paper trail of where your zero has moved.</p>';
         html += '<button class="action-primary" id="btn-add-scope-adj">' + Icon('plus', 20) + 'Add adjustment</button>';
         html += '</div>';
     } else {
