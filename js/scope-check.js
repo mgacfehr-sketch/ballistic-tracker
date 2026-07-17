@@ -232,7 +232,9 @@ var ScopeCheck = (function () {
 
 // Home-action hook (registry actions with `run` resolve here; the
 // caller passes the live db handle)
-window.ToolActions = window.ToolActions || {};
-window.ToolActions.scopeCheck = function (db) {
-    ScopeCheck.start(db);
-};
+if (typeof window !== 'undefined') {
+    window.ToolActions = window.ToolActions || {};
+    window.ToolActions.scopeCheck = function (db) {
+        ScopeCheck.start(db);
+    };
+}

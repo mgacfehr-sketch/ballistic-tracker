@@ -10,7 +10,7 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 |---|---|---|
 | 1 | Scope tracking (tall-target) | ✅ code done |
 | 2 | Suppressor configs | ✅ code done |
-| 3 | DOPE cards | — |
+| 3 | DOPE cards | ✅ code done |
 | 4 | Field/steel logging | — |
 | 5 | Wind grader | — |
 | 6 | Effective range | — |
@@ -39,6 +39,16 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 - Tagging is automatic everywhere: sessions (save), chrono strings (import), cold-bore manual entries, zero records (field pass-through) — all null for single-config rifles.
 - Respected by: the solver (suppressed MV = load MV + measured delta) and the zero-status card (a bare zero no longer masquerades as a suppressed zero).
 - **Judgment calls:** shift requires ≥1 session per config (not 2) to speak early but is labeled measured, not promised; "accounted for" claims only what's wired (MV delta in solver, config-aware zero status) — POI shift is reported but not auto-dialed anywhere.
+
+## F3 — Printable DOPE cards
+
+**Question:** What do I dial? · **Budget:** C (5-tap wizard) · **Verdict:** the card itself — header auto-prints load · DA · date · zero so future-you knows what card this is. · **Empty state (in-wizard):** "This rifle has no load with BC and muzzle velocity — add them in Profiles." · **Taps:** 5 (rifle → load → format → use → pack).
+
+- Pure `dopeRows(table, {mode, scopeFactor})` (+9 tests): hunt = every 25 yd from 100; comp = one row per whole come-up MOA; come-ups snapped to ¼-MOA clicks; wind 5/10/15 mph columns by linear scaling of the 10 mph solution (drift is linear in crosswind for a fixed trajectory — noted approximation).
+- Same trued inputs as the solver: `computeTrajectory()` directly, scope-tracking correction applied to every printed come-up, suppressed MV delta applied when the can is on.
+- Three formats sized to real holders (buttstock strip 1.6×4.6", wrist-coach 3×5", full page) rendered on canvas → jsPDF letter with cut-mark rects; **travel pack** = 3 cards at 0/4,000/8,000 ft via `estimatePressureAtAltitude` on one page; single card uses live conditions (NetService, standard-atmosphere fallback).
+- Tool `dopeCards` in the drawer ("Put my dope on paper"); presets: hunt/compete/all.
+- **Judgment calls:** format picker uses label+description rather than thumbnail pictures (canvas thumbnails deferred to polish — noted against the "shown as pictures" spec); solver's `computeTrajectory` takes pressure not altitude, so travel-pack altitudes convert via the existing pressure model; hunt cards cap at 600 yd, comp at 1,200 yd.
 
 ## Notes so far
 

@@ -36,16 +36,22 @@ var TOOLS = {
         problem: 'Verify my scope dials true',
         homeAction: { id: 'scope-check', icon: '📐', label: 'Verify scope tracking', run: 'scopeCheck' },
         rifleCards: ['scope-truth']
+    },
+    dopeCards: {
+        key: 'dopeCards', core: false, feature: null,
+        problem: 'Put my dope on paper (range cards)',
+        homeAction: { id: 'dope-cards', icon: '🗒️', label: 'Print a DOPE card', run: 'dopeCards' },
+        rifleCards: []
     }
     // Feature waves add entries here — never a new registry, never a nav tab.
 };
 
 // Onboarding answer → which tools wake up
 var ToolPresets = {
-    hunt: [],
-    compete: ['chrono', 'scopeTruth'],
+    hunt: ['dopeCards'],
+    compete: ['chrono', 'scopeTruth', 'dopeCards'],
     handload: ['chrono'],
-    all: ['chrono', 'scopeTruth']
+    all: ['chrono', 'scopeTruth', 'dopeCards']
 };
 
 // ── Pure core ─────────────────────────────────────────────────

@@ -161,6 +161,39 @@ try { RC.register({ id: 'bad', slot: 'nonsense', isVisible: function () {}, rend
 catch (e) { threw = true; }
 check('unknown slot rejected by register', threw, true);
 
+// ── DopeCards.dopeRows ────────────────────────────────────────
+var calcMod = require('../js/calculations.js');
+global.applyScopeCorrection = calcMod.applyScopeCorrection;
+var dopeRows = require('../js/dope-cards.js').dopeRows;
+
+console.log('\nDopeCards.dopeRows:');
+
+// Synthetic trajectory table: comeUp grows ~1 MOA / 100 yd past zero
+var synthTable = [];
+for (var ri = 0; ri <= 1000; ri += 25) {
+    synthTable.push({
+        rangeYards: ri,
+        comeUpMOA: ri <= 100 ? 0 : (ri - 100) / 100,
+        windDriftMOA: ri / 500
+    });
+}
+
+var hunt = dopeRows(synthTable, { mode: 'hunt' });
+check('hunt rows start at 100', hunt[0].rangeYards, 100);
+check('hunt rows every 25 yd', hunt[1].rangeYards - hunt[0].rangeYards, 25);
+check('hunt row count (100..1000 by 25)', hunt.length, 37);
+
+var comp = dopeRows(synthTable, { mode: 'comp' });
+check('comp emits one row per whole come-up MOA', comp.length >= 8, true);
+check('comp first row is the 1-MOA crossing', comp[0].comeUpMOA >= 1, true);
+
+var corrected = dopeRows(synthTable, { mode: 'hunt', scopeFactor: 0.96 });
+check('scope factor inflates come-ups (dial MORE)', corrected[10].comeUpMOA > hunt[10].comeUpMOA, true);
+
+var w = hunt[hunt.length - 1];
+check('wind columns scale linearly (w5 = w10/2)', Math.abs(w.wind5 - Math.round(w.wind10 / 2 * 4) / 4) < 0.26, true);
+check('come-ups snap to quarter-MOA clicks', (hunt[5].comeUpMOA * 4) % 1, 0);
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
