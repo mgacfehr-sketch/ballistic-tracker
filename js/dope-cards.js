@@ -9,12 +9,14 @@
  * Uses the SAME trued inputs as the solver: computeTrajectory(), the
  * rifle's scope-tracking correction (come-ups pre-corrected on paper),
  * and the suppressed velocity delta when the rifle runs a can. Wind
- * columns at 5/10/15 mph full-value (linear scaling of the 10 mph
- * solution — drift is linear in crosswind speed for a fixed trajectory).
+ * columns at user-chosen full-value speeds (linear scaling of the
+ * 10 mph solution — drift is linear in crosswind speed for a fixed
+ * trajectory).
  *
  * Formats sized to the holders people actually own: buttstock strip
- * (1.6"×4.6"), wrist-coach card (3"×5"), full page. "Travel pack"
- * prints three cards for three density altitudes on one page.
+ * (1.6"×4.6"), wrist-coach card (3"×5"), full page. Altitudes are
+ * user-chosen (defaulting to the shooter's CURRENT GPS altitude, with
+ * presets and custom entry); one card prints per selected altitude.
  */
 
 var DopeCards = (function () {
@@ -22,15 +24,19 @@ var DopeCards = (function () {
     // ── Pure: table → card rows ───────────────────────────────
 
     /**
-     * @param {Array} table - computeTrajectory().table
-     * @param {Object} opts - { mode: 'hunt'|'comp', scopeFactor }
+     * @param {Array} table - computeTrajectory().table (10 mph wind basis)
+     * @param {Object} opts - { mode: 'hunt'|'comp', scopeFactor, windSpeeds }
      *   hunt: every 25 yd from 100; comp: one row per whole corrected
-     *   come-up MOA (even-drop-value rows).
-     * @returns {Array<{rangeYards, comeUpMOA, wind5, wind10, wind15}>}
+     *   come-up MOA (even-drop-value rows). windSpeeds: mph values that
+     *   get columns (default [5,10,15]); drift scales linearly off the
+     *   10 mph solution.
+     * @returns {Array<{rangeYards, comeUpMOA, winds: number[]}>}
      */
     function dopeRows(table, opts) {
         var mode = (opts && opts.mode) || 'hunt';
         var factor = opts && opts.scopeFactor;
+        var windSpeeds = (opts && opts.windSpeeds && opts.windSpeeds.length)
+            ? opts.windSpeeds : [5, 10, 15];
         var rows = [];
         var lastWhole = 0;
 
@@ -52,9 +58,9 @@ var DopeCards = (function () {
                 rows.push({
                     rangeYards: r.rangeYards,
                     comeUpMOA: Math.round(comeUp * 4) / 4,      // nearest click
-                    wind5: Math.round(r.windDriftMOA / 2 * 4) / 4,
-                    wind10: Math.round(r.windDriftMOA * 4) / 4,
-                    wind15: Math.round(r.windDriftMOA * 1.5 * 4) / 4
+                    winds: windSpeeds.map(function (mph) {
+                        return Math.round(r.windDriftMOA * (mph / 10) * 4) / 4;
+                    })
                 });
             }
         }
@@ -98,7 +104,7 @@ var DopeCards = (function () {
 
         // Column heads
         var rowsFit = rows.slice(0, fmt.maxRows);
-        var cols = ['YD', 'UP', 'W5', 'W10', 'W15'];
+        var cols = ['YD', 'UP'].concat((meta.windSpeeds || [5, 10, 15]).map(function (w) { return 'W' + w; }));
         var colW = (W - pad * 2) / cols.length;
         var cellSize = Math.max(10, Math.round((H - y - pad) / (rowsFit.length + 1) * 0.62));
         ctx.font = '700 ' + cellSize + 'px Arial';
@@ -119,11 +125,8 @@ var DopeCards = (function () {
             var ry = y + rowH * (i + 1) - rowH * 0.25;
             var vals = [
                 String(rowsFit[i].rangeYards),
-                formatNum(rowsFit[i].comeUpMOA, 2),
-                formatNum(rowsFit[i].wind5, 2),
-                formatNum(rowsFit[i].wind10, 2),
-                formatNum(rowsFit[i].wind15, 2)
-            ];
+                formatNum(rowsFit[i].comeUpMOA, 2)
+            ].concat(rowsFit[i].winds.map(function (wv) { return formatNum(wv, 2); }));
             for (var v = 0; v < vals.length; v++) {
                 ctx.fillText(vals[v], pad + v * colW, ry);
             }
@@ -136,7 +139,7 @@ var DopeCards = (function () {
     function buildDef(rifles, loadsByRifle) {
         return {
             id: 'dope-cards',
-            version: 1,
+            version: 2,
             steps: [
                 {
                     id: 'rifle', prompt: 'Which rifle?', type: 'choice',
@@ -183,11 +186,118 @@ var DopeCards = (function () {
                     ]
                 },
                 {
-                    id: 'pack', prompt: 'How many cards?', type: 'choice',
-                    choices: [
-                        { value: 'single', label: 'One card', desc: 'Current conditions' },
-                        { value: 'travel', label: 'Travel pack', desc: 'Three cards: sea level, 4,000 ft, 8,000 ft' }
-                    ]
+                    id: 'cards', prompt: 'Altitudes & wind columns', type: 'custom',
+                    mount: function (el, state, api) {
+                        var ALTS = [0, 2000, 4000, 6000, 8000, 10000];
+                        var WINDS = [5, 10, 15, 20];
+                        var sel = { alts: { current: true }, winds: { 5: true, 10: true, 15: true } };
+
+                        function altLabel(ft) {
+                            return ft === 0 ? 'Sea level' : ft.toLocaleString() + ' ft';
+                        }
+
+                        var html = '<p class="chrono-hint" style="margin:0 0 6px;">One card prints per altitude.</p>';
+                        html += '<div class="field-chips" id="dope-alts">';
+                        html += '<button class="field-chip field-chip-on" data-alt="current">Current altitude</button>';
+                        ALTS.forEach(function (ft) {
+                            html += '<button class="field-chip" data-alt="' + ft + '">' + altLabel(ft) + '</button>';
+                        });
+                        html += '</div>';
+                        html += '<div style="display:flex;gap:6px;margin:6px 0 10px;">';
+                        html += '<input type="number" id="dope-alt-custom" class="wizard-input" min="-1000" max="15000" step="100" inputmode="numeric" placeholder="Custom altitude (ft)" style="flex:1;margin:0;">';
+                        html += '<button class="btn btn-secondary" id="dope-alt-add" type="button">Add</button>';
+                        html += '</div>';
+                        html += '<div class="field-label">Wind columns (mph, full value)</div>';
+                        html += '<div class="field-chips" id="dope-winds">';
+                        WINDS.forEach(function (mph) {
+                            html += '<button class="field-chip' + (sel.winds[mph] ? ' field-chip-on' : '') + '" data-wind="' + mph + '">' + mph + '</button>';
+                        });
+                        html += '</div>';
+                        html += '<p class="wizard-error" id="dope-cards-error"></p>';
+                        html += '<div class="wizard-nav"><button class="btn btn-primary wizard-next" id="dope-cards-go" type="button">Create cards</button></div>';
+                        el.innerHTML = html;
+
+                        // Label the current-altitude chip with the GPS number (best-effort)
+                        if (typeof NetService !== 'undefined') {
+                            NetService.getConditions().then(function (cond) {
+                                var chip = el.querySelector('[data-alt="current"]');
+                                if (chip && cond && cond.altitude !== null) {
+                                    chip.textContent = 'Current (' + cond.altitude.toLocaleString() + ' ft)';
+                                }
+                            }).catch(function () { /* GPS off — standard atmosphere fallback at print */ });
+                        }
+
+                        function bindToggles(rootId, attr, map) {
+                            var chips = el.querySelector('#' + rootId).querySelectorAll('.field-chip');
+                            for (var i = 0; i < chips.length; i++) {
+                                chips[i].addEventListener('click', function () {
+                                    var key = this.getAttribute(attr);
+                                    map[key] = !map[key];
+                                    this.classList.toggle('field-chip-on', !!map[key]);
+                                });
+                            }
+                        }
+                        bindToggles('dope-alts', 'data-alt', sel.alts);
+                        bindToggles('dope-winds', 'data-wind', sel.winds);
+
+                        el.querySelector('#dope-alt-add').addEventListener('click', function () {
+                            var input = el.querySelector('#dope-alt-custom');
+                            var ft = Math.round(parseFloat(input.value));
+                            if (isNaN(ft) || ft < -1000 || ft > 15000) {
+                                el.querySelector('#dope-cards-error').textContent = 'Altitude must be between -1,000 and 15,000 ft.';
+                                return;
+                            }
+                            el.querySelector('#dope-cards-error').textContent = '';
+                            if (!el.querySelector('[data-alt="' + ft + '"]')) {
+                                var chip = document.createElement('button');
+                                chip.className = 'field-chip field-chip-on';
+                                chip.setAttribute('data-alt', String(ft));
+                                chip.textContent = altLabel(ft);
+                                chip.addEventListener('click', function () {
+                                    sel.alts[ft] = !sel.alts[ft];
+                                    this.classList.toggle('field-chip-on', !!sel.alts[ft]);
+                                });
+                                el.querySelector('#dope-alts').appendChild(chip);
+                            }
+                            sel.alts[ft] = true;
+                            var existing = el.querySelector('[data-alt="' + ft + '"]');
+                            if (existing) existing.classList.add('field-chip-on');
+                            input.value = '';
+                        });
+
+                        el.querySelector('#dope-cards-go').addEventListener('click', function () {
+                            var altitudes = [];
+                            var windSpeeds = [];
+                            for (var a in sel.alts) {
+                                if (sel.alts.hasOwnProperty(a) && sel.alts[a]) {
+                                    altitudes.push(a === 'current' ? 'current' : parseInt(a, 10));
+                                }
+                            }
+                            for (var w in sel.winds) {
+                                if (sel.winds.hasOwnProperty(w) && sel.winds[w]) windSpeeds.push(parseInt(w, 10));
+                            }
+                            if (!altitudes.length) {
+                                el.querySelector('#dope-cards-error').textContent = 'Pick at least one altitude.';
+                                return;
+                            }
+                            if (!windSpeeds.length) {
+                                el.querySelector('#dope-cards-error').textContent = 'Pick at least one wind speed.';
+                                return;
+                            }
+                            // Current first, then ascending altitudes
+                            altitudes.sort(function (x, y) {
+                                if (x === 'current') return -1;
+                                if (y === 'current') return 1;
+                                return x - y;
+                            });
+                            windSpeeds.sort(function (x, y) { return x - y; });
+                            api.submit({ altitudes: altitudes, windSpeeds: windSpeeds });
+                        });
+                    },
+                    validate: function (v) {
+                        return v && v.altitudes && v.altitudes.length && v.windSpeeds && v.windSpeeds.length
+                            ? null : 'Pick at least one altitude and wind speed.';
+                    }
                 }
             ]
         };
@@ -225,11 +335,16 @@ var DopeCards = (function () {
             mv += rifle.configVelocityDelta;
         }
 
-        var altitudes = answers.pack === 'travel' ? [0, 4000, 8000] : [null]; // null = current conditions
+        var picks = answers.cards || {};
+        // 'current' → null sentinel = live GPS conditions at print time
+        var altitudes = (picks.altitudes && picks.altitudes.length ? picks.altitudes : ['current'])
+            .map(function (a) { return a === 'current' ? null : a; });
+        var windSpeeds = picks.windSpeeds && picks.windSpeeds.length ? picks.windSpeeds : [5, 10, 15];
         var fmt = FORMATS[answers.format] || FORMATS.page;
 
-        // Current conditions (best-effort; standard atmosphere fallback)
-        var condPromise = (typeof NetService !== 'undefined' && answers.pack !== 'travel')
+        // Current conditions (best-effort; standard atmosphere fallback) —
+        // only fetched when a "current altitude" card was requested
+        var condPromise = (typeof NetService !== 'undefined' && altitudes.indexOf(null) !== -1)
             ? NetService.getConditions().catch(function () { return null; })
             : Promise.resolve(null);
 
@@ -260,13 +375,15 @@ var DopeCards = (function () {
                 });
                 var rows = dopeRows(result.table, {
                     mode: answers.use,
-                    scopeFactor: rifle.scopeCorrectionFactor
+                    scopeFactor: rifle.scopeCorrectionFactor,
+                    windSpeeds: windSpeeds
                 });
                 return renderCardCanvas(rows, {
                     loadName: load.name,
                     da: Math.round(da),
                     date: new Date().toLocaleDateString(),
-                    zeroRange: rifle.zeroRange || 100
+                    zeroRange: rifle.zeroRange || 100,
+                    windSpeeds: windSpeeds
                 }, fmt);
             });
             exportPdf(canvases, fmt, rifle);

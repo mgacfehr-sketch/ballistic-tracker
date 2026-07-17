@@ -500,21 +500,35 @@ RifleCards.register({
                 var parts = positions.map(function (p) {
                     return p + ' ' + eff[p].yards + ' yd';
                 });
-                html += '<p style="margin:0 0 6px;"><strong>90% hit rate: ' + parts.join(' · ') + '</strong></p>';
+                html += '<p style="margin:0 0 6px;"><strong>90% on a ' + FieldCore.VITALS_IN + '&Prime; vitals target: ' + parts.join(' · ') + '</strong></p>';
                 html += '<p class="chrono-hint">From ' + shots.length + ' logged strings. Updates itself as you log.</p>';
             } else {
-                html += '<p class="chrono-hint" style="margin:0;">Logging started — need ~5 shots per distance before this speaks (' +
-                    shots.length + ' strings so far).</p>';
+                // Progress state — never silent while the shooter is feeding it
+                html += '<p class="empty-state-sub" style="padding:0;">' + shots.length + ' string' + (shots.length === 1 ? '' : 's') +
+                    ' logged — a few more at each distance and I\'ll compute your effective range. ' +
+                    'Each 100-yd bin needs 5+ shots at 90% before it counts.</p>' +
+                    '<button class="btn btn-secondary" id="eff-range-log" style="margin-top:8px;">Log field shots</button>';
             }
 
-            // Wind grader insight (F5) — only when it has something real
-            var insight = FieldCore.windInsight(FieldCore.analyzeWindCalls(shots));
+            // Wind grader insight (F5) — only when it has something real,
+            // spoken in the rifle's own turret unit
+            var insight = FieldCore.windInsight(FieldCore.analyzeWindCalls(shots), ctx.rifle.angleUnit || 'MOA');
             if (insight) {
                 html += '<p class="chrono-hint" style="color:var(--calibration-color);">' + insight + '</p>';
             }
             body.innerHTML = html;
-        }).catch(function () {
-            el.style.display = 'none';
+            var logBtn = body.querySelector('#eff-range-log');
+            if (logBtn) {
+                logBtn.addEventListener('click', function () {
+                    if (window.ToolActions && window.ToolActions.fieldLog) {
+                        window.ToolActions.fieldLog(ctx.db);
+                    }
+                });
+            }
+        }).catch(function (err) {
+            // No silent failures: say what happened instead of vanishing
+            console.warn('[EffRange] failed to load field shots:', err);
+            body.innerHTML = '<p class="chrono-hint" style="margin:0;">Couldn\'t load field data — check your connection and reopen this rifle.</p>';
         });
     }
 });

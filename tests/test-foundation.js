@@ -195,8 +195,14 @@ check('scope factor inflates come-ups once it exceeds a click', corrected[20].co
 check('…and short-range rows legitimately snap to the same click', corrected[2].comeUpMOA, hunt[2].comeUpMOA);
 
 var w = hunt[hunt.length - 1];
-check('wind columns scale linearly (w5 = w10/2)', Math.abs(w.wind5 - Math.round(w.wind10 / 2 * 4) / 4) < 0.26, true);
+check('default wind columns are 5/10/15 (three)', w.winds.length, 3);
+check('wind columns scale linearly (w5 = w10/2)', Math.abs(w.winds[0] - Math.round(w.winds[1] / 2 * 4) / 4) < 0.26, true);
 check('come-ups snap to quarter-MOA clicks', (hunt[5].comeUpMOA * 4) % 1, 0);
+
+var custom = dopeRows(synthTable, { mode: 'hunt', windSpeeds: [10, 20] });
+check('custom wind speeds produce matching columns', custom[custom.length - 1].winds.length, 2);
+check('20 mph column doubles the 10 mph drift', custom[custom.length - 1].winds[1],
+    Math.round(custom[custom.length - 1].winds[0] * 2 * 4) / 4);
 
 // ── FieldCore ─────────────────────────────────────────────────
 var FieldCore = require('../js/field.js').FieldCore;
@@ -221,6 +227,32 @@ check('bins with <5 shots are skipped', FieldCore.computeEffectiveRange([fs(300,
 check('empty input → empty object', Object.keys(FieldCore.computeEffectiveRange([])).length, 0);
 check('threshold configurable', FieldCore.computeEffectiveRange(effShots, { threshold: 0.55 }).prone.yards, 700);
 
+console.log('\nFieldCore.normalizeHitRate (target-size normalization):');
+
+check('vitals-size target passes through', FieldCore.normalizeHitRate(0.9, 10), 0.9);
+check('missing target size passes through', FieldCore.normalizeHitRate(0.7, undefined), 0.7);
+check('null target size passes through', FieldCore.normalizeHitRate(0.7, null), 0.7);
+check('smaller target → higher normalized rate', FieldCore.normalizeHitRate(0.8, 8) > 0.8, true);
+check('larger target → lower normalized rate', FieldCore.normalizeHitRate(0.8, 12) < 0.8, true);
+check('perfect rate stays perfect', FieldCore.normalizeHitRate(1, 12), 1);
+check('zero rate stays zero', FieldCore.normalizeHitRate(0, 8), 0);
+// closed form: p_vitals = 1 - (1-p)^((v/t)^2); p=0.5 on 5" → 1-(0.5)^4 = 0.9375
+check('closed-form value (0.5 on 5" → 0.9375 on 10")',
+    Math.abs(FieldCore.normalizeHitRate(0.5, 5) - 0.9375) < 1e-9, true);
+
+// Effective range respects target size: 8/10 (80%) on a 12" plate at 300
+// normalizes below 90% on vitals and ends the walk; the same raw rate on
+// a 6" plate normalizes above 90% and keeps it.
+function fsT(dist, hits, shots, targetIn) {
+    return { distanceYards: dist, hits: hits, shots: shots, position: 'prone', targetSizeIn: targetIn };
+}
+check('big-plate hits do not inflate effective range',
+    FieldCore.computeEffectiveRange([fsT(300, 8, 10, 12)]).prone, undefined);
+check('small-plate hits normalize upward and qualify',
+    FieldCore.computeEffectiveRange([fsT(300, 8, 10, 6)]).prone.yards, 300);
+check('vitals-size plate unchanged by normalization (85% fails)',
+    FieldCore.computeEffectiveRange([fsT(300, 17, 20, 10)]).prone, undefined);
+
 console.log('\nFieldCore.analyzeWindCalls / windInsight:');
 
 function windShot(value, errorMil) {
@@ -239,8 +271,14 @@ check('classes below minCalls excluded', FieldCore.analyzeWindCalls(windShots.sl
 
 var insight = FieldCore.windInsight(wa);
 check('insight names the biggest bias', insight.indexOf('under-call full left') !== -1, true);
-check('insight includes magnitude', insight.indexOf('0.2 mil') !== -1, true);
+check('insight defaults to mils', insight.indexOf('0.2 mil') !== -1, true);
 check('no meaningful bias → null', FieldCore.windInsight([{ value: 'none', avgErrorMil: 0.02, n: 9 }]), null);
+
+var insightMOA = FieldCore.windInsight(wa, 'MOA');
+check('MOA unit converts the magnitude (0.2 mil → 0.7 MOA)', insightMOA.indexOf('0.7 MOA') !== -1, true);
+check('MOA insight never says mil', insightMOA.indexOf('mil') === -1, true);
+var insightMil = FieldCore.windInsight(wa, 'MIL');
+check('explicit MIL stays in mils', insightMil.indexOf('0.2 mil') !== -1, true);
 
 // ── LadderCore ────────────────────────────────────────────────
 var calcAll = require('../js/calculations.js');

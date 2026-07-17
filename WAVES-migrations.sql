@@ -141,3 +141,12 @@ ALTER TABLE public.loads ADD COLUMN IF NOT EXISTS recipe jsonb;
 -- ────────────────────────────────────────────────────────────
 ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS session_type text;
 ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS ladder jsonb;
+
+
+-- ────────────────────────────────────────────────────────────
+-- MIGRATION 7 (browser-test fix, F4/F6): target size on field
+-- shots — hit rate is meaningless without it. Effective range
+-- normalizes every string to a vitals-size (10") target.
+-- ADDITIVE only.
+-- ────────────────────────────────────────────────────────────
+ALTER TABLE public.field_shots ADD COLUMN IF NOT EXISTS target_size_in real;

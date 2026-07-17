@@ -225,6 +225,16 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     html += '</div>';
     html += '</div>';
 
+    // Turret units — wind grading and insights speak this unit
+    var unitVal = rifle && String(rifle.angleUnit || '').toUpperCase() === 'MIL' ? 'MIL' : 'MOA';
+    html += '<div class="form-group">';
+    html += '<label for="rf-angle-unit">Turret Units</label>';
+    html += '<select id="rf-angle-unit">';
+    html += '<option value="MOA"' + (unitVal === 'MOA' ? ' selected' : '') + '>MOA</option>';
+    html += '<option value="MIL"' + (unitVal === 'MIL' ? ' selected' : '') + '>MIL (mrad)</option>';
+    html += '</select>';
+    html += '</div>';
+
     // ── Barrel fields merged into rifle form ──
     html += '<div class="form-row">';
     html += '<div class="form-group form-group-half">';
@@ -354,6 +364,7 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
             caliber: caliber,
             scopeHeight: parseFloat(document.getElementById('rf-scope-height').value) || 0,
             zeroRange: parseFloat(document.getElementById('rf-zero-range').value) || 0,
+            angleUnit: document.getElementById('rf-angle-unit').value,
             notes: document.getElementById('rf-notes').value.trim(),
             hasConfigs: document.getElementById('rf-has-configs').checked,
             activeConfig: document.getElementById('rf-has-configs').checked ? 'bare' : null,
@@ -389,6 +400,7 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
             rifle.caliber = data.caliber;
             rifle.scopeHeight = data.scopeHeight;
             rifle.zeroRange = data.zeroRange;
+            rifle.angleUnit = data.angleUnit;
             rifle.notes = data.notes;
             rifle.hasConfigs = data.hasConfigs;
             if (data.hasConfigs && !rifle.activeConfig) rifle.activeConfig = 'bare';
@@ -401,29 +413,39 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
 
             var savePromise = self.db.updateRifle(rifle);
 
-            // Also update or create barrel
+            // Also update or create barrel. A barrel failure must never
+            // strand the user on the form — the rifle IS saved by then,
+            // so say what happened and show the detail page anyway.
             if (barrelData) {
                 savePromise = savePromise.then(function () {
+                    var barrelPromise;
                     if (barrel) {
                         // Update existing barrel
                         barrel.twistRate = barrelData.twistRate;
                         barrel.twistDirection = barrelData.twistDirection;
                         barrel.totalRounds = barrelData.totalRounds;
                         if (barrelData.installDate) barrel.installDate = barrelData.installDate;
-                        return self.db.updateBarrel(barrel);
+                        barrelPromise = self.db.updateBarrel(barrel);
                     } else {
                         // Create new barrel
                         barrelData.rifleId = rifle.id;
                         barrelData.isActive = true;
-                        return self.db.addBarrel(barrelData).then(function (newBarrel) {
+                        barrelPromise = self.db.addBarrel(barrelData).then(function (newBarrel) {
                             return self.db.setActiveBarrel(newBarrel.id, rifle.id);
                         });
                     }
+                    return barrelPromise.catch(function (err) {
+                        console.warn('[Profiles] barrel save failed:', err);
+                        alert('Rifle saved, but the barrel update failed: ' + err.message);
+                    });
                 });
             }
 
             savePromise.then(function () {
                 self.showRifleDetail(rifle.id);
+            }).catch(function (err) {
+                console.warn('[Profiles] rifle save failed:', err);
+                alert('Save failed: ' + err.message);
             });
         } else {
             // Create rifle
@@ -474,6 +496,11 @@ ProfileManager.prototype.showRifleDetail = function (rifleId) {
         var barrels = results[2];
         if (!rifle) { self.showRifleList(); return; }
         self._renderRifleDetail(rifle, loads, barrels);
+    }).catch(function (err) {
+        // Never dead-end silently — fall back to the list
+        console.warn('[Profiles] rifle detail load failed:', err);
+        alert('Couldn\'t open that rifle: ' + err.message);
+        self.showRifleList();
     });
 };
 

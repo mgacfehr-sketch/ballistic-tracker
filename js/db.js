@@ -860,6 +860,7 @@ BallisticDB.prototype.addFieldShot = function (data) {
         hits: typeof data.hits === 'number' ? data.hits : null,
         shots: typeof data.shots === 'number' ? data.shots : null,
         position: data.position || null,
+        targetSizeIn: typeof data.targetSizeIn === 'number' && data.targetSizeIn > 0 ? data.targetSizeIn : null,
         config: data.config || null,
         weather: data.weather || null,
         windCall: data.windCall || null,
