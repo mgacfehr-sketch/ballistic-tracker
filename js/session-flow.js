@@ -1138,6 +1138,13 @@ SessionFlow.prototype._saveSession = function () {
         btn.textContent = 'Saved to History';
         if (typeof Recents !== 'undefined') Recents.touchSession(saved.id, self.selectedRifle);
         self._storeAnnotatedImage(saved.id);
+        // Handload bookkeeping: a session on a recipe load = one firing
+        // on its brass (best-effort, never blocks anything)
+        if (self.selectedLoad && self.selectedLoad.recipe && self.selectedLoad.recipe.brass) {
+            var recipeLoad = self.selectedLoad;
+            recipeLoad.recipe.brass.timesFired = (recipeLoad.recipe.brass.timesFired || 0) + 1;
+            self.db.updateLoad(recipeLoad).catch(function () {});
+        }
     }).catch(function (err) {
         // Never lose the session silently: it stays on screen, and the
         // user gets an immediate retry.

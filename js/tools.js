@@ -48,6 +48,12 @@ var TOOLS = {
         problem: 'Know my ethical range',
         homeAction: { id: 'field-log', icon: '🪵', label: 'Log field shots', run: 'fieldLog' },
         rifleCards: ['effective-range']
+    },
+    bench: {
+        key: 'bench', core: false, feature: null,
+        problem: 'Track my handloads',
+        homeAction: { id: 'ladder-info', icon: '🧪', label: 'Run a ladder test', run: 'ladderInfo' },
+        rifleCards: []
     }
     // Feature waves add entries here — never a new registry, never a nav tab.
 };
@@ -56,8 +62,8 @@ var TOOLS = {
 var ToolPresets = {
     hunt: ['dopeCards', 'field'],
     compete: ['chrono', 'scopeTruth', 'dopeCards', 'field'],
-    handload: ['chrono'],
-    all: ['chrono', 'scopeTruth', 'dopeCards', 'field']
+    handload: ['chrono', 'bench'],
+    all: ['chrono', 'scopeTruth', 'dopeCards', 'field', 'bench']
 };
 
 // ── Pure core ─────────────────────────────────────────────────

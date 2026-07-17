@@ -15,7 +15,7 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 | 5 | Wind grader | ✅ code done |
 | 6 | Effective range | ✅ code done |
 | 7 | Ammo lot manager | ✅ code done |
-| 8 | Recipes + component lots | — |
+| 8 | Recipes + component lots | ✅ code done |
 | 9 | Ladder test | — |
 | 10 | Load logbook | — |
 
@@ -68,6 +68,16 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 - Lot number field on the load form; ammo-box OCR now extracts `lotNumber` too; strings inherit the load's lot at confirmation time (the lot they were shot from).
 - Truth-slot card gated to the `chrono` tool; fully silent when lots agree or only one lot exists.
 - **Judgment calls:** lot attaches at STRING-CONFIRMATION time from the load's current lot (import-time lot entry deferred — one field per import would break the flow); 30 fps threshold (≈1.5–2" at 400 for typical loads); no Home-alert provider yet (the card covers it; the alerts slot is wired for a future pass).
+
+## F8 — Reloading recipes + component lot tracking
+
+**Question:** Where's my stuff? · **Budget:** C at the bench (typing allowed — the bench exception, stated in the docs) · **Verdict:** the recipe block on the load, kept for them. · **Empty state:** the collapsed "Recipe (handload)" section itself. · **Taps:** n/a (bench form).
+
+- Recipe lives as structured jsonb ON the load (M5): brass make/lot/times-fired, primer make/lot, powder make/LOT/charge, bullet make/lot, seating depth. All-empty saves as null (clean loads stay clean).
+- Component pickers remember prior entries via `datalist` + `componentMemory` in user_settings (cross-device, capped 20/kind).
+- **Brass firing counts auto-increment**: every saved session on a recipe load adds one firing (best-effort, non-blocking).
+- Section renders only when the `bench` tool is active ("Track my handloads" in the drawer; handload/all presets).
+- **Judgment calls:** one brass-firing increment per SESSION (not per shot/case — cases fire once per outing in practice; per-case tracking deferred); recipe editing reuses the load form rather than a separate recipe screen; `bench`'s Home action slot points at the ladder test (F9).
 
 ## Notes so far
 

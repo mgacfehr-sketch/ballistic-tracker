@@ -727,6 +727,33 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     html += '</div>';
     html += '</div>';
 
+    // Recipe (bench tool) — the one place typing is expected
+    if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench')) {
+        var rec = (load && load.recipe) || {};
+        var rb = rec.brass || {}, rp = rec.primer || {}, rw = rec.powder || {}, ru = rec.bullet || {};
+        html += '<details class="session-details" style="margin:0 0 12px;"' + (load && load.recipe ? ' open' : '') + '>';
+        html += '<summary class="session-details-summary">Recipe (handload)</summary>';
+        html += '<div class="session-details-body" style="padding:8px 0 0;">';
+        html += '<div class="form-row">';
+        html += '<div class="form-group form-group-half"><label for="rc-brass">Brass</label><input type="text" id="rc-brass" list="mem-brass" maxlength="40" placeholder="Lapua" value="' + escapeAttr(rb.make || '') + '"></div>';
+        html += '<div class="form-group form-group-half"><label for="rc-brass-lot">Brass lot · fired</label><div style="display:flex;gap:6px;"><input type="text" id="rc-brass-lot" maxlength="20" placeholder="lot" value="' + escapeAttr(rb.lot || '') + '" style="flex:1;"><input type="number" id="rc-brass-fired" min="0" step="1" placeholder="0" value="' + (typeof rb.timesFired === 'number' ? rb.timesFired : '') + '" style="width:70px;"></div></div>';
+        html += '</div>';
+        html += '<div class="form-row">';
+        html += '<div class="form-group form-group-half"><label for="rc-primer">Primer</label><input type="text" id="rc-primer" list="mem-primer" maxlength="40" placeholder="CCI BR-2" value="' + escapeAttr(rp.make || '') + '"></div>';
+        html += '<div class="form-group form-group-half"><label for="rc-primer-lot">Primer lot</label><input type="text" id="rc-primer-lot" maxlength="20" value="' + escapeAttr(rp.lot || '') + '"></div>';
+        html += '</div>';
+        html += '<div class="form-row">';
+        html += '<div class="form-group form-group-half"><label for="rc-powder">Powder · charge (gr)</label><div style="display:flex;gap:6px;"><input type="text" id="rc-powder" list="mem-powder" maxlength="40" placeholder="H4350" value="' + escapeAttr(rw.make || '') + '" style="flex:1;"><input type="number" id="rc-charge" min="0" max="150" step="0.1" placeholder="41.8" value="' + (typeof rw.chargeGr === 'number' ? rw.chargeGr : '') + '" style="width:80px;"></div></div>';
+        html += '<div class="form-group form-group-half"><label for="rc-powder-lot">Powder LOT</label><input type="text" id="rc-powder-lot" maxlength="20" placeholder="matters: 30-60 fps between lots" value="' + escapeAttr(rw.lot || '') + '"></div>';
+        html += '</div>';
+        html += '<div class="form-row">';
+        html += '<div class="form-group form-group-half"><label for="rc-bullet">Bullet make · lot</label><div style="display:flex;gap:6px;"><input type="text" id="rc-bullet" list="mem-bullet" maxlength="40" placeholder="Berger" value="' + escapeAttr(ru.make || '') + '" style="flex:1;"><input type="text" id="rc-bullet-lot" maxlength="20" placeholder="lot" value="' + escapeAttr(ru.lot || '') + '" style="width:80px;"></div></div>';
+        html += '<div class="form-group form-group-half"><label for="rc-seating">Seating depth (in)</label><input type="number" id="rc-seating" min="0" max="5" step="0.001" placeholder="2.810 CBTO" value="' + (typeof rec.seatingDepthIn === 'number' ? rec.seatingDepthIn : '') + '"></div>';
+        html += '</div>';
+        html += '<datalist id="mem-brass"></datalist><datalist id="mem-primer"></datalist><datalist id="mem-powder"></datalist><datalist id="mem-bullet"></datalist>';
+        html += '</div></details>';
+    }
+
     html += '<div class="form-group">';
     html += '<label for="ld-notes">Notes</label>';
     html += '<textarea id="ld-notes" rows="2" placeholder="Optional notes">' + escapeHtml(load ? load.notes : '') + '</textarea>';
@@ -746,6 +773,52 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     this._bindLoadFormEvents(rifleId, load);
 };
 
+/**
+ * Read the recipe fields into a structured object, or null when every
+ * field is empty (no-recipe loads stay clean). Also feeds component
+ * memory (best-effort, cross-device via user_settings).
+ */
+ProfileManager.prototype._collectRecipe = function () {
+    function val(id) {
+        var el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+    }
+    function num(id) {
+        var v = parseFloat(val(id));
+        return isFinite(v) ? v : null;
+    }
+    if (!document.getElementById('rc-brass')) return undefined; // bench off → leave untouched
+
+    var recipe = {
+        brass: { make: val('rc-brass') || null, lot: val('rc-brass-lot') || null, timesFired: num('rc-brass-fired') },
+        primer: { make: val('rc-primer') || null, lot: val('rc-primer-lot') || null },
+        powder: { make: val('rc-powder') || null, lot: val('rc-powder-lot') || null, chargeGr: num('rc-charge') },
+        bullet: { make: val('rc-bullet') || null, lot: val('rc-bullet-lot') || null },
+        seatingDepthIn: num('rc-seating')
+    };
+    var hasAny = recipe.brass.make || recipe.primer.make || recipe.powder.make ||
+        recipe.bullet.make || recipe.powder.chargeGr !== null || recipe.seatingDepthIn !== null;
+    if (!hasAny) return null;
+
+    // Remember components for the pickers (merge, cap 20 each)
+    var self = this;
+    this.db.getUserSetting('componentMemory').then(function (mem) {
+        mem = mem || {};
+        [['brass', recipe.brass.make], ['primer', recipe.primer.make],
+         ['powder', recipe.powder.make], ['bullet', recipe.bullet.make]].forEach(function (pair) {
+            if (!pair[1]) return;
+            mem[pair[0]] = mem[pair[0]] || [];
+            if (mem[pair[0]].indexOf(pair[1]) === -1) {
+                mem[pair[0]].unshift(pair[1]);
+                mem[pair[0]] = mem[pair[0]].slice(0, 20);
+            }
+        });
+        return self.db.setUserSetting('componentMemory', mem);
+    }).catch(function () {});
+
+    return recipe;
+};
+
 ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
     var self = this;
 
@@ -756,6 +829,21 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
             self.showRifleDetail(rifleId);
         }
     });
+
+    // Component pickers remember prior entries (bench)
+    if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench')) {
+        this.db.getUserSetting('componentMemory').then(function (mem) {
+            if (!mem) return;
+            ['brass', 'primer', 'powder', 'bullet'].forEach(function (kind) {
+                var dl = document.getElementById('mem-' + kind);
+                if (dl && mem[kind]) {
+                    dl.innerHTML = mem[kind].map(function (v) {
+                        return '<option value="' + escapeAttr(v) + '">';
+                    }).join('');
+                }
+            });
+        }).catch(function () {});
+    }
 
     // Ammo-box OCR: prefill the form fields for the user to review
     if (typeof Onboarding !== 'undefined') {
@@ -786,6 +874,7 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
             rifleId: rifleId,
             name: name,
             lotNumber: document.getElementById('ld-lot').value.trim() || null,
+            recipe: self._collectRecipe(),
             bulletName: document.getElementById('ld-bullet-name').value.trim(),
             bulletWeight: weight,
             bulletDiameter: dia,
@@ -800,6 +889,8 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
 
         if (load) {
             load.name = data.name;
+            load.lotNumber = data.lotNumber;
+            if (data.recipe !== undefined) load.recipe = data.recipe;
             load.bulletName = data.bulletName;
             load.bulletWeight = data.bulletWeight;
             load.bulletDiameter = data.bulletDiameter;
