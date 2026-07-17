@@ -3391,3 +3391,12 @@ html, body {
     margin-left: auto;
     min-width: 120px;
 }
+
+/* Scope-check measure canvas */
+.sc-canvas {
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin: 10px 0;
+    cursor: crosshair;
+}

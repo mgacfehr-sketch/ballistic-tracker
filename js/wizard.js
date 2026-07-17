@@ -95,7 +95,11 @@ WizardShell.prototype._render = function () {
     }
     html += '<h3 class="wizard-prompt">' + step.prompt + '</h3>';
 
-    if (step.type === 'choice') {
+    if (step.type === 'custom') {
+        // Custom steps own their body and advance via api.submit(answer).
+        // step.mount(bodyEl, state, api) is called after the shell renders.
+        html += '<div class="wizard-custom" id="wizard-custom-body"></div>';
+    } else if (step.type === 'choice') {
         for (var c = 0; c < step.choices.length; c++) {
             var ch = step.choices[c];
             html += '<button class="wizard-choice" data-value="' + ch.value + '">' +
@@ -114,13 +118,23 @@ WizardShell.prototype._render = function () {
     if (this.state.index > 0) {
         html += '<button class="btn btn-secondary" id="wizard-back">‹ Back</button>';
     }
-    if (step.type !== 'choice') {
+    if (step.type !== 'choice' && step.type !== 'custom') {
         html += '<button class="btn btn-primary wizard-next" id="wizard-next">Next</button>';
     }
     html += '</div>';
     html += '</div>';
 
     this._root.innerHTML = html;
+
+    if (step.type === 'custom' && step.mount) {
+        step.mount(this._root.querySelector('#wizard-custom-body'), this.state, {
+            submit: function (answer) { self._advance(answer); },
+            error: function (msg) {
+                var errEl = self._root.querySelector('.wizard-error');
+                if (errEl) errEl.textContent = msg || '';
+            }
+        });
+    }
 
     // Choice taps answer AND advance — one decision per screen
     var choices = this._root.querySelectorAll('.wizard-choice');

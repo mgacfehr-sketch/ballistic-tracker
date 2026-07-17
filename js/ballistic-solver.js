@@ -888,6 +888,10 @@ BallisticSolverManager.prototype._renderTable = function (result) {
     var zeroRange = (this.selectedRifle && this.selectedRifle.zeroRange)
         ? parseFloat(this.selectedRifle.zeroRange) : 100;
 
+    // Scope-tracking correction (tall-target test) — applied silently
+    var scopeFactor = this.selectedRifle && typeof this.selectedRifle.scopeCorrectionFactor === 'number'
+        ? this.selectedRifle.scopeCorrectionFactor : null;
+
     var html = '<div class="solver-table-wrap">';
     html += '<table class="solver-table">';
     html += '<thead><tr>';
@@ -913,7 +917,7 @@ BallisticSolverManager.prototype._renderTable = function (result) {
         html += '<td>' + row.rangeYards + '</td>';
         html += '<td>' + formatFixed(row.dropInches, 1) + '</td>';
         html += '<td>' + formatFixed(row.dropMOA, 1) + '</td>';
-        html += '<td class="solver-comeup">' + formatFixed(row.comeUpMOA, 1) + '</td>';
+        html += '<td class="solver-comeup">' + formatFixed(applyScopeCorrection(row.comeUpMOA, scopeFactor), 1) + '</td>';
         html += '<td>' + formatFixed(row.windDriftInches, 1) + '</td>';
         html += '<td>' + formatFixed(row.windDriftMOA, 1) + '</td>';
         html += '<td>' + row.velocityFps + '</td>';
@@ -925,6 +929,10 @@ BallisticSolverManager.prototype._renderTable = function (result) {
 
     html += '</tbody></table>';
     html += '</div>';
+    if (scopeFactor && Math.abs(scopeFactor - 1) > 0.01) {
+        html += '<p class="chrono-hint">Come-ups corrected for this scope\'s measured tracking (' +
+            formatFixed((1 / scopeFactor - 1) * 100, 1) + '% adjustment).</p>';
+    }
 
     container.innerHTML = html;
 };

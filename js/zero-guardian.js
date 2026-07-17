@@ -46,12 +46,16 @@ var ZeroGuardian = (function () {
 
     /**
      * Verdict for a results object with the current click preference,
-     * or null when no POA/ATZ data exists.
+     * or null when no POA/ATZ data exists. An optional scope-tracking
+     * factor corrects the click math silently (effective click value =
+     * nominal × factor, so a 4%-small scope yields more clicks).
      */
-    function verdictFor(results) {
+    function verdictFor(results, clickFactor) {
         var atz = _atzFromResults(results);
         if (!atz) return null;
-        return zeroVerdict(atz, getClickValue(), TOLERANCE_MOA);
+        var effectiveClick = getClickValue() *
+            (typeof clickFactor === 'number' && isFinite(clickFactor) && clickFactor > 0 ? clickFactor : 1);
+        return zeroVerdict(atz, effectiveClick, TOLERANCE_MOA);
     }
 
     /**
@@ -67,11 +71,11 @@ var ZeroGuardian = (function () {
     /**
      * Render the banner into a container. No POA → renders nothing.
      */
-    function render(container, results) {
+    function render(container, results, clickFactor) {
         if (!container) return;
         if (!enabled()) { container.innerHTML = ''; return; }
 
-        var v = verdictFor(results);
+        var v = verdictFor(results, clickFactor);
         if (!v) {
             container.innerHTML = '';
             return;
@@ -102,7 +106,7 @@ var ZeroGuardian = (function () {
         var sel = container.querySelector('#zg-click');
         sel.addEventListener('change', function () {
             setClickValue(parseFloat(this.value));
-            render(container, results); // re-render with new click math
+            render(container, results, clickFactor); // re-render with new click math
         });
     }
 

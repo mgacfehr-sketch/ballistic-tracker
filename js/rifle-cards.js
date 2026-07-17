@@ -175,6 +175,60 @@ RifleCards.register({
     }
 });
 
+// ── truth: scope tracking (silent while things are fine) ──────
+RifleCards.register({
+    id: 'scope-truth',
+    slot: 'truth',
+    tool: 'scopeTruth',
+    isVisible: function (ctx) { return !!ctx.rifle; },
+    render: function (el, ctx) {
+        var rifle = ctx.rifle;
+        var factor = rifle.scopeCorrectionFactor;
+        var html;
+
+        if (typeof factor !== 'number' || !isFinite(factor)) {
+            // Empty state: one sentence + one button
+            html = '<div class="detail-card">' +
+                '<p class="empty-state-sub" style="padding:0;">This scope\'s tracking has never been verified — most scopes are 2–5% off, silently.</p>' +
+                '<button class="btn btn-secondary" id="scope-truth-test" style="margin-top:8px;">Verify scope tracking</button>' +
+                '</div>';
+        } else {
+            var errorPct = (factor - 1) * 100;
+            var testedAt = rifle.scopeTrackingTestedAt ? new Date(rifle.scopeTrackingTestedAt) : null;
+            var stale = testedAt && (Date.now() - testedAt.getTime()) > 365 * 24 * 3600 * 1000;
+            var when = testedAt ? testedAt.toLocaleDateString() : '';
+
+            if (Math.abs(errorPct) <= 1 && !stale && !rifle.scopeCantWarn) {
+                // Silence is a feature: healthy + fresh renders one quiet line
+                html = '<div class="detail-card"><p class="chrono-hint" style="margin:0;">✓ Scope tracks true — verified ' + when + '</p></div>';
+            } else {
+                html = '<div class="detail-card">';
+                if (Math.abs(errorPct) > 1) {
+                    html += '<p style="margin:0 0 6px;"><strong>Your clicks are ' +
+                        formatNum(Math.abs(errorPct), 1) + '% ' + (errorPct < 0 ? 'small' : 'large') +
+                        '</strong> — corrected automatically in every solution.</p>';
+                }
+                if (rifle.scopeCantWarn) {
+                    html += '<p class="chrono-hint" style="color:var(--calibration-color);">⚠ Lateral drift seen during the test — check scope plumb/cant.</p>';
+                }
+                html += '<p class="chrono-hint">Verified ' + when + (stale ? ' — over a year old, re-test recommended' : '') + '</p>';
+                html += '<button class="btn btn-secondary btn-sm" id="scope-truth-test">Re-test</button>';
+                html += '</div>';
+            }
+        }
+        el.innerHTML = html;
+
+        var btn = el.querySelector('#scope-truth-test');
+        if (btn && typeof ScopeCheck !== 'undefined') {
+            btn.addEventListener('click', function () {
+                ScopeCheck.start(ctx.db, function () {
+                    ctx.managers.profile.showRifleDetail(ctx.rifle.id);
+                });
+            });
+        }
+    }
+});
+
 // ── progress: barrel round counts (with inline editor) ────────
 RifleCards.register({
     id: 'barrel',

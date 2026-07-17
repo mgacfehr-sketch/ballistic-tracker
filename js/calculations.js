@@ -225,6 +225,40 @@ function zeroVerdict(atz, clickValueMOA, toleranceMOA) {
 }
 
 /**
+ * Scope tracking (tall-target test) analysis.
+ *
+ * @param {number} dialedMOA - MOA the shooter dialed up (clicks × click value)
+ * @param {number} distanceYards - measured target distance
+ * @param {number} actualTravelInches - measured vertical POI travel
+ * @param {number} horizDriftInches - lateral POI drift during the dial
+ * @returns {{expectedInches, actualInches, factor, errorPct, cantWarn}}
+ *   factor = actual/expected (0.96 = clicks move 4% LESS than marked);
+ *   cantWarn when lateral drift exceeds 2% of expected travel (reticle
+ *   not plumb / cant in the setup).
+ */
+function scopeTrackingAnalysis(dialedMOA, distanceYards, actualTravelInches, horizDriftInches) {
+    var expected = moaToInches(dialedMOA, distanceYards);
+    var factor = expected > 0 ? actualTravelInches / expected : 1;
+    return {
+        expectedInches: round4(expected),
+        actualInches: round4(actualTravelInches),
+        factor: round4(factor),
+        errorPct: round4((factor - 1) * 100),
+        cantWarn: Math.abs(horizDriftInches || 0) > expected * 0.02
+    };
+}
+
+/**
+ * Apply a scope's measured correction factor to a dial value.
+ * If the scope tracks 4% small (factor 0.96), you must DIAL MORE:
+ * corrected = nominal / factor. No factor (null/0/1) → unchanged.
+ */
+function applyScopeCorrection(moa, factor) {
+    if (typeof factor !== 'number' || !isFinite(factor) || factor <= 0) return moa;
+    return moa / factor;
+}
+
+/**
  * Population standard deviation of an array of numbers.
  * @param {number[]} values
  * @returns {number}
@@ -467,6 +501,8 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateShotOffset,
         calculateSession,
         zeroVerdict,
+        scopeTrackingAnalysis,
+        applyScopeCorrection,
         round4
     };
 }

@@ -273,6 +273,31 @@ assert(zvOneAxis.windClicks === 4, '0.9 MOA @ 1/4 → 4 clicks (round 3.6)');
 const zvDefaults = calc.zeroVerdict({ elevationMOA: 0.5, windageMOA: 0.1, elevationDir: 'Down', windageDir: 'Right' });
 assert(zvDefaults.confirmed === false && zvDefaults.elevClicks === 2, 'defaults: 1/4 MOA click + 0.25 tol');
 
+// ─── Scope tracking (tall-target) ───────────────────────────────
+
+console.log('\nScope tracking analysis:');
+
+// Dial 30 clicks of 1/4 MOA at 100 yd = 7.5 MOA = 7.8525"
+const st1 = calc.scopeTrackingAnalysis(7.5, 100, 7.538, 0.05);
+assertApprox(st1.expectedInches, 7.8525, 0.001, 'expected travel = 7.8525" for 7.5 MOA @ 100');
+assertApprox(st1.factor, 0.96, 0.001, 'measured 7.538" → factor 0.96 (4% small)');
+assertApprox(st1.errorPct, -4.0, 0.05, 'errorPct ≈ -4%');
+assert(st1.cantWarn === false, 'tiny lateral drift → no cant warning');
+
+const st2 = calc.scopeTrackingAnalysis(7.5, 100, 7.8525, 0.3);
+assertApprox(st2.factor, 1.0, 0.001, 'perfect travel → factor 1.0');
+assert(st2.cantWarn === true, '0.3" lateral on 7.85" travel (>2%) → cant warning');
+
+const st3 = calc.scopeTrackingAnalysis(7.5, 100, 8.24, 0);
+assert(st3.errorPct > 4.8 && st3.errorPct < 5.0, 'clicks 5% LARGE detected');
+
+console.log('\nApply scope correction:');
+assertApprox(calc.applyScopeCorrection(10, 0.96), 10.4167, 0.001, 'factor 0.96 → dial MORE (10 → 10.42)');
+assertApprox(calc.applyScopeCorrection(10, 1.04), 9.6154, 0.001, 'factor 1.04 → dial LESS');
+assert(calc.applyScopeCorrection(10, null) === 10, 'null factor → unchanged');
+assert(calc.applyScopeCorrection(10, 0) === 10, 'zero factor → unchanged (guard)');
+assert(calc.applyScopeCorrection(10, 1) === 10, 'factor 1 → unchanged');
+
 // ─── Summary ────────────────────────────────────────────────────
 
 console.log(`\n${'═'.repeat(40)}`);

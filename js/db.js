@@ -86,6 +86,11 @@ BallisticDB.prototype.addRifle = function (data) {
                 zeroRange: data.zeroRange || 0,
                 angleUnit: data.angleUnit || 'MOA',
                 notes: data.notes || '',
+                // Scope facts (tall-target test) — all optional
+                scopeClickValue: data.scopeClickValue || null,
+                scopeCorrectionFactor: data.scopeCorrectionFactor || null,
+                scopeTrackingTestedAt: data.scopeTrackingTestedAt || null,
+                scopeCantWarn: typeof data.scopeCantWarn === 'boolean' ? data.scopeCantWarn : null,
                 // Build sheet (certificate) — all optional
                 serialNumber: data.serialNumber || null,
                 action: data.action || null,

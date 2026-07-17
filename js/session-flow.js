@@ -1064,9 +1064,11 @@ SessionFlow.prototype._renderResults = function () {
 
     card.innerHTML = html;
 
-    // Zero Guardian plain-English verdict (feature-gated inside render)
+    // Zero Guardian plain-English verdict (feature-gated inside render);
+    // click math silently corrected by the rifle's scope-tracking factor
     if (typeof ZeroGuardian !== 'undefined') {
-        ZeroGuardian.render(document.getElementById('zero-guardian-banner'), r);
+        ZeroGuardian.render(document.getElementById('zero-guardian-banner'), r,
+            this.selectedRifle ? this.selectedRifle.scopeCorrectionFactor : null);
     }
 };
 

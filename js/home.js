@@ -195,8 +195,9 @@ HomeManager.prototype._renderActions = function () {
     var html = '';
     for (var i = 0; i < actions.length; i++) {
         var a = actions[i].homeAction;
-        html += '<button class="home-action" data-action-id="' + a.id +
-            '" data-view="' + a.view + '">' +
+        html += '<button class="home-action" data-action-id="' + a.id + '"' +
+            (a.view ? ' data-view="' + a.view + '"' : '') +
+            (a.run ? ' data-run="' + a.run + '"' : '') + '>' +
             '<span class="home-action-icon">' + a.icon + '</span>' +
             '<span class="home-action-label">' + a.label + '</span>' +
             '</button>';
@@ -208,11 +209,16 @@ HomeManager.prototype._renderActions = function () {
         buttons[b].addEventListener('click', function () {
             var id = this.getAttribute('data-action-id');
             var view = this.getAttribute('data-view');
+            var run = this.getAttribute('data-run');
             try {
                 localStorage.setItem('yort_home_counts',
                     JSON.stringify(HomeCore.bumpCount(self._counts(), id)));
             } catch (e) { /* adaptivity is best-effort */ }
-            if (window.AppNav) window.AppNav.go(view);
+            if (run && window.ToolActions && window.ToolActions[run]) {
+                window.ToolActions[run](self.db);
+            } else if (view && window.AppNav) {
+                window.AppNav.go(view);
+            }
         });
     }
 };

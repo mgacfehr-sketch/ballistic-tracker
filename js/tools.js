@@ -30,6 +30,12 @@ var TOOLS = {
         problem: 'Track my velocities',
         homeAction: { id: 'import-chrono', icon: '📥', label: 'Import chrono data', view: 'chrono' },
         rifleCards: []
+    },
+    scopeTruth: {
+        key: 'scopeTruth', core: false, feature: null,
+        problem: 'Verify my scope dials true',
+        homeAction: { id: 'scope-check', icon: '📐', label: 'Verify scope tracking', run: 'scopeCheck' },
+        rifleCards: ['scope-truth']
     }
     // Feature waves add entries here — never a new registry, never a nav tab.
 };
@@ -37,9 +43,9 @@ var TOOLS = {
 // Onboarding answer → which tools wake up
 var ToolPresets = {
     hunt: [],
-    compete: ['chrono'],
+    compete: ['chrono', 'scopeTruth'],
     handload: ['chrono'],
-    all: ['chrono']
+    all: ['chrono', 'scopeTruth']
 };
 
 // ── Pure core ─────────────────────────────────────────────────
