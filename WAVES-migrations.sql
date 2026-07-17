@@ -29,8 +29,46 @@ ALTER TABLE public.rifles           ADD COLUMN IF NOT EXISTS config_velocity_del
 ALTER TABLE public.rifles           ADD COLUMN IF NOT EXISTS config_poi_shift jsonb;      -- {elevMOA, windMOA} suppressed minus bare
 ALTER TABLE public.sessions         ADD COLUMN IF NOT EXISTS config text;
 ALTER TABLE public.velocity_strings ADD COLUMN IF NOT EXISTS config text;
-ALTER TABLE public.cold_bore_shots  ADD COLUMN IF NOT EXISTS config text;
 ALTER TABLE public.zero_records     ADD COLUMN IF NOT EXISTS config text;
+
+-- cold_bore_shots is only created by beta-migration.sql, which was never
+-- run on the live database (beta features are hard-disabled). The live
+-- cold-bore feature stores auto-derived data in sessions.cold_bore
+-- (cold-bore-migration.sql), but js/db.js still writes MANUAL cold-bore
+-- entries to this table — so create it here if missing (definition
+-- copied verbatim from beta-migration.sql), then tag it with config.
+CREATE TABLE IF NOT EXISTS public.cold_bore_shots (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    rifle_id            uuid NOT NULL REFERENCES public.rifles(id) ON DELETE CASCADE,
+    distance_yards      integer DEFAULT 100,
+    condition           text DEFAULT 'clean_cold',
+    elevation_offset_moa real DEFAULT 0,
+    windage_offset_moa  real DEFAULT 0,
+    notes               text DEFAULT '',
+    date                timestamptz DEFAULT now(),
+    created_at          timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.cold_bore_shots ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can read own cold bore shots" ON public.cold_bore_shots;
+CREATE POLICY "Users can read own cold bore shots"
+    ON public.cold_bore_shots FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own cold bore shots" ON public.cold_bore_shots;
+CREATE POLICY "Users can insert own cold bore shots"
+    ON public.cold_bore_shots FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own cold bore shots" ON public.cold_bore_shots;
+CREATE POLICY "Users can update own cold bore shots"
+    ON public.cold_bore_shots FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own cold bore shots" ON public.cold_bore_shots;
+CREATE POLICY "Users can delete own cold bore shots"
+    ON public.cold_bore_shots FOR DELETE USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_cold_bore_shots_rifle
+    ON public.cold_bore_shots(user_id, rifle_id);
+
+ALTER TABLE public.cold_bore_shots ADD COLUMN IF NOT EXISTS config text;
 
 
 -- ────────────────────────────────────────────────────────────
@@ -59,12 +97,16 @@ CREATE TABLE IF NOT EXISTS public.field_shots (
 
 ALTER TABLE public.field_shots ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own field shots" ON public.field_shots;
 CREATE POLICY "Users can read own field shots"
     ON public.field_shots FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own field shots" ON public.field_shots;
 CREATE POLICY "Users can insert own field shots"
     ON public.field_shots FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own field shots" ON public.field_shots;
 CREATE POLICY "Users can update own field shots"
     ON public.field_shots FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own field shots" ON public.field_shots;
 CREATE POLICY "Users can delete own field shots"
     ON public.field_shots FOR DELETE USING (auth.uid() = user_id);
 
