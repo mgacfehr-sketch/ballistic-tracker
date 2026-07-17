@@ -1377,7 +1377,7 @@ input[type="checkbox"] {
 
 /* ── 21. AI — Ask yorT ─────────────────────────────────────────── */
 
-#view-ai.active { display: flex; flex-direction: column; overflow: hidden; }
+#view-ai.active { display: flex; flex-direction: column; overflow: hidden; position: relative; }
 
 .ai-chat-header { flex: none; padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--line); }
 

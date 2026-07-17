@@ -138,3 +138,20 @@ files (`#ccc`/`#aaa` in the rifle form, `#ff6b6b` in app.js's fatal card)
   DOPE/certificate PDFs) are deliberately unchanged: they draw onto
   photos/paper, not themed UI. Green impacts / blue POA / amber
   calibration on a photograph is a visibility system that works.
+
+## Step 5 — The rest (CACHE v84)
+
+History, cleaning/scope logs, loads & recipes, Performance Report,
+certificate screen, admin dashboard (incl. crowd tables), and Ask yorT
+all emit the shared scaffolding classes (`.profile-screen`,
+`.session-card`, `.log-entry`, `.report-*`, `.cert-*`, `.admin-*`,
+`.ai-*`) — verified by sweep; every one is styled by the token sheet, so
+this step's audit found only one structural gap: the Ask yorT
+conversation-history panel needed a positioning context under the new
+chat layout (`#view-ai` is now `position:relative`).
+
+Ask yorT reads as a proper chat now: user messages right in raised
+surface, yorT replies left in cards, dot-pulse loading, input bar pinned
+above the nav with a 48px send key. Admin tables get sticky headers and
+tabular numerals. Certificate preview sits on white (it's paper).
+Nothing anywhere still references the old green-accent language.
