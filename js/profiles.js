@@ -681,6 +681,11 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     html += '</div>';
 
     html += '<div class="form-group">';
+    html += '<label for="ld-lot">Lot Number</label>';
+    html += '<input type="text" id="ld-lot" maxlength="40" placeholder="From the box flap — catches lot-to-lot velocity shifts" value="' + escapeAttr(load && load.lotNumber ? load.lotNumber : '') + '">';
+    html += '</div>';
+
+    html += '<div class="form-group">';
     html += '<label for="ld-bullet-name">Bullet Name</label>';
     html += '<input type="text" id="ld-bullet-name" maxlength="80" placeholder="e.g., ELD Match" value="' + escapeAttr(load ? load.bulletName : '') + '">';
     html += '</div>';
@@ -762,6 +767,7 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
             if (fields.bulletBC) document.getElementById('ld-bullet-bc').value = fields.bulletBC;
             if (fields.dragModel) document.getElementById('ld-drag-model').value = fields.dragModel;
             if (fields.muzzleVelocity) document.getElementById('ld-mv').value = fields.muzzleVelocity;
+            if (fields.lotNumber) document.getElementById('ld-lot').value = fields.lotNumber;
         });
     }
 
@@ -779,6 +785,7 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
         var data = {
             rifleId: rifleId,
             name: name,
+            lotNumber: document.getElementById('ld-lot').value.trim() || null,
             bulletName: document.getElementById('ld-bullet-name').value.trim(),
             bulletWeight: weight,
             bulletDiameter: dia,

@@ -256,6 +256,40 @@ check('unconfirmed strings ignored', V.configShift([], [
     { config: 'suppressed', assignmentStatus: 'suggested', avgFps: 2730, shots: [] }
 ]), null);
 
+// ── Lot drift ─────────────────────────────────────────────────
+console.log('\nlotDrift:');
+
+function lotString(loadId, lot, avg, date) {
+    return { loadId: loadId, lotNumber: lot, avgFps: avg, date: date,
+        assignmentStatus: 'confirmed', shots: new Array(10).fill({ fps: avg }) };
+}
+
+var ld1 = V.lotDrift([
+    lotString('A', 'LOT-1', 2700, '2026-06-01'),
+    lotString('A', 'LOT-2', 2745, '2026-07-01')
+]);
+check('45 fps drift → one alert', ld1.length, 1);
+check('alert names the new lot', ld1[0].newLot, 'LOT-2');
+check('alert delta +45', ld1[0].deltaFps, 45);
+
+check('drift under threshold → silent', V.lotDrift([
+    lotString('A', 'LOT-1', 2700, '2026-06-01'),
+    lotString('A', 'LOT-2', 2720, '2026-07-01')
+]).length, 0);
+check('single lot → silent', V.lotDrift([lotString('A', 'LOT-1', 2700, '2026-06-01')]).length, 0);
+check('strings without lot numbers ignored', V.lotDrift([
+    lotString('A', 'LOT-1', 2700, '2026-06-01'),
+    { loadId: 'A', lotNumber: null, avgFps: 2760, date: '2026-07-01', assignmentStatus: 'confirmed', shots: [] }
+]).length, 0);
+check('newest-by-date wins as the "new" lot', V.lotDrift([
+    lotString('A', 'LOT-9', 2745, '2026-05-01'),
+    lotString('A', 'LOT-2', 2700, '2026-07-01')
+])[0].newLot, 'LOT-2');
+check('slower drift reported negative', V.lotDrift([
+    lotString('A', 'L1', 2745, '2026-06-01'),
+    lotString('A', 'L2', 2700, '2026-07-01')
+])[0].deltaFps, -45);
+
 // ── Per-rifle aggregation ─────────────────────────────────────
 console.log('\naggregateRifle:');
 

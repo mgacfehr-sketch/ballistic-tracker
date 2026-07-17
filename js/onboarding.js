@@ -17,7 +17,7 @@ var Onboarding = (function () {
         'Reply with ONLY a JSON object — no prose, no markdown fences: ' +
         '{"name": string|null, "bulletName": string|null, "bulletWeight": number|null, ' +
         '"bulletDiameter": number|null, "bulletBC": number|null, "dragModel": "G1"|"G7"|null, ' +
-        '"muzzleVelocity": number|null} ' +
+        '"muzzleVelocity": number|null, "lotNumber": string|null} ' +
         'Rules: name = brand + weight + bullet (e.g. "Hornady 168gr ELD Match"). ' +
         'bulletWeight in grains. bulletDiameter in inches (convert caliber/mm: .308 Win -> 0.308, 6.5mm -> 0.264). ' +
         'muzzleVelocity in fps only if printed on the box. ' +
@@ -66,6 +66,7 @@ var Onboarding = (function () {
         if (typeof raw.bulletBC === 'number' && raw.bulletBC > 0 && raw.bulletBC <= 2) out.bulletBC = raw.bulletBC;
         if (raw.dragModel === 'G1' || raw.dragModel === 'G7') out.dragModel = raw.dragModel;
         if (typeof raw.muzzleVelocity === 'number' && raw.muzzleVelocity >= 500 && raw.muzzleVelocity <= 5000) out.muzzleVelocity = raw.muzzleVelocity;
+        if (typeof raw.lotNumber === 'string' && raw.lotNumber.trim()) out.lotNumber = raw.lotNumber.trim().slice(0, 40);
 
         if (!Object.keys(out).length) {
             throw new Error("Couldn't read the box — enter the load manually.");

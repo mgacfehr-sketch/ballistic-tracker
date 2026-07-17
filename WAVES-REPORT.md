@@ -14,7 +14,7 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 | 4 | Field/steel logging | ✅ code done |
 | 5 | Wind grader | ✅ code done |
 | 6 | Effective range | ✅ code done |
-| 7 | Ammo lot manager | — |
+| 7 | Ammo lot manager | ✅ code done |
 | 8 | Recipes + component lots | — |
 | 9 | Ladder test | — |
 | 10 | Load logbook | — |
@@ -59,6 +59,15 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 **F6** — pure `computeEffectiveRange`: 100-yd bins, ≥5 shots per bin to judge, walk from near until the first failing bin — a good bin BEYOND a failing one never resurrects the range (tested). Card (progress slot, `field` tool): "**90% hit rate: prone 500 yd · seated 200 yd**", wind insight appended when real. 15 new FieldCore tests.
 - `field_shots` table = WAVES-migrations M3 (with suppressor-config tag). Tool `field` ("Know my ethical range") adds the Home action + card; presets hunt/compete/all.
 - **Judgment calls:** wind "slider" is speed+value chips (gloves-friendly, no typing — a literal slider is worse outdoors); wind actual captured as the signed correction that worked (±mil chips), positive = called under; effective-range needs ≥5 shots per bin before judging (silence over noise); hits chips step by 2 above 10 shots.
+
+## F7 — Factory ammo lot manager
+
+**Question:** Is my equipment telling the truth? · **Budget:** A/B — lot captured once on the load (typed or OCR'd from the box photo), everything after is automatic · **Verdict:** "Federal GMM — lot B runs 45 fps faster than lot A — confirm your zero before it matters." · **Empty state:** none — the card is silent until a drift exists (silence is a feature). · **Taps:** 0 after setup.
+
+- Pure `lotDrift(strings)` in velocity-stats (+8 tests): per-load, newest lot (by string date) vs previous, weighted averages, speaks at ≥30 fps.
+- Lot number field on the load form; ammo-box OCR now extracts `lotNumber` too; strings inherit the load's lot at confirmation time (the lot they were shot from).
+- Truth-slot card gated to the `chrono` tool; fully silent when lots agree or only one lot exists.
+- **Judgment calls:** lot attaches at STRING-CONFIRMATION time from the load's current lot (import-time lot entry deferred — one field per import would break the flow); 30 fps threshold (≈1.5–2" at 400 for typical loads); no Home-alert provider yet (the card covers it; the alerts slot is wired for a future pass).
 
 ## Notes so far
 

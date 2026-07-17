@@ -294,6 +294,56 @@ function assignRoundCounts(baseCount, sessions) {
     return out;
 }
 
+// ── Factory ammo lot drift ────────────────────────────────────
+
+/**
+ * Compare the newest lot's measured velocity against the previous lot,
+ * per load. Speaks only when the drift matters (default ≥ 30 fps).
+ *
+ * @param {Array} strings - confirmed strings with loadId, lotNumber,
+ *   avgFps, shots, date
+ * @param {number} [minDeltaFps=30]
+ * @returns {Array<{loadId, newLot, prevLot, deltaFps}>}
+ */
+function lotDrift(strings, minDeltaFps) {
+    var threshold = minDeltaFps || 30;
+    var byLoad = {};
+    (strings || []).forEach(function (s) {
+        if (s.assignmentStatus !== 'confirmed' || !s.loadId || !s.lotNumber ||
+            typeof s.avgFps !== 'number') return;
+        byLoad[s.loadId] = byLoad[s.loadId] || {};
+        var lot = byLoad[s.loadId][s.lotNumber] = byLoad[s.loadId][s.lotNumber] ||
+            { sum: 0, n: 0, latest: '' };
+        var w = s.shots && s.shots.length ? s.shots.length : 1;
+        lot.sum += s.avgFps * w;
+        lot.n += w;
+        if ((s.date || '') > lot.latest) lot.latest = s.date || '';
+    });
+
+    var alerts = [];
+    for (var loadId in byLoad) {
+        if (!byLoad.hasOwnProperty(loadId)) continue;
+        var lots = Object.keys(byLoad[loadId]);
+        if (lots.length < 2) continue;
+        lots.sort(function (a, b) {
+            return byLoad[loadId][a].latest.localeCompare(byLoad[loadId][b].latest);
+        });
+        var newest = lots[lots.length - 1];
+        var prev = lots[lots.length - 2];
+        var delta = byLoad[loadId][newest].sum / byLoad[loadId][newest].n -
+            byLoad[loadId][prev].sum / byLoad[loadId][prev].n;
+        if (Math.abs(delta) >= threshold) {
+            alerts.push({
+                loadId: loadId,
+                newLot: newest,
+                prevLot: prev,
+                deltaFps: Math.round(delta)
+            });
+        }
+    }
+    return alerts;
+}
+
 // ── Suppressor configuration shift ────────────────────────────
 
 /**
@@ -479,6 +529,7 @@ if (typeof module !== 'undefined' && module.exports) {
         assignRoundCounts,
         aggregateRifle,
         configShift,
+        lotDrift,
         DEFAULT_STRING_SD
     };
 }

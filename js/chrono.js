@@ -920,6 +920,13 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
     status.textContent = 'Saving assignment…';
 
     loadPromise.then(function (loadId) {
+        // Lot inheritance: strings confirmed to a load carry its lot
+        // number at confirmation time (the lot they were shot from)
+        var lot = null;
+        var reviewLoads = (self._review && self._review.loads) || [];
+        for (var rl = 0; rl < reviewLoads.length; rl++) {
+            if (reviewLoads[rl].id === loadId) { lot = reviewLoads[rl].lotNumber || null; break; }
+        }
         var chain = Promise.resolve();
         stringIds.forEach(function (id) {
             chain = chain.then(function () {
@@ -927,6 +934,7 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
                     id: id,
                     rifleId: rifleId,
                     loadId: loadId,
+                    lotNumber: lot,
                     assignmentStatus: 'confirmed'
                 });
             });

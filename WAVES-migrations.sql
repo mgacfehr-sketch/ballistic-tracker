@@ -70,3 +70,32 @@ CREATE POLICY "Users can delete own field shots"
 
 CREATE INDEX IF NOT EXISTS idx_field_shots_rifle
     ON public.field_shots(user_id, rifle_id);
+
+
+-- ────────────────────────────────────────────────────────────
+-- MIGRATION 4 (F7 lot manager): lot numbers on loads and strings.
+-- ADDITIVE only.
+-- ────────────────────────────────────────────────────────────
+ALTER TABLE public.loads            ADD COLUMN IF NOT EXISTS lot_number text;
+ALTER TABLE public.velocity_strings ADD COLUMN IF NOT EXISTS lot_number text;
+
+
+-- ────────────────────────────────────────────────────────────
+-- MIGRATION 5 (F8 recipes): structured handload recipe on the load.
+-- jsonb: { brass:{make,lot,timesFired}, primer:{make,lot},
+--          powder:{make,lot,chargeGr}, bullet:{make,lot},
+--          seatingDepthIn }
+-- ADDITIVE only.
+-- ────────────────────────────────────────────────────────────
+ALTER TABLE public.loads ADD COLUMN IF NOT EXISTS recipe jsonb;
+
+
+-- ────────────────────────────────────────────────────────────
+-- MIGRATION 6 (F9 ladder test): ladder sessions ride the existing
+-- session engine. session_type: 'standard' (null) | 'ladder'.
+-- ladder jsonb: { shotsPerGroup, series:[{label, indices, centroidYIn,
+--                 sizeMOA, avgFps|null}], window:{startLabel, endLabel}|null }
+-- ADDITIVE only.
+-- ────────────────────────────────────────────────────────────
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS session_type text;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS ladder jsonb;

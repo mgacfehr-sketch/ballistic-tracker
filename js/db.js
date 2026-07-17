@@ -319,6 +319,8 @@ BallisticDB.prototype.addLoad = function (data) {
         id: generateUUID(),
         rifleId: data.rifleId,
         name: data.name || '',
+        lotNumber: data.lotNumber || null,
+        recipe: data.recipe || null,
         bulletName: data.bulletName || '',
         bulletWeight: data.bulletWeight || 0,
         bulletLength: data.bulletLength || 0,
@@ -770,6 +772,7 @@ BallisticDB.prototype.addVelocityString = function (data) {
         roundCountAt: typeof data.roundCountAt === 'number' ? data.roundCountAt : null,
         assignmentStatus: data.assignmentStatus || 'unassigned',
         config: data.config || null,
+        lotNumber: data.lotNumber || null,
         notes: data.notes || '',
         createdAt: new Date().toISOString()
     };

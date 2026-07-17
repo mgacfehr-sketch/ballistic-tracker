@@ -440,6 +440,36 @@ RifleCards.register({
     }
 });
 
+// ── truth: ammo lot drift (silent unless a lot differs) ───────
+RifleCards.register({
+    id: 'lot-alert',
+    slot: 'truth',
+    tool: 'chrono',
+    isVisible: function (ctx) { return !!ctx.rifle; },
+    render: function (el, ctx) {
+        ctx.db.getVelocityStringsByRifle(ctx.rifle.id).then(function (strings) {
+            var alerts = typeof lotDrift === 'function' ? lotDrift(strings) : [];
+            if (!alerts.length) {
+                el.style.display = 'none'; // silence is a feature
+                return;
+            }
+            var loadNames = {};
+            (ctx.loads || []).forEach(function (l) { loadNames[l.id] = l.name; });
+            var html = '<div class="detail-card" style="border-color:var(--calibration-color);">';
+            alerts.forEach(function (a) {
+                html += '<p style="margin:0 0 6px;"><strong>' +
+                    escapeHtml(loadNames[a.loadId] || 'A load') + ' — lot ' + escapeHtml(a.newLot) +
+                    ' runs ' + Math.abs(a.deltaFps) + ' fps ' + (a.deltaFps > 0 ? 'faster' : 'slower') +
+                    '</strong> than lot ' + escapeHtml(a.prevLot) + ' — confirm your zero before it matters.</p>';
+            });
+            html += '</div>';
+            el.innerHTML = html;
+        }).catch(function () {
+            el.style.display = 'none';
+        });
+    }
+});
+
 // ── progress: personal effective range (from field shots) ─────
 RifleCards.register({
     id: 'effective-range',
