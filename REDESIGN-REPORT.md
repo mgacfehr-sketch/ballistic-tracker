@@ -155,3 +155,72 @@ surface, yorT replies left in cards, dot-pulse loading, input bar pinned
 above the nav with a 48px send key. Admin tables get sticky headers and
 tabular numerals. Certificate preview sits on white (it's paper).
 Nothing anywhere still references the old green-accent language.
+
+## Step 6 — Polish (CACHE v85)
+
+- **Motion:** one system — views fade+rise 200ms, state changes 120ms,
+  `prefers-reduced-motion` kills all of it. Nothing bounces.
+- **Empty states re-worded to teach** where they didn't: rifle list now
+  explains the hub ("Your rifle is the hub — every target photo, chrono
+  string, and insight lands on it"); session history points at Home →
+  Check a target; stale "in Profiles" / "Chrono tab" references
+  rewritten for the new nav everywhere.
+- **Loading and error states** verified present on every async surface
+  (cards self-report failures since the Wave fixes; fatal DB errors use
+  the danger token).
+
+**Engine untouched, verified:** `git diff develop..redesign` contains no
+changes to calculations.js, velocity-stats.js, garmin-import.js,
+ballistic-solver.js, wizard-core.js, db.js, net.js, any .sql, or the SW
+fetch strategy (only CACHE_VERSION bumps). All 385 tests green at every
+step.
+
+---
+
+# BROWSER WALKTHROUGH — every screen in the new design
+
+Setup: hard-reload until SW v85 is active. Do the whole list once in
+dark, then flip Sunlight mode (☀) and spot-check items marked ☀.
+
+1. **Auth** — wordmark, 52px inputs, one blue primary (Log In). ☀
+2. **Shell** — bottom nav Home · Rifles · Ask yorT; slim header with
+   dot + ☀ + Log out; admin ⚙ appears in the header (admin login only);
+   active tab = blue with top indicator. One-handed reach check. ☀
+3. **Home** — first action carries the blue edge; actions ≥68px; Recent
+   strip; "+ Add a tool" drawer opens flat rows; activating a tool adds
+   its action live; alerts slot silent when nothing matters. ☀
+4. **Rifle list** — toolbar with + Add Rifle; empty state teaches the
+   hub; row cards 60px with chevrons.
+5. **Rifle hub** — slot question labels visible only for populated
+   slots; zero verdict reads as a green/amber status light from
+   distance ☀; config 🔊/🔇 toggle; scope-truth card; effective-range
+   card (verdict or progress state); barrel stats; build sheet;
+   history links; report promo.
+6. **Check a target (session)** — canvas full-bleed, step sheet with
+   accent progress bar; each step exactly one blue button; presets
+   chips; results: status light → huge group size → rows → Advanced
+   folded; Save Session primary. ☀ (glare test the step sheet)
+7. **Wizards** — onboarding (re-run from a fresh account or deep link),
+   scope check (photo + 4 taps step), DOPE cards (altitude/wind chips
+   step), ladder split overlay, field logger: all bottom sheets, 56px
+   choices, progress bar. Gloves test the chips. ☀
+8. **Solver** — form inputs 52px; table: sticky header, tabular
+   numerals, accent zero row, come-up bold.
+9. **Chrono import + review** — file label as primary action; proposal
+   cards; 24px checkboxes; amber dup badges; confirm flow to a rifle.
+10. **History** — session cards with thumbnails fading in; detail with
+    full image; cleaning + scope logs as flat rows with + Add.
+11. **Loads & recipes** — load form (bench typing OK), recipe section
+    when bench tool active, component datalist suggestions; load detail
+    Development Log timeline.
+12. **Performance Report & Certificate** — report aggregation, green
+    recommended card, certificate preview on white + PDF export.
+13. **Ask yorT** — chat bubbles left/right, history panel slides over,
+    image attach preview, input bar above the nav. ☀
+14. **Admin (⚙)** — stat grid, tables scroll with sticky headers, crowd
+    export filters.
+15. **Sunlight mode full pass** — flip ☀ on the rifle hub: white
+    background, black text, status colors darkened, borders 2px; no
+    dark-on-dark or light-on-light anywhere.
+16. **Offline sanity** — airplane mode: header dot goes amber, cached
+    rifle data still renders (read-only mirror unchanged).

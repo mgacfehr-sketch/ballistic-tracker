@@ -151,7 +151,7 @@ RifleReportManager.prototype._render = function (rifle, agg, strings, loads) {
         }
         html += '</ul></div>';
     } else {
-        html += '<div class="detail-card"><p class="chrono-intro">No chrono strings imported yet — use the Chrono tab.</p></div>';
+        html += '<div class="detail-card"><p class="chrono-intro">No chrono strings imported yet — Home → "Import chrono data".</p></div>';
     }
     html += '</div>';
 

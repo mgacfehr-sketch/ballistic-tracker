@@ -48,7 +48,7 @@ HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
         html += '<div class="empty-state">';
         html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
         html += '<p class="empty-state-text">No sessions yet</p>';
-        html += '<p class="empty-state-sub">Complete a session and tap "Save Session" to log it here</p>';
+        html += '<p class="empty-state-sub">Check a target from Home and save it — every session is remembered here, photo and all.</p>';
         html += '</div>';
     } else {
         html += '<div class="profile-list">';

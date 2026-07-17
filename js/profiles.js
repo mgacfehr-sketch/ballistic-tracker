@@ -46,8 +46,8 @@ ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed)
     html += '<button class="btn btn-primary btn-sm" id="btn-add-rifle">+ Add Rifle</button>';
     html += '</div>';
 
-    // One-time workflow pointer — the certificate chain spans four tabs
-    // and is otherwise undiscoverable (dismissible, never returns)
+    // One-time workflow pointer — the certificate chain spans several
+    // surfaces and is otherwise undiscoverable (dismissible, never returns)
     if (!workflowDismissed && typeof hasFeature === 'function' && hasFeature('certificate')) {
         html += '<div class="detail-card workflow-card" id="workflow-card">';
         html += '<button id="workflow-dismiss" class="workflow-dismiss" aria-label="Dismiss" title="Dismiss">×</button>';
@@ -65,7 +65,7 @@ ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed)
         html += '<div class="empty-state">';
         html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
         html += '<p class="empty-state-text">No rifles yet</p>';
-        html += '<p class="empty-state-sub">Tap "+ Add Rifle" to create your first profile</p>';
+        html += '<p class="empty-state-sub">Your rifle is the hub — every target photo, chrono string, and insight lands on it. Add yours to start.</p>';
         html += '</div>';
     } else {
         html += '<div class="profile-list">';

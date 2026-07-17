@@ -382,7 +382,7 @@ SessionFlow.prototype._renderProfilePicker = function (groups) {
         html += '<div class="picker-rifle-name">' + escapeHtml(rifle.name) + ' <span style="color:var(--text-muted);font-weight:400;">' + escapeHtml(rifle.caliber) + '</span></div>';
 
         if (loads.length === 0) {
-            html += '<p class="empty-state-sub" style="padding:4px 0;">No loads — add one in Profiles</p>';
+            html += '<p class="empty-state-sub" style="padding:4px 0;">No loads — add one on the rifle page (Rifles)</p>';
         } else {
             for (var l = 0; l < loads.length; l++) {
                 var ld = loads[l];

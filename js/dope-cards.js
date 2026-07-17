@@ -153,7 +153,7 @@ var DopeCards = (function () {
                         var loads = loadsByRifle[state.answers.rifle] || [];
                         var ready = loads.filter(function (l) { return l.bulletBC && l.muzzleVelocity; });
                         if (!ready.length) {
-                            el.innerHTML = '<p class="empty-state-sub" style="padding:0;">This rifle has no load with BC and muzzle velocity — add them in Profiles.</p>';
+                            el.innerHTML = '<p class="empty-state-sub" style="padding:0;">This rifle has no load with BC and muzzle velocity — open the load on its rifle page and add them.</p>';
                             return;
                         }
                         var html = '';
