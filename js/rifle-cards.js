@@ -22,6 +22,20 @@
 var RifleCards = (function () {
 
     var SLOTS = ['ready', 'dial', 'ammo', 'truth', 'progress', 'records', 'prove'];
+
+    // The seven questions, in the user's words — rendered as quiet
+    // engraved labels above each slot that has at least one card, so
+    // the fixed order is legible without adding chrome.
+    var SLOT_QUESTIONS = {
+        ready: 'Am I ready?',
+        dial: 'What do I dial?',
+        ammo: 'Which ammo?',
+        truth: 'Is my equipment telling the truth?',
+        progress: 'Am I getting better?',
+        records: 'Where’s my stuff?',
+        prove: 'Prove it.'
+    };
+
     var _cards = [];
 
     /** Pure: fixed slot order, registration order within a slot. */
@@ -53,7 +67,15 @@ var RifleCards = (function () {
             try { return !!c.isVisible(ctx); } catch (e) { return false; }
         });
         var ordered = orderCards(visible);
+        var lastSlot = null;
         for (var i = 0; i < ordered.length; i++) {
+            if (ordered[i].slot !== lastSlot) {
+                lastSlot = ordered[i].slot;
+                var label = document.createElement('div');
+                label.className = 'slot-label';
+                label.textContent = SLOT_QUESTIONS[lastSlot] || '';
+                container.appendChild(label);
+            }
             var el = document.createElement('div');
             el.className = 'rifle-card rifle-card-' + ordered[i].slot;
             el.setAttribute('data-card-id', ordered[i].id);
@@ -338,7 +360,7 @@ RifleCards.register({
                 var statEl = statsEl.querySelector('#stat-total-rounds');
                 if (!statEl) return;
                 statEl.innerHTML =
-                    '<input type="number" id="rounds-input" min="0" step="1" inputmode="numeric" value="' + totalRounds + '" style="width:80px;text-align:center;font-size:1.1rem;padding:4px;border-radius:6px;border:1px solid #555;background:#2a2a2a;color:#fff;">' +
+                    '<input type="number" id="rounds-input" class="rounds-edit-input" min="0" step="1" inputmode="numeric" value="' + totalRounds + '">' +
                     '<div style="display:flex;gap:6px;margin-top:6px;">' +
                         '<button class="btn btn-sm btn-primary" id="btn-save-rounds" style="padding:2px 10px;font-size:0.75rem;">Save</button>' +
                         '<button class="btn btn-sm btn-secondary" id="btn-cancel-rounds" style="padding:2px 10px;font-size:0.75rem;">Cancel</button>' +

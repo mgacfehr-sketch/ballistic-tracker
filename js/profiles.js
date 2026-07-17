@@ -54,8 +54,8 @@ ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed)
         html += '<h4>From ammo box to certificate</h4>';
         html += '<ol class="workflow-steps">';
         html += '<li>Create a rifle + load here</li>';
-        html += '<li><strong>Chrono</strong> tab — import your ShotView strings</li>';
-        html += '<li><strong>Session</strong> tab — shoot and save target groups</li>';
+        html += '<li>Home → <strong>Import chrono data</strong> for your ShotView strings</li>';
+        html += '<li>Home → <strong>Check a target</strong> to shoot and save groups</li>';
         html += '<li>Rifle → <strong>Performance Report</strong> → Generate Certificate</li>';
         html += '</ol>';
         html += '</div>';

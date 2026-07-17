@@ -78,3 +78,32 @@ tool drawer as a flat details-row list.
   icon ambiguity beat the space savings.
 - View switching stays class-toggle based (`.app-view.active`) — the
   entire manager layer targets it; the new motion lives in CSS.
+
+## Step 3 — The rifle hub (CACHE v82)
+
+**The seven-question order is now visible.** `RifleCards.render` inserts
+a quiet engraved micro-label above each slot that has at least one card —
+"Am I ready?" · "What do I dial?" · "Which ammo?" · "Is my equipment
+telling the truth?" · "Am I getting better?" · "Where's my stuff?" ·
+"Prove it." Empty slots still occupy zero pixels; a new user's hub shows
+three questions, a power user's shows seven — both feel complete.
+
+**The ready verdict is a status light.** `.zg-banner` is now a centered,
+full-width color field — green "✓ ZERO CONFIRMED" or amber
+"adjust 8 clicks RIGHT" at 28px bold on the fill color. It's the first
+thing on the page and reads from a meter away, sunlight mode included.
+
+**Before/after:** before, cards ran together as undifferentiated gray
+boxes and the zero banner was a text row. After, the page reads as an
+instrument panel: question → answer, question → answer, top to bottom in
+confidence order.
+
+**Also:** the barrel round-count editor's hard-coded dark-theme colors
+(`#2a2a2a` inputs) replaced with a tokenized `.rounds-edit-input`; the
+"From ammo box to certificate" pointer card rewritten — it referenced
+"Chrono tab / Session tab" which no longer exist in the new nav (actions
+live on Home).
+
+**Judgment call:** slot labels use the questions verbatim rather than
+one-word headers ("TRUTH", "PROVE") — the Master Plan's law is that the
+app speaks the user's language, and the questions ARE that language.
