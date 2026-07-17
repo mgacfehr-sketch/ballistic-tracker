@@ -1,226 +1,92 @@
-# REDESIGN REPORT — ground-up UX/UI rebuild
+# REDESIGN REPORT — total presentation rebuild
 
-Branch `redesign` from `develop` (`278d2e5`). The engine (calculations,
-velocity-stats, garmin-import, ballistic-solver, wizard-core, db, net,
-schema, tests, SW offline strategy) is untouched throughout; everything
-visual and structural is rebuilt. Updated per step.
+Branch `redesign`, rebuild run of 2026-07-17. This run replaced the previous
+redesign passes entirely: `css/main.css` was never opened, no existing class
+name or DOM arrangement was used as a starting point, and the whole
+presentation layer was rebuilt from a committed spec
+(`docs/REDESIGN-SPEC.md`) outward. The engine — calculations.js,
+velocity-stats.js, garmin-import.js, ballistic-solver.js, wizard-core.js,
+db.js, net.js, schema, tests, SW offline strategy — is untouched.
+**All 385 unit tests green at every commit** (71+37+103+49+8+117).
 
-## Step 1 — Design system (CACHE v80)
+## Build log
 
-**What changed:** `css/main.css` replaced wholesale (3,500 lines of
-accreted styles → one token-driven system, ~1,100 lines). New spec at
-`docs/DESIGN-SYSTEM.md`.
+| Step | Commit | What |
+|---|---|---|
+| 0 | `02902eb` | `docs/REDESIGN-SPEC.md` — shooter walkthrough of the seven questions, designer concept (graphite/brass palette, surface-step elevation, verdict-first type scale w/ tabular numerals, icon rules), three-zone composition grammar, ASCII sketches of Home / Rifle Hub / wizard, complete component vocabulary, frozen-file compat contract. Committed before any UI code. |
+| 1 | `966beeb` | `js/icons.js` — one thin-stroke SVG family (~60 icons, 24×24, stroke 1.75, currentColor) behind `Icon(name, size)`. The only icon source in the app. |
+| 2 | `aadd40d` | `css/ui.css` written from a blank file (tokens → components → sunlight remap → clearly-marked COMPAT section for frozen solver markup). `index.html` body rebuilt from scratch: machined auth plate, slim icon header, canvas-hero session view with bottom-sheet step panel and 7-segment machined progress, icon bottom nav. `main.css` unreferenced everywhere. SW v86. |
+| 3 | `6a7064a` | Home as a **status instrument**: hero rifle plate with the readiness verdict dominant (lamp + READY / CHECK ZERO / NOT CHECKED + click-correction sentence), ONE brass primary action chosen from usage counts, quiet tile grid, recent + tool drawer whispering below a hairline. First-run keeps the one-brass-object law. |
+| 4 | `f7f60ed` | Rifle Hub (seven-question card stack, kickers auto-hide over empty slots, contextual brass action on the verdict card), profiles list/forms/load detail, history (month-grouped instrument rows, verdict-first session detail), AI chat (readout-style answers, overlay history, icon composer), session flow (choice-plate picker, verified chip, verdict-first results card). SW v87. |
+| 5 | `baf8846` | WizardShell full-screen conversation; chrono import/preview/assignment; field logger, ladder, DOPE-card steps; cold-bore + Verified-DOPE hub cards; performance report + certificate preflight; admin + crowd warehouse; wind-call. All chart canvases repainted to palette tokens. Dead compat rules pruned. SW v88. |
+| 6 | (this commit) | Polish: final sweeps, this report. SW v89. |
 
-**The language — "Machined Instrument":**
-- Graphite dark theme (`#0C0F13` base) as default; Sunlight mode is now a
-  TRUE light theme (white/print-like) implemented as a token swap on the
-  same `.high-contrast` body class the toggle already uses — the old
-  version was a 200-line pile of per-screen overrides; now ~20 token
-  values restyle every component at once.
-- **The green accent is gone as an action color.** Color is semantic now:
-  blue = tappable, green = confirmed, amber = attention, red = destructive.
-  The old UI used green for actions AND confirmations, so "READY" and
-  "Save" shouted at the same volume. (Canvas marker colors on target
-  photos are unchanged — green impacts on paper is a visibility decision,
-  kept because it's right.)
-- Type: base 14px → 17px; verdicts 22px+; display numbers 42px; tabular
-  numerals app-wide so tables never shimmy.
-- Touch: everything interactive ≥48px (chips, rows, buttons, nav).
-- Cards separate by hairlines, not shadows (shadows die in sunlight); the
-  one shadow in the app belongs to overlay sheets.
-- Wizard shell became a bottom sheet on phones (thumb reach) and a
-  centered card on desktop.
+## Verification method
 
-**Judgment calls:**
-- Kept every existing class NAME as the component API (`.btn`,
-  `.detail-card`, `.zg-banner`, `.field-chip`…) so 40 JS files restyle
-  without logic edits — the redesign changes what the classes MEAN, not
-  what emits them.
-- Legacy CSS variable names referenced by inline styles in JS
-  (`--calibration-color`, `--text-muted`, `--border`, `--primary`) kept as
-  aliases to new tokens; they'll be cleaned when those screens are touched.
-- Dead styles from the old sheet (8 orphan classes) not carried over.
-- `prefers-reduced-motion` disables all animation; one motion curve
-  app-wide.
+Every major screen was rendered headlessly (Playwright, 390×844 @2x) with
+fixture data and inspected as an image before its commit: Home (ready /
+adjust / fresh / sunlight), Rifle Hub (top + bottom of stack), session
+picker + results, wizard question, field logger overlay, AI consent + chat,
+solver (frozen markup on compat styles). Sweeps run over `js/*.js` +
+`index.html`:
 
-**Before/after:** old = 14px text, green-on-dark buttons everywhere,
-mixed paddings/radii per era, high-contrast mode as patchwork overrides.
-New = one palette, one scale, one grammar; sunlight mode is a real theme.
+- **Emoji/pictographs in rendered strings: 0** (remaining matches are
+  box-drawing/arrows inside source comments only).
+- **`style="…"` in emitted markup: 0** outside frozen `ballistic-solver.js`
+  (allowed exceptions kept: canvas buffer geometry, textarea auto-height,
+  print-iframe positioning).
+- **Legacy classes: emitted only by frozen `ballistic-solver.js`**, styled by
+  the marked COMPAT section at the end of `ui.css`. `.wizard-overlay`,
+  `.wizard-card`, `.help-btn` rules deleted once their last emitters were
+  rewritten.
 
-## Step 2 — The shell (CACHE v81)
+## Acceptance self-grade
 
-**Navigation model rethought:** the top button row is gone. New chrome:
-- **Bottom nav bar** — three destinations (Home · Rifles · Ask yorT),
-  56px targets in thumb reach for one-handed field use. Text labels, no
-  icon guessing games for over-50 eyes; active = accent + top indicator.
-- **Slim header** — yorT wordmark left; connection dot, sunlight toggle,
-  and Log out right. That's the whole top of the screen.
-- **Admin and beta Wind Call are header icon buttons now, not tabs** —
-  "no feature ever adds a nav tab" is now structurally true. They keep
-  the `.nav-tab` class so the shared view-switch binding drives them
-  unchanged.
-- Flow views (session, solver, chrono, admin, wizards) remain full-screen
-  pushes launched from Home actions and cards — no tab, back to leave.
+**1. Screenshot-diff test — different bones, not different paint?** Yes.
+Home went from a stack of identical action buttons to hero-verdict /
+one-primary / subordinate-grid zones. The rifle page went from uniform
+cards to an engraved-kicker question stack with mixed rhythm (verdict
+panel, load rows, seg toggle, spec sheet, link rows, award row). Results
+went from a label:value table to instrument-first (verdict banner → 40px
+group size → ATZ strip → everything else in a fold). Wizards went from a
+centered modal card to a full-screen conversation with machined ticks.
+Chat went from two bubbles to bubble-vs-readout asymmetry. No screen kept
+its old skeleton.
 
-**Auth screen:** re-skinned by the system (big wordmark, 52px inputs, one
-primary action). Structure kept — it was already one email + one password
-+ two buttons, which is correct.
+**2. The Sig/Garmin test — would a stranger assume a professional design
+team shipped this?** Honest answer: yes for structure and discipline — one
+type scale, one icon family, one accent used only for state, tabular
+numerals everywhere data lives, consistent machined hairlines. The gap to
+a Garmin production app is motion polish and photographic content, not
+composition.
 
-**Home:** re-dressed by the token system: first action carries the accent
-edge (THE thing to do), 68px action rows, quiet uppercase "Recent" label,
-tool drawer as a flat details-row list.
+**3. The glove test — primary action reachable and unmistakable
+one-handed?** Yes. Exactly one 56px brass object per screen, full width,
+in or near the thumb zone (Home primary, wizard Next in `.wiz-foot`,
+Save in overlays, fab-zone "+ Add rifle"); chips and choice plates are
+40–56px; bottom nav is 64px.
 
-**Judgment calls:**
-- Home's DOM structure (alerts → actions → recent → drawer) was kept —
-  it already implements the Master Plan surface exactly; rebuilding it
-  differently would change truth, not presentation.
-- Log out stays a text button (not an icon) — accidental-logout risk and
-  icon ambiguity beat the space savings.
-- View switching stays class-toggle based (`.app-view.active`) — the
-  entire manager layer targets it; the new motion lives in CSS.
+**4. The glance test — most important truth readable in under one second
+from arm's length?** Yes on both graded screens. Home: an 18px lamp +
+28px verdict word (READY / CHECK ZERO) on the hero plate — one glance, one
+truth. Rifle Hub: same verdict component leads the stack under "Am I
+ready?". Session results lead with the ZeroGuardian verdict, then a 40px
+group-size numeral.
 
-## Step 3 — The rifle hub (CACHE v82)
+**5. The emoji test — zero emoji, one coherent icon family?** Yes. Zero
+emoji in rendered output (sweep above); every icon in the product renders
+from `js/icons.js` (the only inline SVGs elsewhere are the static copies
+of the same geometry in `index.html`, required before JS loads).
 
-**The seven-question order is now visible.** `RifleCards.render` inserts
-a quiet engraved micro-label above each slot that has at least one card —
-"Am I ready?" · "What do I dial?" · "Which ammo?" · "Is my equipment
-telling the truth?" · "Am I getting better?" · "Where's my stuff?" ·
-"Prove it." Empty slots still occupy zero pixels; a new user's hub shows
-three questions, a power user's shows seven — both feel complete.
+## Known follow-ups (not regressions)
 
-**The ready verdict is a status light.** `.zg-banner` is now a centered,
-full-width color field — green "✓ ZERO CONFIRMED" or amber
-"adjust 8 clicks RIGHT" at 28px bold on the fill color. It's the first
-thing on the page and reads from a meter away, sunlight mode included.
-
-**Before/after:** before, cards ran together as undifferentiated gray
-boxes and the zero banner was a text row. After, the page reads as an
-instrument panel: question → answer, question → answer, top to bottom in
-confidence order.
-
-**Also:** the barrel round-count editor's hard-coded dark-theme colors
-(`#2a2a2a` inputs) replaced with a tokenized `.rounds-edit-input`; the
-"From ammo box to certificate" pointer card rewritten — it referenced
-"Chrono tab / Session tab" which no longer exist in the new nav (actions
-live on Home).
-
-**Judgment call:** slot labels use the questions verbatim rather than
-one-word headers ("TRUTH", "PROVE") — the Master Plan's law is that the
-app speaks the user's language, and the questions ARE that language.
-
-## Step 4 — The flows (CACHE v83)
-
-Most of the flow re-skin shipped with the token system itself, because
-every flow emits the shared component classes:
-- **Session / target check:** step panel is now a rounded sheet over the
-  canvas with a 3px accent progress bar; steps keep the one-primary-action
-  rule; the results card leads with the Zero Guardian status light, then
-  the group size as the huge number, stats in quiet rows, advanced stats
-  folded — verdict first, numbers underneath, unchanged logic.
-- **Wizards (onboarding, scope check, DOPE, ladder, field logger):** the
-  shared `WizardShell` skin is a bottom sheet with 56px answer rows and
-  an accent progress bar — every Budget-C flow inherits it from one place.
-- **Chrono import + review:** cards, checkboxes at 24px, badges as quiet
-  pills, warnings in amber text — no layout logic touched.
-- **Solver:** styled entirely from CSS (sticky table header, tabular
-  numerals, accent zero-row).
-
-**Fixed in this step:** the last DOM hard-coded colors in flow/manager
-files (`#ccc`/`#aaa` in the rifle form, `#ff6b6b` in app.js's fatal card)
-— they would have broken Sunlight mode.
-
-**Judgment calls:**
-- `ballistic-solver.js` is engine-protected, so the solver redesign is
-  CSS-only; its one inline `#ff6b6b` fallback div stays (DB-unavailable
-  message). The "dial number huge" ideal needs a UI split of that file —
-  deferred, noted as future work.
-- Canvas-drawn colors (target markers, cold-bore plot, ladder chart,
-  DOPE/certificate PDFs) are deliberately unchanged: they draw onto
-  photos/paper, not themed UI. Green impacts / blue POA / amber
-  calibration on a photograph is a visibility system that works.
-
-## Step 5 — The rest (CACHE v84)
-
-History, cleaning/scope logs, loads & recipes, Performance Report,
-certificate screen, admin dashboard (incl. crowd tables), and Ask yorT
-all emit the shared scaffolding classes (`.profile-screen`,
-`.session-card`, `.log-entry`, `.report-*`, `.cert-*`, `.admin-*`,
-`.ai-*`) — verified by sweep; every one is styled by the token sheet, so
-this step's audit found only one structural gap: the Ask yorT
-conversation-history panel needed a positioning context under the new
-chat layout (`#view-ai` is now `position:relative`).
-
-Ask yorT reads as a proper chat now: user messages right in raised
-surface, yorT replies left in cards, dot-pulse loading, input bar pinned
-above the nav with a 48px send key. Admin tables get sticky headers and
-tabular numerals. Certificate preview sits on white (it's paper).
-Nothing anywhere still references the old green-accent language.
-
-## Step 6 — Polish (CACHE v85)
-
-- **Motion:** one system — views fade+rise 200ms, state changes 120ms,
-  `prefers-reduced-motion` kills all of it. Nothing bounces.
-- **Empty states re-worded to teach** where they didn't: rifle list now
-  explains the hub ("Your rifle is the hub — every target photo, chrono
-  string, and insight lands on it"); session history points at Home →
-  Check a target; stale "in Profiles" / "Chrono tab" references
-  rewritten for the new nav everywhere.
-- **Loading and error states** verified present on every async surface
-  (cards self-report failures since the Wave fixes; fatal DB errors use
-  the danger token).
-
-**Engine untouched, verified:** `git diff develop..redesign` contains no
-changes to calculations.js, velocity-stats.js, garmin-import.js,
-ballistic-solver.js, wizard-core.js, db.js, net.js, any .sql, or the SW
-fetch strategy (only CACHE_VERSION bumps). All 385 tests green at every
-step.
-
----
-
-# BROWSER WALKTHROUGH — every screen in the new design
-
-Setup: hard-reload until SW v85 is active. Do the whole list once in
-dark, then flip Sunlight mode (☀) and spot-check items marked ☀.
-
-1. **Auth** — wordmark, 52px inputs, one blue primary (Log In). ☀
-2. **Shell** — bottom nav Home · Rifles · Ask yorT; slim header with
-   dot + ☀ + Log out; admin ⚙ appears in the header (admin login only);
-   active tab = blue with top indicator. One-handed reach check. ☀
-3. **Home** — first action carries the blue edge; actions ≥68px; Recent
-   strip; "+ Add a tool" drawer opens flat rows; activating a tool adds
-   its action live; alerts slot silent when nothing matters. ☀
-4. **Rifle list** — toolbar with + Add Rifle; empty state teaches the
-   hub; row cards 60px with chevrons.
-5. **Rifle hub** — slot question labels visible only for populated
-   slots; zero verdict reads as a green/amber status light from
-   distance ☀; config 🔊/🔇 toggle; scope-truth card; effective-range
-   card (verdict or progress state); barrel stats; build sheet;
-   history links; report promo.
-6. **Check a target (session)** — canvas full-bleed, step sheet with
-   accent progress bar; each step exactly one blue button; presets
-   chips; results: status light → huge group size → rows → Advanced
-   folded; Save Session primary. ☀ (glare test the step sheet)
-7. **Wizards** — onboarding (re-run from a fresh account or deep link),
-   scope check (photo + 4 taps step), DOPE cards (altitude/wind chips
-   step), ladder split overlay, field logger: all bottom sheets, 56px
-   choices, progress bar. Gloves test the chips. ☀
-8. **Solver** — form inputs 52px; table: sticky header, tabular
-   numerals, accent zero row, come-up bold.
-9. **Chrono import + review** — file label as primary action; proposal
-   cards; 24px checkboxes; amber dup badges; confirm flow to a rifle.
-10. **History** — session cards with thumbnails fading in; detail with
-    full image; cleaning + scope logs as flat rows with + Add.
-11. **Loads & recipes** — load form (bench typing OK), recipe section
-    when bench tool active, component datalist suggestions; load detail
-    Development Log timeline.
-12. **Performance Report & Certificate** — report aggregation, green
-    recommended card, certificate preview on white + PDF export.
-13. **Ask yorT** — chat bubbles left/right, history panel slides over,
-    image attach preview, input bar above the nav. ☀
-14. **Admin (⚙)** — stat grid, tables scroll with sticky headers, crowd
-    export filters.
-15. **Sunlight mode full pass** — flip ☀ on the rifle hub: white
-    background, black text, status colors darkened, borders 2px; no
-    dark-on-dark or light-on-light anywhere.
-16. **Offline sanity** — airplane mode: header dot goes amber, cached
-    rifle data still renders (read-only mirror unchanged).
+- `css/main.css` is dead and unreferenced but still on disk — deletion left
+  to the owner per standing rule (also `docs/DESIGN-SYSTEM.md`, which
+  documents the previous system, and `docs/REWRITE-BRIEF.md`, the internal
+  brief used for this rebuild).
+- The `loaded` class on the report thumbnail is a vestigial JS hook
+  (unstyled, harmless).
+- Chart canvases size their drawing buffer in JS; a `.chart-canvas` CSS
+  helper could replace that if more charts appear.
+- Sunlight mode was verified on Home; a full-screen sweep in sunlight mode
+  is worth one range-day QA pass on a real phone in glare.
