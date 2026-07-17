@@ -412,6 +412,8 @@ BallisticDB.prototype.addSession = function (data) {
         sightInComments: data.sightInComments || '',
         isZeroSession: data.isZeroSession || false,
         config: data.config || null,
+        sessionType: data.sessionType || null,
+        ladder: data.ladder || null,
         createdAt: new Date().toISOString()
     };
     var row = _jsToRow(session, self.userId);

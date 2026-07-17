@@ -1064,6 +1064,20 @@ SessionFlow.prototype._renderResults = function () {
 
     card.innerHTML = html;
 
+    // Ladder split (bench tool): enough impacts to form charge groups
+    if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench') &&
+        typeof LadderManager !== 'undefined' && this.impacts.length >= 4) {
+        var ladderBtn = document.createElement('button');
+        ladderBtn.className = 'btn btn-secondary';
+        ladderBtn.style.margin = '8px 0';
+        ladderBtn.textContent = this.ladderResult ? 'Ladder attached ✓ (re-split)' : 'Split into ladder groups';
+        var flowRef = this;
+        ladderBtn.addEventListener('click', function () {
+            LadderManager.open(flowRef);
+        });
+        card.appendChild(ladderBtn);
+    }
+
     // Zero Guardian plain-English verdict (feature-gated inside render);
     // click math silently corrected by the rifle's scope-tracking factor
     if (typeof ZeroGuardian !== 'undefined') {
@@ -1114,7 +1128,10 @@ SessionFlow.prototype._saveSession = function () {
             ? ZeroGuardian.isConfirmed(this.results) : false,
         // Suppressor configuration tag (null when the rifle has no configs)
         config: this.selectedRifle && this.selectedRifle.hasConfigs
-            ? (this.selectedRifle.activeConfig || 'bare') : null
+            ? (this.selectedRifle.activeConfig || 'bare') : null,
+        // Ladder test attachment (bench tool)
+        sessionType: this.ladderResult ? 'ladder' : null,
+        ladder: this.ladderResult || null
     };
 
     // Store snapshot of rifle/load names for historical reference
@@ -1135,6 +1152,7 @@ SessionFlow.prototype._saveSession = function () {
 
     this.db.addSession(sessionData).then(function (saved) {
         self.savedSessionId = saved.id;
+        self.ladderResult = null; // consumed by this save
         btn.textContent = 'Saved to History';
         if (typeof Recents !== 'undefined') Recents.touchSession(saved.id, self.selectedRifle);
         self._storeAnnotatedImage(saved.id);

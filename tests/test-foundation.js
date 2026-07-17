@@ -242,6 +242,49 @@ check('insight names the biggest bias', insight.indexOf('under-call full left') 
 check('insight includes magnitude', insight.indexOf('0.2 mil') !== -1, true);
 check('no meaningful bias → null', FieldCore.windInsight([{ value: 'none', avgErrorMil: 0.02, n: 9 }]), null);
 
+// ── LadderCore ────────────────────────────────────────────────
+var calcAll = require('../js/calculations.js');
+global.moaToInches = calcAll.moaToInches;
+global.inchesToMOA = calcAll.inchesToMOA;
+global.calculateCentroid = calcAll.calculateCentroid;
+global.calculateGroupSize = calcAll.calculateGroupSize;
+global.round4 = calcAll.round4;
+var LadderCore = require('../js/ladder.js').LadderCore;
+
+console.log('\nLadderCore:');
+
+// 100 px/in at 100 yd. Groups at POI-Y (px): 0, 500, 510, 515, 900
+// → 5"/0.05"/0.05"/3.85" shifts; threshold 0.35 MOA ≈ 0.366" @ 100.
+function grp(cy) {
+    return [{ x: 0, y: cy }, { x: 20, y: cy + 10 }, { x: -15, y: cy - 10 }];
+}
+var series = [
+    { label: '41.4', impacts: grp(0) },
+    { label: '41.6', impacts: grp(500) },
+    { label: '41.8', impacts: grp(510) },
+    { label: '42.0', impacts: grp(515) },
+    { label: '42.2', impacts: grp(900) }
+];
+var la = LadderCore.ladderAnalysis(series, 100, 100);
+check('five groups analyzed', la.groups.length, 5);
+check('window found', !!la.window, true);
+check('window = the stable middle run (41.6–42.0)', la.window.startIdx + '-' + la.window.endIdx, '1-3');
+check('sentence names the labels', la.sentence, '41.6–42.0 is your window.');
+check('group size computed in MOA', la.groups[0].sizeMOA > 0, true);
+
+var noWin = LadderCore.ladderAnalysis([
+    { label: 'a', impacts: grp(0) },
+    { label: 'b', impacts: grp(500) },
+    { label: 'c', impacts: grp(1000) }
+], 100, 100);
+check('all-moving series → no window', noWin.window, null);
+check('no-window sentence honest', noWin.sentence.indexOf('No stable window') === 0, true);
+
+var split = LadderCore.splitByTapOrder([1, 2, 3, 4, 5, 6, 7].map(function (n) { return { x: n, y: n }; }), 3, ['A', 'B', 'C']);
+check('tap-order split: 3 groups from 7 impacts', split.length, 3);
+check('short last group kept', split[2].impacts.length, 1);
+check('labels applied in order', split[1].label, 'B');
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

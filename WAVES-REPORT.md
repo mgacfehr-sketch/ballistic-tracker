@@ -16,7 +16,7 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 | 6 | Effective range | ✅ code done |
 | 7 | Ammo lot manager | ✅ code done |
 | 8 | Recipes + component lots | ✅ code done |
-| 9 | Ladder test | — |
+| 9 | Ladder test | ✅ code done |
 | 10 | Load logbook | — |
 
 ## F1 — Scope tracking (tall-target test)
@@ -78,6 +78,15 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 - **Brass firing counts auto-increment**: every saved session on a recipe load adds one firing (best-effort, non-blocking).
 - Section renders only when the `bench` tool is active ("Track my handloads" in the drawer; handload/all presets).
 - **Judgment calls:** one brass-firing increment per SESSION (not per shot/case — cases fire once per outing in practice; per-case tracking deferred); recipe editing reuses the load form rather than a separate recipe screen; `bench`'s Home action slot points at the ladder test (F9).
+
+## F9 — Multi-group ladder test
+
+**Question:** Which ammo? · **Budget:** C over the existing session engine (the wizard IS the session flow + one split overlay) · **Verdict:** "41.6–42.0 is your window." (honest negative: "No stable window in this series.") · **Empty state:** the Home action shows a one-card explainer that routes into a session. · **Taps:** normal session + shots-per-group chip + one comma-separated labels field + Analyze + Attach.
+
+- Pure `LadderCore.ladderAnalysis` (+10 tests): per-charge centroid + group size via the existing calculations engine; stable window = longest run of consecutive charges with adjacent vertical POI shift ≤ 0.35 MOA (≥2 charges; first run wins ties).
+- `splitByTapOrder`: impacts grouped k-at-a-time in FIRE ORDER (the flow instructs tapping in fire order); uneven remainders kept as a short, flagged last group.
+- Results-step "Split into ladder groups" button (bench tool, ≥4 impacts) → chips + labels → chart (POI line, green stable-window band, per-charge labels) + starred table rows → "Attach to session" → normal Save stores `session_type='ladder'` + the ladder jsonb (M6).
+- **Judgment calls:** groups are assigned by TAP ORDER, not round-robin (v1 limitation, stated in the explainer — shoot charge-by-charge); velocity flat-spot overlay DEFERRED — auto-matching chrono strings to charges is guesswork, and guessing near load-development conclusions violates the no-silent-assignment principle; charge labels are a typed comma list (bench exception).
 
 ## Notes so far
 
