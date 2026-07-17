@@ -188,7 +188,11 @@ check('comp emits one row per whole come-up MOA', comp.length >= 8, true);
 check('comp first row is the 1-MOA crossing', comp[0].comeUpMOA >= 1, true);
 
 var corrected = dopeRows(synthTable, { mode: 'hunt', scopeFactor: 0.96 });
-check('scope factor inflates come-ups (dial MORE)', corrected[10].comeUpMOA > hunt[10].comeUpMOA, true);
+// At short range the 4% correction collapses inside quarter-MOA click
+// snapping (correct print behavior) — assert where it exceeds a click:
+// 600 yd, 5.0 MOA raw → 5.21 corrected → snaps to 5.25
+check('scope factor inflates come-ups once it exceeds a click', corrected[20].comeUpMOA > hunt[20].comeUpMOA, true);
+check('…and short-range rows legitimately snap to the same click', corrected[2].comeUpMOA, hunt[2].comeUpMOA);
 
 var w = hunt[hunt.length - 1];
 check('wind columns scale linearly (w5 = w10/2)', Math.abs(w.wind5 - Math.round(w.wind10 / 2 * 4) / 4) < 0.26, true);
