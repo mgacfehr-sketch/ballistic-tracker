@@ -867,6 +867,9 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 .btn-danger:active, .action-danger:active { background: var(--status-problem-subtle); }
 
+/* a primary button placed directly on the page ground */
+.btn-edge { width: calc(100% - 2 * var(--edge)); margin: 10px var(--edge) 0; }
+
 .action-row { display: flex; gap: 10px; }
 .action-row > * { flex: 1; }
 .btn-sm { min-height: var(--tap-min); padding: 0 12px; font: var(--type-label); }

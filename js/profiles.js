@@ -41,18 +41,20 @@ ProfileManager.prototype.showRifleList = function () {
 };
 
 ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed) {
-    var html = '<div class="view-toolbar">';
-    html += '<h2 class="toolbar-title">Rifles</h2>';
-    html += '</div>';
+    var self = this;
+    var html = '<div class="screen">';
+    html += '<div class="pagehead"><div class="pagetitle">Rifles</div></div>';
 
-    html += '<div class="screen">';
+    // Fleet summary chips line ("4 ready · 2 need adjustment · 1 not checked")
+    if (rifles.length > 1) {
+        html += '<div class="fleetline" id="fleet-summary"></div>';
+    }
 
-    // One-time workflow pointer — the certificate chain spans several
-    // surfaces and is otherwise undiscoverable (dismissible, never returns)
+    // One-time workflow pointer (dismissible, never returns)
     if (!workflowDismissed && typeof hasFeature === 'function' && hasFeature('certificate')) {
-        html += '<div class="plate u-mb-12" id="workflow-card">';
+        html += '<div class="card card-pad u-mb-12" id="workflow-card">';
         html += '<h4 class="t-head">From ammo box to certificate</h4>';
-        html += '<p class="t-body u-quiet u-mt-10">Create a rifle and load here. Import chrono data and check targets from Home. When a load proves out, generate its certificate from the rifle’s performance report.</p>';
+        html += '<p class="t-body u-quiet u-mt-10">Create a rifle and load here. Import chrono data and check targets from Home. When a load proves out, generate its certificate from the rifle&rsquo;s performance report.</p>';
         html += '<button type="button" class="action-ghost u-mt-10" id="workflow-dismiss">Got it</button>';
         html += '</div>';
     }
@@ -60,50 +62,92 @@ ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed)
     if (rifles.length === 0) {
         html += '<div class="empty-teach">';
         html += '<p>Every target photo, chrono string, and insight lands on a rifle &mdash; add yours to start.</p>';
-        html += '<button type="button" class="action-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
+        html += '<button type="button" class="btn-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
         html += '</div>';
     } else {
+        // Search appears only when the fleet outgrows a screen
+        if (rifles.length > 8) {
+            html += '<div class="search">' + Icon('search', 18) +
+                '<input type="text" id="rifle-search" placeholder="Search rifles&hellip;" aria-label="Search rifles"></div>';
+        }
+        html += '<div class="card" id="rifle-list-card">';
         for (var i = 0; i < rifles.length; i++) {
             var r = rifles[i];
-            html += '<button type="button" class="row-item" data-rifle-id="' + r.id + '">';
-            html += '<div class="row-main">';
-            html += '<div class="row-title">' + escapeHtml(r.name) + '</div>';
-            html += '<div class="row-sub">' + escapeHtml(r.caliber) + '</div>';
-            html += '</div>';
-            html += '<span class="row-aside">' + Icon('chevron-right', 18) + '</span>';
-            html += '</button>';
+            html += UI.rowlink({
+                button: true,
+                title: r.name || 'Rifle',
+                sub: r.caliber || '',
+                data: { 'rifle-id': r.id },
+                right: '<span class="chip" data-fleet-chip="' + UI.esc(r.id) + '">&hellip;</span>'
+            });
         }
-        html += '<p class="t-micro u-mt-10">' + rifles.length + ' / ' + MAX_RIFLES + ' profiles</p>';
+        html += '</div>';
+        html += '<p class="t-micro u-mt-10 edge">' + rifles.length + ' / ' + MAX_RIFLES + ' profiles</p>';
     }
 
     // Misc sessions link
-    html += '<button type="button" class="row-item u-mt-14" id="btn-misc-sessions">';
-    html += '<div class="row-main">';
-    html += '<div class="row-title">Misc sessions</div>';
-    html += '<div class="row-sub">Sessions saved without a rifle profile</div>';
-    html += '</div>';
-    html += '<span class="row-aside">' + Icon('chevron-right', 18) + '</span>';
-    html += '</button>';
+    html += UI.sectionHead('More');
+    html += UI.card(
+        UI.rowlink({
+            button: true, id: 'btn-misc-sessions',
+            title: 'Misc sessions', sub: 'Sessions saved without a rifle profile', chev: true
+        })
+    );
 
     // Account (privacy + deletion — store compliance)
-    html += '<details class="fold u-mt-14"><summary>Account</summary>';
+    html += '<details class="fold u-mt-14 edge"><summary>Account</summary>';
     html += '<div class="fold-body">';
     html += '<p class="t-body"><a href="privacy-policy.html">Privacy policy</a></p>';
     html += '<p class="t-body u-quiet u-mt-10">Deleting your account permanently removes every rifle, session, photo, and chrono string. This cannot be undone.</p>';
-    html += '<button type="button" class="action-danger u-mt-10" id="btn-delete-account">Delete account&hellip;</button>';
+    html += '<button type="button" class="btn-danger u-mt-10" id="btn-delete-account">Delete account&hellip;</button>';
     html += '</div></details>';
 
     html += '</div>'; // close .screen
 
-    // The screen's single primary, pinned in thumb reach
+    // Add rifle · Scan certificate, pinned in thumb reach
     if (rifles.length > 0) {
         html += '<div class="fab-zone">';
-        html += '<button type="button" class="action-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
+        html += '<button type="button" class="btn-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
+        html += '<button type="button" class="btn u-full u-mt-10" id="btn-scan-cert">Scan certificate</button>';
         html += '</div>';
     }
 
     this.container.innerHTML = html;
     this._bindRifleListEvents();
+    this._fillFleetReadiness(rifles);
+};
+
+/** Readiness chips per row + the fleet summary line (async fill). */
+ProfileManager.prototype._fillFleetReadiness = function (rifles) {
+    var self = this;
+    if (!rifles.length || typeof Readiness === 'undefined') return;
+    Promise.all(rifles.map(function (r) {
+        return Readiness.assess(self.db, r).then(function (res) {
+            var chipEl = self.container.querySelector('[data-fleet-chip="' + r.id + '"]');
+            if (chipEl) chipEl.outerHTML = UI.chip(res.chip.kind, res.chip.text);
+            // status one-liner under the name
+            var row = self.container.querySelector('[data-rifle-id="' + r.id + '"] .txt span');
+            if (row) {
+                var status = res.state === 'ready' && res.lastChecked
+                    ? 'zero confirmed ' + res.lastChecked.toLocaleDateString()
+                    : (res.state === 'adjust' && res.correction
+                        ? res.correction.toLowerCase() + ' needed'
+                        : (res.state === 'adjust' ? 'confirm with one more group' : 'never checked'));
+                row.textContent = (r.caliber ? r.caliber + ' · ' : '') + status;
+            }
+            return res.state;
+        }).catch(function () { return null; });
+    })).then(function (states) {
+        var summary = document.getElementById('fleet-summary');
+        if (!summary || !summary.isConnected) return;
+        var counts = { ready: 0, adjust: 0, unchecked: 0 };
+        states.forEach(function (s) { if (s && counts.hasOwnProperty(s)) counts[s]++; });
+        var chips = '';
+        if (counts.ready) chips += UI.chip('ready', counts.ready + ' ready');
+        if (counts.adjust) chips += UI.chip('caution', counts.adjust + ' need adjustment');
+        if (counts.unchecked) chips += UI.chip('problem', counts.unchecked + ' not checked');
+        summary.innerHTML = chips;
+    });
 };
 
 ProfileManager.prototype._bindRifleListEvents = function () {
@@ -124,11 +168,43 @@ ProfileManager.prototype._bindRifleListEvents = function () {
         });
     }
 
-    var cards = this.container.querySelectorAll('.row-item[data-rifle-id]');
+    var cards = this.container.querySelectorAll('[data-rifle-id]');
     for (var i = 0; i < cards.length; i++) {
         cards[i].addEventListener('click', function () {
             var id = this.getAttribute('data-rifle-id');
             self.showRifleDetail(id);
+        });
+    }
+
+    // Search filters rows in place (shown only for >8 rifles)
+    var search = document.getElementById('rifle-search');
+    if (search) {
+        search.addEventListener('input', function () {
+            var q = this.value.toLowerCase();
+            var rows = self.container.querySelectorAll('#rifle-list-card [data-rifle-id]');
+            for (var r = 0; r < rows.length; r++) {
+                var text = rows[r].textContent.toLowerCase();
+                rows[r].classList.toggle('hidden', q && text.indexOf(q) === -1);
+            }
+        });
+    }
+
+    // Scan certificate: certificates carry a QR deep link — explain it
+    var scanBtn = document.getElementById('btn-scan-cert');
+    if (scanBtn) {
+        scanBtn.addEventListener('click', function () {
+            var overlay = document.createElement('div');
+            overlay.className = 'overlay';
+            overlay.innerHTML =
+                '<div class="overlay-card">' +
+                '<div class="overlay-title">Scan a certificate</div>' +
+                '<p class="overlay-text">Every Proven certificate carries a QR code. Point your phone&rsquo;s camera at it &mdash; the link opens that rifle right here.</p>' +
+                '<button class="btn u-full" id="scan-cert-close">Got it</button>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+            overlay.querySelector('#scan-cert-close').addEventListener('click', close);
         });
     }
 
@@ -497,57 +573,151 @@ ProfileManager.prototype.showRifleDetail = function (rifleId) {
     });
 };
 
+/**
+ * The SLIM rifle page (Proven §3.4): identity header · readiness
+ * verdict banner + Confirm zero · stat strip (rounds, best MOA,
+ * 90% yd) · build sheet · five category shortcut rows. Nothing else —
+ * all detail lives in the category screens.
+ */
 ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
+    var self = this;
     // Feed the Home "Recent" strip (guarded — home.js may not be loaded)
     if (typeof Recents !== 'undefined') Recents.touchRifle(rifle);
     var activeBarrel = null;
     for (var b = 0; b < barrels.length; b++) {
         if (barrels[b].isActive) { activeBarrel = barrels[b]; break; }
     }
+    if (!activeBarrel && barrels.length) activeBarrel = barrels[0];
 
-    loads.sort(function (a, b) {
-        return (a.name || '').localeCompare(b.name || '');
-    });
+    var html = '<div class="screen">';
 
-    // Toolbar: back · engraved name · edit
-    var html = '<div class="view-toolbar">';
-    html += '<button type="button" class="toolbar-back" id="btn-detail-back">' + Icon('chevron-left', 20) + 'Rifles</button>';
-    html += '<h2 class="toolbar-title">' + escapeHtml(rifle.name) + '</h2>';
-    html += '<button type="button" class="toolbar-act" id="btn-edit-rifle" title="Edit" aria-label="Edit rifle">' + Icon('pencil', 20) + '</button>';
+    // Identity header: name, spec line, Edit
+    html += '<div class="pagehead">';
+    html += '<button type="button" class="backline" id="btn-detail-back">&lsaquo; Rifles</button>';
+    html += '<div class="pagehead-row">';
+    html += '<div class="pagetitle">' + escapeHtml(rifle.name) + '</div>';
+    html += '<button type="button" class="pagehead-act" id="btn-edit-rifle">Edit</button>';
+    html += '</div>';
+    var specBits = [];
+    if (rifle.caliber) specBits.push(escapeHtml(rifle.caliber));
+    if (activeBarrel && activeBarrel.twistRate) specBits.push(escapeHtml(activeBarrel.twistRate));
+    if (rifle.barrelSpec) specBits.push(escapeHtml(rifle.barrelSpec));
+    if (rifle.serialNumber) specBits.push('SN ' + escapeHtml(rifle.serialNumber));
+    if (specBits.length) html += '<div class="pagesub mono">' + specBits.join(' &middot; ') + '</div>';
     html += '</div>';
 
-    // Build line (caliber · twist · barrel, when known)
-    var buildBits = [];
-    if (rifle.caliber) buildBits.push(escapeHtml(rifle.caliber));
-    if (activeBarrel && activeBarrel.twistRate) buildBits.push(escapeHtml(activeBarrel.twistRate));
-    if (rifle.barrelSpec) buildBits.push(escapeHtml(rifle.barrelSpec));
-    if (buildBits.length) {
-        html += '<div class="toolbar-sub">' + buildBits.join(' &middot; ') + '</div>';
+    // Readiness verdict banner + Confirm zero (fills in async)
+    html += '<div id="rifle-verdict"></div>';
+    html += '<button type="button" class="btn-primary btn-edge" id="btn-confirm-zero">Confirm zero</button>';
+
+    // Stat strip: rounds · best MOA · 90% yd (fills in async)
+    html += '<div class="card u-mt-14" id="rifle-stats">' +
+        UI.statStrip([
+            { value: activeBarrel ? Number(activeBarrel.totalRounds || 0).toLocaleString() : '—', label: 'Rounds' },
+            { value: '—', label: 'Best MOA' },
+            { value: '—', label: '90% yd' }
+        ]) + '</div>';
+
+    // Build sheet
+    var specRows = '';
+    var buildRows = [
+        ['Caliber', rifle.caliber],
+        ['Scope height', rifle.scopeHeight ? rifle.scopeHeight + '″' : null],
+        ['Zero range', rifle.zeroRange ? rifle.zeroRange + ' yd' : null],
+        ['Twist', activeBarrel && activeBarrel.twistRate
+            ? activeBarrel.twistRate + ' ' + (activeBarrel.twistDirection || 'Right') : null],
+        ['Serial #', rifle.serialNumber],
+        ['Action', rifle.action],
+        ['Barrel', rifle.barrelSpec],
+        ['Trigger', rifle.triggerSpec],
+        ['Chassis', rifle.chassis],
+        ['Muzzle', rifle.muzzleDevice],
+        ['Notes', rifle.notes]
+    ];
+    for (var br = 0; br < buildRows.length; br++) {
+        if (buildRows[br][1]) {
+            specRows += '<div class="spec-row"><span class="spec-key">' + buildRows[br][0] +
+                '</span><span class="spec-val">' + escapeHtml(buildRows[br][1]) + '</span></div>';
+        }
+    }
+    if (specRows) {
+        html += UI.sectionHead('Build sheet');
+        html += '<div class="card card-pad">' + specRows + '</div>';
     }
 
-    // Rifle cards — the seven-question stack (rifle-cards.js fills it)
-    html += '<div id="rifle-cards" class="screen"></div>';
+    // Five shortcut rows — one per job category, chip pre-set to this rifle
+    html += UI.sectionHead('Everything else');
+    var catRows = '';
+    if (typeof Categories !== 'undefined') {
+        Categories.KEYS.forEach(function (key) {
+            if (!Categories.hasActiveTools(key)) return;
+            var def = Categories.DEFS[key];
+            catRows += UI.rowlink({
+                button: true,
+                title: def.title,
+                sub: def.desc,
+                chev: true,
+                data: { 'cat-shortcut': key }
+            });
+        });
+    }
+    html += UI.card(catRows);
+
+    html += '</div>'; // .screen
 
     this.container.innerHTML = html;
     this._bindRifleDetailEvents(rifle, activeBarrel);
+    this._fillRifleDetailAsync(rifle, loads, activeBarrel);
+};
 
-    // Render the card stack (cards carry their own bindings)
-    if (typeof RifleCards !== 'undefined') {
-        RifleCards.render(document.getElementById('rifle-cards'), {
-            db: this.db,
-            rifle: rifle,
-            loads: loads,
-            barrels: barrels,
-            activeBarrel: activeBarrel,
-            managers: {
-                profile: this,
-                history: this.historyManager,
-                report: this.reportManager,
-                certificate: this.certificateManager
-            }
+ProfileManager.prototype._fillRifleDetailAsync = function (rifle, loads, activeBarrel) {
+    var self = this;
+
+    // Verdict banner
+    if (typeof Readiness !== 'undefined') {
+        Readiness.assess(this.db, rifle).then(function (r) {
+            var el = document.getElementById('rifle-verdict');
+            if (!el || !el.isConnected) return;
+            var kind = r.state === 'ready' ? 'ready' : (r.state === 'adjust' ? 'caution' : 'problem');
+            var text = r.state === 'ready'
+                ? 'READY — ' + r.note + '.'
+                : (r.state === 'adjust' && r.correction
+                    ? 'ADJUST — ' + r.correction + ', then shoot a confirmation group.'
+                    : (r.state === 'adjust'
+                        ? 'ALMOST THERE — less than 1 click off, shoot a confirmation group.'
+                        : 'NOT CHECKED — photograph a target and Proven confirms your zero.'));
+            el.innerHTML = UI.banner(kind, UI.esc(text), true);
         });
     }
 
+    // Stats: best MOA + 90% yd
+    Promise.all([
+        this.db.getSessionsByRifle(rifle.id).catch(function () { return []; }),
+        this.db.getVelocityStringsByRifle(rifle.id).catch(function () { return []; }),
+        this.db.getFieldShotsByRifle(rifle.id).catch(function () { return []; })
+    ]).then(function (res) {
+        var el = document.getElementById('rifle-stats');
+        if (!el || !el.isConnected) return;
+        var bestMoa = '—';
+        if (typeof aggregateRifle === 'function') {
+            var agg = aggregateRifle({ sessions: res[0], strings: res[1], loads: loads || [] });
+            if (agg.bestGroup) bestMoa = formatFixed(agg.bestGroup.moa, 2);
+        }
+        var effYd = '—';
+        if (res[2] && res[2].length && typeof FieldCore !== 'undefined') {
+            var eff = FieldCore.computeEffectiveRange(res[2]);
+            var best = 0;
+            for (var p in eff) {
+                if (eff.hasOwnProperty(p) && eff[p].yards > best) best = eff[p].yards;
+            }
+            if (best) effYd = Number(best).toLocaleString();
+        }
+        el.innerHTML = UI.statStrip([
+            { value: activeBarrel ? Number(activeBarrel.totalRounds || 0).toLocaleString() : '—', label: 'Rounds' },
+            { value: bestMoa, label: 'Best MOA' },
+            { value: effYd, label: '90% yd' }
+        ]);
+    });
 };
 
 ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel) {
@@ -561,10 +731,24 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
         self.showRifleForm(rifle.id);
     });
 
-    // (Loads bindings moved into the 'loads' card — rifle-cards.js)
+    var confirmZero = document.getElementById('btn-confirm-zero');
+    if (confirmZero) {
+        confirmZero.addEventListener('click', function () {
+            if (window.SessionLaunch) {
+                SessionLaunch.start({ rifleId: rifle.id });
+            } else if (window.AppNav) {
+                AppNav.go('session');
+            }
+        });
+    }
 
-    // (History links, report promo, and the barrel editor all live in
-    // their cards now — rifle-cards.js)
+    // Category shortcuts open that screen WITH THIS RIFLE in the chip
+    var shortcuts = this.container.querySelectorAll('[data-cat-shortcut]');
+    for (var i = 0; i < shortcuts.length; i++) {
+        shortcuts[i].addEventListener('click', function () {
+            if (window.AppNav) AppNav.openCategory(this.getAttribute('data-cat-shortcut'), rifle.id);
+        });
+    }
 };
 
 // ── Barrel Form ────────────────────────────────────────────────
