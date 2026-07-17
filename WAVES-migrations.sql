@@ -31,3 +31,42 @@ ALTER TABLE public.sessions         ADD COLUMN IF NOT EXISTS config text;
 ALTER TABLE public.velocity_strings ADD COLUMN IF NOT EXISTS config text;
 ALTER TABLE public.cold_bore_shots  ADD COLUMN IF NOT EXISTS config text;
 ALTER TABLE public.zero_records     ADD COLUMN IF NOT EXISTS config text;
+
+
+-- ────────────────────────────────────────────────────────────
+-- MIGRATION 3 (F4/F5 field logging + wind grader): field_shots.
+-- One row per logged STRING ("7 of 10 at 600, prone"), with an
+-- optional pre-shot wind call and post-shot actual for the grader.
+-- ADDITIVE: new table + RLS + index only.
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.field_shots (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    rifle_id       uuid NOT NULL REFERENCES public.rifles(id) ON DELETE CASCADE,
+    load_id        uuid REFERENCES public.loads(id) ON DELETE SET NULL,
+    date           timestamptz DEFAULT now(),
+    distance_yards integer,
+    hits           integer,
+    shots          integer,
+    position       text,                -- 'prone' | 'seated' | 'standing' | 'barricade'
+    config         text,                -- suppressor config tag
+    weather        jsonb,               -- auto-attached conditions snapshot
+    wind_call      jsonb,               -- {mph, value: 'full-left'|'half-left'|'none'|'half-right'|'full-right'}
+    wind_actual    jsonb,               -- {errorMil: signed; + = called under (needed more)}
+    notes          text DEFAULT '',
+    created_at     timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.field_shots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own field shots"
+    ON public.field_shots FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own field shots"
+    ON public.field_shots FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own field shots"
+    ON public.field_shots FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own field shots"
+    ON public.field_shots FOR DELETE USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_field_shots_rifle
+    ON public.field_shots(user_id, rifle_id);

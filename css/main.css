@@ -3425,3 +3425,42 @@ html, body {
     color: var(--text);
     background: rgba(76, 175, 80, 0.12);
 }
+
+/* Field logger chips */
+.field-label {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 10px 0 4px;
+}
+
+.field-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.field-chip {
+    min-height: 44px;
+    min-width: 52px;
+    padding: 0 12px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.field-chip-on {
+    border-color: var(--primary);
+    background: rgba(76, 175, 80, 0.14);
+}
+
+.field-card {
+    max-height: 88vh;
+    overflow-y: auto;
+}

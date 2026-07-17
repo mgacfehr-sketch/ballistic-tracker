@@ -42,16 +42,22 @@ var TOOLS = {
         problem: 'Put my dope on paper (range cards)',
         homeAction: { id: 'dope-cards', icon: '🗒️', label: 'Print a DOPE card', run: 'dopeCards' },
         rifleCards: []
+    },
+    field: {
+        key: 'field', core: false, feature: null,
+        problem: 'Know my ethical range',
+        homeAction: { id: 'field-log', icon: '🪵', label: 'Log field shots', run: 'fieldLog' },
+        rifleCards: ['effective-range']
     }
     // Feature waves add entries here — never a new registry, never a nav tab.
 };
 
 // Onboarding answer → which tools wake up
 var ToolPresets = {
-    hunt: ['dopeCards'],
-    compete: ['chrono', 'scopeTruth', 'dopeCards'],
+    hunt: ['dopeCards', 'field'],
+    compete: ['chrono', 'scopeTruth', 'dopeCards', 'field'],
     handload: ['chrono'],
-    all: ['chrono', 'scopeTruth', 'dopeCards']
+    all: ['chrono', 'scopeTruth', 'dopeCards', 'field']
 };
 
 // ── Pure core ─────────────────────────────────────────────────

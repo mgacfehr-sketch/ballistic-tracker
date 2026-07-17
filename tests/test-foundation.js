@@ -198,6 +198,50 @@ var w = hunt[hunt.length - 1];
 check('wind columns scale linearly (w5 = w10/2)', Math.abs(w.wind5 - Math.round(w.wind10 / 2 * 4) / 4) < 0.26, true);
 check('come-ups snap to quarter-MOA clicks', (hunt[5].comeUpMOA * 4) % 1, 0);
 
+// ── FieldCore ─────────────────────────────────────────────────
+var FieldCore = require('../js/field.js').FieldCore;
+
+console.log('\nFieldCore.computeEffectiveRange:');
+
+function fs(dist, hits, shots, pos) {
+    return { distanceYards: dist, hits: hits, shots: shots, position: pos || 'prone' };
+}
+
+var effShots = [
+    fs(200, 10, 10), fs(300, 9, 10), fs(400, 9, 10), fs(500, 9, 10),
+    fs(600, 6, 10),                       // 60% at 600 — the wall
+    fs(700, 9, 10),                       // good beyond the wall — must NOT extend range
+    fs(300, 3, 10, 'seated'), fs(200, 9, 10, 'seated')
+];
+var eff = FieldCore.computeEffectiveRange(effShots);
+check('prone effective range stops before the failing bin', eff.prone.yards, 500);
+check('failing far bin does not resurrect the range', eff.prone.yards < 700, true);
+check('seated capped by its own wall', eff.seated.yards, 200);
+check('bins with <5 shots are skipped', FieldCore.computeEffectiveRange([fs(300, 2, 2)]).prone, undefined);
+check('empty input → empty object', Object.keys(FieldCore.computeEffectiveRange([])).length, 0);
+check('threshold configurable', FieldCore.computeEffectiveRange(effShots, { threshold: 0.55 }).prone.yards, 700);
+
+console.log('\nFieldCore.analyzeWindCalls / windInsight:');
+
+function windShot(value, errorMil) {
+    return { windCall: { mph: 10, value: value }, windActual: { errorMil: errorMil } };
+}
+var windShots = [];
+for (var wi = 0; wi < 6; wi++) windShots.push(windShot('full-left', 0.2));
+for (var wj = 0; wj < 6; wj++) windShots.push(windShot('full-right', -0.05));
+windShots.push({ windCall: null, windActual: null }); // ungraded rows ignored
+
+var wa = FieldCore.analyzeWindCalls(windShots);
+check('two graded classes', wa.length, 2);
+var fullLeft = wa.filter(function (a) { return a.value === 'full-left'; })[0];
+check('full-left average error +0.2', fullLeft.avgErrorMil, 0.2);
+check('classes below minCalls excluded', FieldCore.analyzeWindCalls(windShots.slice(0, 3)).length, 0);
+
+var insight = FieldCore.windInsight(wa);
+check('insight names the biggest bias', insight.indexOf('under-call full left') !== -1, true);
+check('insight includes magnitude', insight.indexOf('0.2 mil') !== -1, true);
+check('no meaningful bias → null', FieldCore.windInsight([{ value: 'none', avgErrorMil: 0.02, n: 9 }]), null);
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

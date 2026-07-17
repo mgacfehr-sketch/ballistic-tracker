@@ -183,7 +183,8 @@ BallisticDB.prototype.deleteRifle = function (id) {
             self.supabase.from('cleaning_logs').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('dope_entries').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('cold_bore_shots').delete().eq('rifle_id', id).eq('user_id', self.userId),
-            self.supabase.from('velocity_strings').delete().eq('rifle_id', id).eq('user_id', self.userId)
+            self.supabase.from('velocity_strings').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            self.supabase.from('field_shots').delete().eq('rifle_id', id).eq('user_id', self.userId)
         ]);
     }).then(function (results) {
         for (var i = 0; i < results.length; i++) {
@@ -835,6 +836,54 @@ BallisticDB.prototype.getUnassignedVelocityStrings = function () {
 BallisticDB.prototype.deleteVelocityString = function (id) {
     var self = this;
     return self.supabase.from('velocity_strings').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};
+
+// ── Field Shot CRUD (steel/hit logging) ───────────────────────
+
+BallisticDB.prototype.addFieldShot = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        loadId: data.loadId || null,
+        date: data.date || new Date().toISOString(),
+        distanceYards: data.distanceYards || null,
+        hits: typeof data.hits === 'number' ? data.hits : null,
+        shots: typeof data.shots === 'number' ? data.shots : null,
+        position: data.position || null,
+        config: data.config || null,
+        weather: data.weather || null,
+        windCall: data.windCall || null,
+        windActual: data.windActual || null,
+        notes: data.notes || '',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('field_shots').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getFieldShotsByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('field_shots').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.deleteFieldShot = function (id) {
+    var self = this;
+    return self.supabase.from('field_shots').delete()
         .eq('id', id).eq('user_id', self.userId)
         .then(function (res) {
             if (res.error) throw res.error;

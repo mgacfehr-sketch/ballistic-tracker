@@ -440,6 +440,55 @@ RifleCards.register({
     }
 });
 
+// ── progress: personal effective range (from field shots) ─────
+RifleCards.register({
+    id: 'effective-range',
+    slot: 'progress',
+    tool: 'field',
+    isVisible: function (ctx) { return !!ctx.rifle; },
+    render: function (el, ctx) {
+        el.innerHTML = '<div class="detail-card" id="eff-range-body"></div>';
+        var body = el.querySelector('#eff-range-body');
+
+        ctx.db.getFieldShotsByRifle(ctx.rifle.id).then(function (shots) {
+            if (!shots || !shots.length) {
+                body.innerHTML =
+                    '<p class="empty-state-sub" style="padding:0;">Log field shots and this card fills itself — your honest "should I shoot?" number.</p>' +
+                    '<button class="btn btn-secondary" id="eff-range-log" style="margin-top:8px;">Log field shots</button>';
+                body.querySelector('#eff-range-log').addEventListener('click', function () {
+                    if (window.ToolActions && window.ToolActions.fieldLog) {
+                        window.ToolActions.fieldLog(ctx.db);
+                    }
+                });
+                return;
+            }
+
+            var eff = FieldCore.computeEffectiveRange(shots);
+            var positions = Object.keys(eff);
+            var html = '';
+            if (positions.length) {
+                var parts = positions.map(function (p) {
+                    return p + ' ' + eff[p].yards + ' yd';
+                });
+                html += '<p style="margin:0 0 6px;"><strong>90% hit rate: ' + parts.join(' · ') + '</strong></p>';
+                html += '<p class="chrono-hint">From ' + shots.length + ' logged strings. Updates itself as you log.</p>';
+            } else {
+                html += '<p class="chrono-hint" style="margin:0;">Logging started — need ~5 shots per distance before this speaks (' +
+                    shots.length + ' strings so far).</p>';
+            }
+
+            // Wind grader insight (F5) — only when it has something real
+            var insight = FieldCore.windInsight(FieldCore.analyzeWindCalls(shots));
+            if (insight) {
+                html += '<p class="chrono-hint" style="color:var(--calibration-color);">' + insight + '</p>';
+            }
+            body.innerHTML = html;
+        }).catch(function () {
+            el.style.display = 'none';
+        });
+    }
+});
+
 // ── records: history & log links ──────────────────────────────
 RifleCards.register({
     id: 'history-links',
