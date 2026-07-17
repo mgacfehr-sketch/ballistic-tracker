@@ -17,7 +17,7 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 | 7 | Ammo lot manager | ✅ code done |
 | 8 | Recipes + component lots | ✅ code done |
 | 9 | Ladder test | ✅ code done |
-| 10 | Load logbook | — |
+| 10 | Load logbook | ✅ code done |
 
 ## F1 — Scope tracking (tall-target test)
 
@@ -87,6 +87,13 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 - `splitByTapOrder`: impacts grouped k-at-a-time in FIRE ORDER (the flow instructs tapping in fire order); uneven remainders kept as a short, flagged last group.
 - Results-step "Split into ladder groups" button (bench tool, ≥4 impacts) → chips + labels → chart (POI line, green stable-window band, per-charge labels) + starred table rows → "Attach to session" → normal Save stores `session_type='ladder'` + the ladder jsonb (M6).
 - **Judgment calls:** groups are assigned by TAP ORDER, not round-robin (v1 limitation, stated in the explainer — shoot charge-by-charge); velocity flat-spot overlay DEFERRED — auto-matching chrono strings to charges is guesswork, and guessing near load-development conclusions violates the no-silent-assignment principle; charge labels are a typed comma list (bench exception).
+
+## F10 — Load-development logbook
+
+**Question:** Where's my stuff? · **Budget:** A — a view; reading is the only interaction. · **Verdict:** the timeline itself, best group starred. · **Empty state:** "Nothing logged with this load yet — sessions and chrono strings will assemble here by themselves." · **Taps:** 0.
+
+- Load detail (bench tool) gains the Recipe block (make/lot/fired counts/charge/seating) + the **Development Log**: every session (🎯 group w/ MOA, 🧪 ladder w/ its window sentence) and every confirmed string (📥 avg/SD, lot, 🔇 config) in date order; best eligible group starred; lot number shown on the load card.
+- Pure view over F7–F9 data — no new storage, no migration.
 
 ## Notes so far
 

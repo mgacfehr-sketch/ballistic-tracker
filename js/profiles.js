@@ -923,6 +923,74 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
 
 // ── Load Detail ────────────────────────────────────────────────
 
+/**
+ * F10 — the load-development logbook: every session (ladder tests
+ * called out), every confirmed chrono string, in date order, with the
+ * best group starred. A view over existing data — the binder they
+ * always meant to keep, kept for them.
+ */
+ProfileManager.prototype._renderLoadLogbook = function (rifleId, load) {
+    var el = document.getElementById('load-logbook');
+    if (!el) return; // bench off
+
+    Promise.all([
+        this.db.getSessionsByRifle(rifleId),
+        this.db.getVelocityStringsByRifle(rifleId)
+    ]).then(function (res) {
+        var sessions = (res[0] || []).filter(function (s) { return s.loadId === load.id; });
+        var strings = (res[1] || []).filter(function (s) {
+            return s.loadId === load.id && s.assignmentStatus === 'confirmed';
+        });
+
+        // Best (smallest) eligible group gets the star
+        var bestId = null, bestMOA = Infinity;
+        sessions.forEach(function (s) {
+            if (s.results && typeof s.results.groupSizeMOA === 'number' &&
+                s.impacts && s.impacts.length >= 3 && s.results.groupSizeMOA < bestMOA) {
+                bestMOA = s.results.groupSizeMOA;
+                bestId = s.id;
+            }
+        });
+
+        var entries = [];
+        sessions.forEach(function (s) {
+            var isLadder = s.sessionType === 'ladder' && s.ladder;
+            var text;
+            if (isLadder) {
+                text = '🧪 Ladder — ' + (s.ladder.sentence || 'series recorded');
+            } else {
+                text = '🎯 Group — ' + (s.results && typeof s.results.groupSizeMOA === 'number'
+                    ? formatNum(s.results.groupSizeMOA, 2) + ' MOA · ' + (s.impacts ? s.impacts.length : 0) + ' shots'
+                    : 'session') + (s.id === bestId ? ' ★ best' : '');
+            }
+            entries.push({ date: s.date || '', text: text });
+        });
+        strings.forEach(function (s) {
+            entries.push({
+                date: s.date || '',
+                text: '📥 String — avg ' + formatNum(s.avgFps, 0) + ' · SD ' + formatNum(s.sdFps, 1) +
+                    (s.lotNumber ? ' · lot ' + s.lotNumber : '') +
+                    (s.config === 'suppressed' ? ' · 🔇' : '')
+            });
+        });
+        entries.sort(function (a, b) { return b.date.localeCompare(a.date); });
+
+        if (!entries.length) {
+            el.innerHTML = '<p class="empty-state-sub" style="padding:0;">Nothing logged with this load yet — sessions and chrono strings will assemble here by themselves.</p>';
+            return;
+        }
+        var html = '<ul class="chrono-string-list" style="margin:0;">';
+        entries.forEach(function (e) {
+            var when = e.date ? new Date(e.date).toLocaleDateString() : '—';
+            html += '<li><span class="chrono-hint">' + when + '</span> &nbsp;' + escapeHtml(e.text) + '</li>';
+        });
+        html += '</ul>';
+        el.innerHTML = html;
+    }).catch(function () {
+        el.innerHTML = '<p class="chrono-hint" style="margin:0;">Could not load the development log.</p>';
+    });
+};
+
 ProfileManager.prototype.showLoadDetail = function (rifleId, loadId) {
     var self = this;
     this.db.getLoad(loadId).then(function (load) {
@@ -954,10 +1022,46 @@ ProfileManager.prototype._renderLoadDetail = function (rifleId, load) {
     if (load.bulletLength) {
         html += '<div class="detail-row"><span class="detail-label">Bullet Length</span><span class="detail-value">' + load.bulletLength + '"</span></div>';
     }
+    if (load.lotNumber) {
+        html += '<div class="detail-row"><span class="detail-label">Lot</span><span class="detail-value">' + escapeHtml(load.lotNumber) + '</span></div>';
+    }
     if (load.notes) {
         html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(load.notes) + '</span></div>';
     }
     html += '</div>';
+
+    // Recipe block (bench)
+    if (load.recipe) {
+        var rec = load.recipe;
+        html += '<div class="detail-card">';
+        html += '<h4 style="margin:0 0 6px;">Recipe</h4>';
+        var recRows = [
+            ['Brass', rec.brass && rec.brass.make ? rec.brass.make +
+                (rec.brass.lot ? ' · lot ' + rec.brass.lot : '') +
+                (typeof rec.brass.timesFired === 'number' ? ' · fired ' + rec.brass.timesFired + '×' : '') : null],
+            ['Primer', rec.primer && rec.primer.make ? rec.primer.make + (rec.primer.lot ? ' · lot ' + rec.primer.lot : '') : null],
+            ['Powder', rec.powder && rec.powder.make ? rec.powder.make +
+                (typeof rec.powder.chargeGr === 'number' ? ' · ' + rec.powder.chargeGr + ' gr' : '') +
+                (rec.powder.lot ? ' · lot ' + rec.powder.lot : '') : null],
+            ['Bullet', rec.bullet && rec.bullet.make ? rec.bullet.make + (rec.bullet.lot ? ' · lot ' + rec.bullet.lot : '') : null],
+            ['Seating', typeof rec.seatingDepthIn === 'number' ? rec.seatingDepthIn + '"' : null]
+        ];
+        recRows.forEach(function (row) {
+            if (row[1]) {
+                html += '<div class="detail-row"><span class="detail-label">' + row[0] +
+                    '</span><span class="detail-value">' + escapeHtml(row[1]) + '</span></div>';
+            }
+        });
+        html += '</div>';
+    }
+
+    // Development logbook (bench) — the binder, kept for them
+    if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench')) {
+        html += '<div class="detail-section"><div class="detail-section-header">';
+        html += '<h3 class="detail-section-title">Development Log</h3></div>';
+        html += '<div class="detail-card" id="load-logbook"><p class="chrono-hint" style="margin:0;">Loading…</p></div>';
+        html += '</div>';
+    }
 
     html += '<div class="btn-row" style="padding: 0 16px;">';
     html += '<button class="btn btn-danger" id="btn-delete-load">Delete Load</button>';
@@ -968,6 +1072,7 @@ ProfileManager.prototype._renderLoadDetail = function (rifleId, load) {
     this.container.innerHTML = html;
 
     var self = this;
+    this._renderLoadLogbook(rifleId, load);
 
     document.getElementById('btn-form-back').addEventListener('click', function () {
         self.showRifleDetail(rifleId);
