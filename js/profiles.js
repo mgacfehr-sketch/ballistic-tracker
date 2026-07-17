@@ -300,11 +300,13 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     // Turret units — wind grading and insights speak this unit
     var unitVal = rifle && String(rifle.angleUnit || '').toUpperCase() === 'MIL' ? 'MIL' : 'MOA';
     html += '<div class="field">';
-    html += '<label class="field-label" for="rf-angle-unit">Turret units</label>';
-    html += '<select id="rf-angle-unit">';
-    html += '<option value="MOA"' + (unitVal === 'MOA' ? ' selected' : '') + '>MOA</option>';
-    html += '<option value="MIL"' + (unitVal === 'MIL' ? ' selected' : '') + '>MIL (mrad)</option>';
-    html += '</select>';
+    html += '<label class="field-label">Turret units</label>';
+    // Template C segmented control; a hidden input carries the value
+    html += '<input type="hidden" id="rf-angle-unit" value="' + (unitVal === 'MIL' ? 'MIL' : 'MOA') + '">';
+    html += '<div class="segment" id="rf-angle-seg">';
+    html += '<button type="button" data-unit="MOA"' + (unitVal !== 'MIL' ? ' class="on"' : '') + '>MOA</button>';
+    html += '<button type="button" data-unit="MIL"' + (unitVal === 'MIL' ? ' class="on"' : '') + '>MIL (mrad)</button>';
+    html += '</div>';
     html += '</div>';
 
     // ── Barrel fields merged into rifle form ──
@@ -352,11 +354,15 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
         html += '</details>';
     }
 
-    // Suppressor configurations
+    // Suppressor configurations (Template C segmented No/Yes)
+    var hasConfigs = !!(rifle && rifle.hasConfigs);
     html += '<div class="field">';
-    html += '<label class="t-body">';
-    html += '<input type="checkbox" id="rf-has-configs"' + (rifle && rifle.hasConfigs ? ' checked' : '') + '> ';
-    html += 'This rifle sometimes runs a suppressor</label>';
+    html += '<label class="field-label">Sometimes runs a suppressor</label>';
+    html += '<input type="checkbox" id="rf-has-configs" class="hidden"' + (hasConfigs ? ' checked' : '') + '>';
+    html += '<div class="segment" id="rf-configs-seg">';
+    html += '<button type="button" data-configs="0"' + (!hasConfigs ? ' class="on"' : '') + '>No</button>';
+    html += '<button type="button" data-configs="1"' + (hasConfigs ? ' class="on"' : '') + '>Yes</button>';
+    html += '</div>';
     html += '<p class="field-hint">Bare and suppressed configurations get their own zero and velocity records</p>';
     html += '</div>';
 
@@ -384,10 +390,14 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     html += '<textarea id="rf-notes" rows="3" placeholder="Optional notes">' + escapeHtml(rifle ? rifle.notes : '') + '</textarea>';
     html += '</div>';
 
-    html += '<button type="submit" class="action-primary u-mt-14">' + (isEdit ? 'Save changes' : 'Create rifle') + '</button>';
+    // Template C: sticky actions — Save · Cancel · guarded delete
+    html += '<div class="form-actions">';
+    html += '<button type="submit" class="btn-primary u-full">' + (isEdit ? 'Save' : 'Create rifle') + '</button>';
+    html += '<button type="button" class="btn u-full" id="btn-rifle-form-cancel">Cancel</button>';
     if (isEdit) {
-        html += '<button type="button" class="action-danger u-full u-mt-10" id="btn-delete-rifle">Delete rifle</button>';
+        html += '<button type="button" class="btn-danger u-full" id="btn-delete-rifle">Delete rifle&hellip;</button>';
     }
+    html += '</div>';
 
     html += '</form>';
     html += '</div>'; // close .screen
@@ -411,13 +421,42 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
 ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
     var self = this;
 
-    document.getElementById('btn-form-back').addEventListener('click', function () {
+    function leaveForm() {
         if (rifle) {
             self.showRifleDetail(rifle.id);
         } else {
             self.showRifleList();
         }
-    });
+    }
+    document.getElementById('btn-form-back').addEventListener('click', leaveForm);
+    var cancelBtn = document.getElementById('btn-rifle-form-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', leaveForm);
+
+    // Segmented controls drive their hidden inputs
+    var unitSeg = document.getElementById('rf-angle-seg');
+    if (unitSeg) {
+        var unitBtns = unitSeg.querySelectorAll('[data-unit]');
+        for (var u = 0; u < unitBtns.length; u++) {
+            unitBtns[u].addEventListener('click', function () {
+                document.getElementById('rf-angle-unit').value = this.getAttribute('data-unit');
+                var siblings = unitSeg.querySelectorAll('[data-unit]');
+                for (var s = 0; s < siblings.length; s++) siblings[s].classList.remove('on');
+                this.classList.add('on');
+            });
+        }
+    }
+    var cfgSeg = document.getElementById('rf-configs-seg');
+    if (cfgSeg) {
+        var cfgBtns = cfgSeg.querySelectorAll('[data-configs]');
+        for (var c = 0; c < cfgBtns.length; c++) {
+            cfgBtns[c].addEventListener('click', function () {
+                document.getElementById('rf-has-configs').checked = this.getAttribute('data-configs') === '1';
+                var sibs = cfgSeg.querySelectorAll('[data-configs]');
+                for (var s = 0; s < sibs.length; s++) sibs[s].classList.remove('on');
+                this.classList.add('on');
+            });
+        }
+    }
 
     document.getElementById('rifle-form').addEventListener('submit', function (e) {
         e.preventDefault();
@@ -959,10 +998,14 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     html += '<textarea id="ld-notes" rows="2" placeholder="Optional notes">' + escapeHtml(load ? load.notes : '') + '</textarea>';
     html += '</div>';
 
-    html += '<button type="submit" class="action-primary u-mt-14">' + (isEdit ? 'Save changes' : 'Create load') + '</button>';
+    // Template C: sticky actions — Save · Cancel · guarded delete
+    html += '<div class="form-actions">';
+    html += '<button type="submit" class="btn-primary u-full">' + (isEdit ? 'Save' : 'Create load') + '</button>';
+    html += '<button type="button" class="btn u-full" id="btn-load-form-cancel">Cancel</button>';
     if (isEdit) {
-        html += '<button type="button" class="action-danger u-full u-mt-10" id="btn-delete-load">Delete load</button>';
+        html += '<button type="button" class="btn-danger u-full" id="btn-delete-load">Delete load&hellip;</button>';
     }
+    html += '</div>';
 
     html += '</form>';
     html += '</div>'; // close .screen
@@ -1020,13 +1063,16 @@ ProfileManager.prototype._collectRecipe = function () {
 ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
     var self = this;
 
-    document.getElementById('btn-form-back').addEventListener('click', function () {
+    function leaveForm() {
         if (load) {
             self.showLoadDetail(rifleId, load.id);
         } else {
             self.showRifleDetail(rifleId);
         }
-    });
+    }
+    document.getElementById('btn-form-back').addEventListener('click', leaveForm);
+    var cancelBtn = document.getElementById('btn-load-form-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', leaveForm);
 
     // Component pickers remember prior entries (bench)
     if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench')) {
