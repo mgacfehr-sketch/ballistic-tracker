@@ -1,13 +1,13 @@
 {
-    "name": "yorT",
-    "short_name": "yorT",
-    "description": "Precision rifle shot group analysis and ballistic solver",
+    "name": "Proven",
+    "short_name": "Proven",
+    "description": "Precision rifle shot group analysis and ballistic solver — Proven by Workhorse",
     "start_url": "./index.html",
     "scope": "./",
     "display": "standalone",
     "orientation": "any",
-    "theme_color": "#121212",
-    "background_color": "#121212",
+    "theme_color": "#F7F6F3",
+    "background_color": "#F7F6F3",
     "icons": [
         {
             "src": "icons/icon-192.png",

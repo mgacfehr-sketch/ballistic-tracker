@@ -44,9 +44,9 @@
                 initBetaFeatures(user.id);
             }
 
-            // Admin and beta Wind Call live as header utility buttons, not
-            // nav tabs — no feature ever adds a tab. They keep the
-            // .nav-tab class so the shared view-switch binding drives them.
+            // Admin lives as a header utility button, never a nav tab —
+            // no feature ever adds a tab. It keeps the .nav-tab class so
+            // the shared view-switch binding drives it.
             var utility = document.querySelector('#app-header .header-utility');
 
             if (user.id === ADMIN_USER_ID && utility &&
@@ -60,16 +60,8 @@
                 utility.insertBefore(adminBtn, utility.firstChild);
             }
 
-            if (typeof isBetaEnabled === 'function' && isBetaEnabled('windCall') &&
-                utility && !utility.querySelector('[data-view="wind"]')) {
-                var windBtn = document.createElement('button');
-                windBtn.className = 'nav-tab util-btn';
-                windBtn.setAttribute('data-view', 'wind');
-                windBtn.setAttribute('title', 'Wind Call');
-                windBtn.setAttribute('aria-label', 'Wind Call');
-                windBtn.innerHTML = Icon('wind');
-                utility.insertBefore(windBtn, utility.firstChild);
-            }
+            // Wind Call lives inside the Shoot category — never a header
+            // control or tab.
 
             var db = new BallisticDB(client, user.id);
             db.open().then(function () {
@@ -429,23 +421,24 @@
             lastTouchEnd = now;
         }, false);
 
-        // Beta: Sunlight / High Contrast mode toggle
-        var sunlightBtn = document.getElementById('btn-sunlight-mode');
-        if (sunlightBtn) {
-            sunlightBtn.addEventListener('click', function () {
-                document.body.classList.toggle('high-contrast');
-                // Persist preference
-                try {
-                    var isOn = document.body.classList.contains('high-contrast');
-                    localStorage.setItem('yort_high_contrast', isOn ? '1' : '0');
-                } catch (e) { /* ignore */ }
+        // Theme toggle: light (default) <-> dark via [data-theme] on <html>.
+        // The boot inline script applied the saved theme before first paint.
+        function syncThemeColorMeta() {
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (!meta) return;
+            var bg = getComputedStyle(document.documentElement)
+                .getPropertyValue('--surface-background').trim();
+            if (bg) meta.setAttribute('content', bg);
+        }
+        syncThemeColorMeta();
+        var themeBtn = document.getElementById('btn-sunlight-mode');
+        if (themeBtn) {
+            themeBtn.addEventListener('click', function () {
+                var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+                document.documentElement.dataset.theme = next;
+                syncThemeColorMeta();
+                try { localStorage.setItem('yort_theme', next); } catch (e) { /* ignore */ }
             });
-            // Restore saved preference
-            try {
-                if (localStorage.getItem('yort_high_contrast') === '1') {
-                    document.body.classList.add('high-contrast');
-                }
-            } catch (e) { /* ignore */ }
         }
     }
 })();

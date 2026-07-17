@@ -1,23 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0C0E10">
+    <meta name="theme-color" content="">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>yorT</title>
+    <title>Proven</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/ui.css">
+    <script>
+        // Apply the saved theme before first paint (light is the default).
+        (function () {
+            try {
+                var t = localStorage.getItem('yort_theme');
+                if (!t) { // migrate the old sunlight-mode flag
+                    var hc = localStorage.getItem('yort_high_contrast');
+                    t = hc === '0' ? 'dark' : 'light';
+                }
+                document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+            } catch (e) { /* light default stands */ }
+        })();
+    </script>
 </head>
 <body>
-    <!-- ── Auth: the machined front plate ─────────────────── -->
+    <!-- ── Auth: the Proven front plate ────────────────────── -->
     <div id="view-auth" class="auth-screen hidden">
         <div class="auth-plate">
-            <img src="assets/logo.png" alt="" class="auth-logo-img" onerror="this.style.display='none'">
-            <h1 class="auth-wordmark"><span class="brand-yor">yor</span><span class="brand-t">T</span></h1>
+            <div class="auth-mark" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4">
+                    <circle cx="24" cy="24" r="20"/>
+                    <line x1="24" y1="4" x2="24" y2="10"/><line x1="24" y1="38" x2="24" y2="44"/>
+                    <line x1="4" y1="24" x2="10" y2="24"/><line x1="38" y1="24" x2="44" y2="24"/>
+                    <path d="M14 24l6-9 4 6 2-3 6 8" stroke-width="2.2"/>
+                    <text x="24" y="34" text-anchor="middle" font-family="Arial Black,Arial" font-size="13" font-weight="900" fill="currentColor" stroke="none">W</text>
+                </svg>
+            </div>
+            <h1 class="auth-wordmark">PROVEN<i>.</i></h1>
+            <p class="auth-seal">Proven by Workhorse</p>
             <div class="field">
                 <label class="field-label" for="auth-email">Email</label>
                 <input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com">
@@ -44,10 +66,21 @@
     <div id="app" class="hidden">
         <!-- ── Shell chrome ───────────────────────────────── -->
         <header id="app-header" class="shell-header">
-            <div class="shell-brand" aria-hidden="true"><span class="brand-yor">yor</span><span class="brand-t">T</span></div>
+            <div class="shell-brand" aria-hidden="true">
+                <span class="mark">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4">
+                        <circle cx="24" cy="24" r="20"/>
+                        <line x1="24" y1="4" x2="24" y2="10"/><line x1="24" y1="38" x2="24" y2="44"/>
+                        <line x1="4" y1="24" x2="10" y2="24"/><line x1="38" y1="24" x2="44" y2="24"/>
+                        <path d="M14 24l6-9 4 6 2-3 6 8" stroke-width="2.2"/>
+                        <text x="24" y="34" text-anchor="middle" font-family="Arial Black,Arial" font-size="13" font-weight="900" fill="currentColor" stroke="none">W</text>
+                    </svg>
+                </span>
+                <span class="wordmark">PROVEN<i>.</i></span>
+            </div>
             <div class="header-utility shell-utils">
                 <span id="connection-status" class="conn-dot" title="Connection"></span>
-                <button id="btn-sunlight-mode" class="util-btn" title="Sunlight mode" aria-label="Sunlight mode">
+                <button id="btn-sunlight-mode" class="util-btn" title="Light / dark theme" aria-label="Light / dark theme">
                     <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22"/><line x1="2" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="19.1" y2="4.9"/></svg>
                 </button>
                 <button id="btn-logout" class="util-btn" title="Log out" aria-label="Log out">
@@ -60,8 +93,16 @@
         <div id="view-session" class="app-view">
             <main id="canvas-container">
                 <div class="canvas-brand-lockup">
-                    <img src="assets/logo.png" alt="" class="canvas-watermark" onerror="this.style.display='none'">
-                    <div class="canvas-wordmark"><span class="brand-yor">yor</span><span class="brand-t">T</span></div>
+                    <span class="mark" aria-hidden="true">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4">
+                            <circle cx="24" cy="24" r="20"/>
+                            <line x1="24" y1="4" x2="24" y2="10"/><line x1="24" y1="38" x2="24" y2="44"/>
+                            <line x1="4" y1="24" x2="10" y2="24"/><line x1="38" y1="24" x2="44" y2="24"/>
+                            <path d="M14 24l6-9 4 6 2-3 6 8" stroke-width="2.2"/>
+                            <text x="24" y="34" text-anchor="middle" font-family="Arial Black,Arial" font-size="13" font-weight="900" fill="currentColor" stroke="none">W</text>
+                        </svg>
+                    </span>
+                    <div class="canvas-wordmark">PROVEN<i>.</i></div>
                 </div>
                 <canvas id="main-canvas"></canvas>
                 <div id="canvas-hint"></div>
@@ -309,15 +350,15 @@
              pushes launched from Home / rifle hub; never a tab. ────── -->
         <nav id="app-nav" class="navbar">
             <button class="nav-item nav-tab active" data-view="home">
-                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.8 12 3l9 7.8"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg>
                 Home
             </button>
             <button class="nav-item nav-tab" data-view="profiles">
-                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg>
+                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="4" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="20" y2="12"/></svg>
                 Rifles
             </button>
             <button class="nav-item nav-tab" data-view="ai">
-                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 0-3.9 7.4L21 21l-1.1-3.6A8.96 8.96 0 0 0 21 12Z"/></svg>
+                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M21 5l-9 9-2-4"/></svg>
                 Ask yorT
             </button>
         </nav>
