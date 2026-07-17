@@ -2,55 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#121212">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0C0E10">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>yorT</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/ui.css">
 </head>
 <body>
-    <!-- Auth Screen (shown before login) -->
+    <!-- ── Auth: the machined front plate ─────────────────── -->
     <div id="view-auth" class="auth-screen hidden">
-        <div class="auth-container">
+        <div class="auth-plate">
             <img src="assets/logo.png" alt="" class="auth-logo-img" onerror="this.style.display='none'">
-            <h1 class="auth-logo"><span class="brand-yor">yor</span><span class="brand-t">T</span></h1>
-            <div class="form-group">
-                <label for="auth-email">Email</label>
+            <h1 class="auth-wordmark"><span class="brand-yor">yor</span><span class="brand-t">T</span></h1>
+            <div class="field">
+                <label class="field-label" for="auth-email">Email</label>
                 <input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com">
             </div>
-            <div class="form-group">
-                <label for="auth-password">Password</label>
+            <div class="field">
+                <label class="field-label" for="auth-password">Password</label>
                 <input type="password" id="auth-password" autocomplete="current-password" placeholder="Password">
             </div>
             <p id="auth-error" class="auth-error"></p>
-            <button id="btn-login" class="btn btn-primary auth-btn">Log In</button>
-            <button id="btn-signup" class="btn btn-secondary auth-btn">Sign Up</button>
+            <button id="btn-login" class="action-primary">Log In</button>
+            <button id="btn-signup" class="action u-full u-mt-10">Sign Up</button>
             <button id="btn-forgot" class="auth-forgot">Forgot password?</button>
             <div id="auth-reset" class="hidden">
-                <div class="form-group">
-                    <label for="auth-new-password">New Password</label>
+                <div class="field">
+                    <label class="field-label" for="auth-new-password">New password</label>
                     <input type="password" id="auth-new-password" autocomplete="new-password" placeholder="At least 6 characters">
                 </div>
-                <button id="btn-set-password" class="btn btn-primary auth-btn">Set New Password</button>
+                <button id="btn-set-password" class="action-primary">Set New Password</button>
             </div>
             <p class="auth-legal"><a href="privacy-policy.html">Privacy Policy</a></p>
         </div>
     </div>
 
     <div id="app" class="hidden">
-        <header id="app-header">
-            <div class="header-brand" aria-hidden="true"><span class="brand-yor">yor</span><span class="brand-t">T</span></div>
-            <div class="header-utility">
-                <span id="connection-status" class="connection-dot" title="Connection"></span>
-                <button id="btn-sunlight-mode" class="utility-btn" title="Sunlight Mode" aria-label="Sunlight Mode">&#9788;</button>
-                <button id="btn-logout" class="nav-logout">Log out</button>
+        <!-- ── Shell chrome ───────────────────────────────── -->
+        <header id="app-header" class="shell-header">
+            <div class="shell-brand" aria-hidden="true"><span class="brand-yor">yor</span><span class="brand-t">T</span></div>
+            <div class="header-utility shell-utils">
+                <span id="connection-status" class="conn-dot" title="Connection"></span>
+                <button id="btn-sunlight-mode" class="util-btn" title="Sunlight mode" aria-label="Sunlight mode">
+                    <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22"/><line x1="2" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="19.1" y2="4.9"/></svg>
+                </button>
+                <button id="btn-logout" class="util-btn" title="Log out" aria-label="Log out">
+                    <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/><line x1="12" y1="2" x2="12" y2="11"/></svg>
+                </button>
             </div>
         </header>
 
-        <!-- Session View (canvas + step panel) -->
+        <!-- ── Session view: canvas hero + machined step sheet ── -->
         <div id="view-session" class="app-view">
             <main id="canvas-container">
                 <div class="canvas-brand-lockup">
@@ -67,236 +72,261 @@
                     <div id="progress-bar"></div>
                 </div>
 
-                <!-- Step 1: Select Profile -->
+                <!-- Step 1: rifle & load -->
                 <section class="step active" id="step-profile" data-step="1">
                     <div class="step-header">
-                        <span class="step-badge">1</span>
-                        <span class="step-title">Select Rifle &amp; Load</span>
+                        <div class="step-titles">
+                            <span class="step-kicker">Step 1 of 7</span>
+                            <span class="step-title">Rifle &amp; load</span>
+                        </div>
                     </div>
-                    <div class="step-body">
-                        <div id="profile-picker"></div>
-                        <div class="btn-row">
-                            <button id="btn-quick-mode" class="btn btn-secondary">Quick Mode</button>
-                        </div>
-                        <div class="target-row">
-                            <button id="btn-print-target" class="btn btn-secondary btn-sm target-btn">Print Target</button>
-                            <button id="btn-share-target" class="btn btn-secondary btn-sm target-btn">Share Blank Target</button>
-                        </div>
+                    <div id="profile-picker"></div>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-quick-mode" class="action">Quick Mode</button>
+                    </div>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-print-target" class="action-ghost">
+                            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="8" rx="1.5"/><rect x="7" y="14" width="10" height="7"/></svg>
+                            Print target
+                        </button>
+                        <button id="btn-share-target" class="action-ghost">
+                            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="5.5" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><line x1="8.3" y1="10.9" x2="15.7" y2="6.6"/><line x1="8.3" y1="13.1" x2="15.7" y2="17.4"/></svg>
+                            Share blank target
+                        </button>
                     </div>
                 </section>
 
-                <!-- Step 2: Load Image -->
+                <!-- Step 2: image -->
                 <section class="step" id="step-load" data-step="2">
                     <div class="step-header">
-                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
-                        <span class="step-badge">2</span>
-                        <span class="step-title">Load Target Image</span>
-                    </div>
-                    <div class="step-body">
-                        <input type="file" id="input-camera" accept="image/*" capture="environment" hidden>
-                        <input type="file" id="input-gallery" accept="image/*" hidden>
-                        <div class="btn-row">
-                            <button id="btn-camera" class="btn btn-primary">Take Photo</button>
-                            <button id="btn-gallery" class="btn btn-secondary">Choose Image</button>
+                        <button class="btn-step-back" aria-label="Back" title="Back">
+                            <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 6 8.5 12 14.5 18"/></svg>
+                        </button>
+                        <div class="step-titles">
+                            <span class="step-kicker">Step 2 of 7</span>
+                            <span class="step-title">Target photo</span>
                         </div>
+                    </div>
+                    <input type="file" id="input-camera" accept="image/*" capture="environment" hidden>
+                    <input type="file" id="input-gallery" accept="image/*" hidden>
+                    <button id="btn-camera" class="action-primary">
+                        <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h3l1.5-2.5h7L17 7h3a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V8.5A1.5 1.5 0 0 1 4 7Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                        Take photo
+                    </button>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-gallery" class="action">Choose from gallery</button>
                     </div>
                 </section>
 
-                <!-- Step 3: Calibrate -->
+                <!-- Step 3: scale -->
                 <section class="step" id="step-calibrate" data-step="3">
                     <div class="step-header">
-                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
-                        <span class="step-badge">3</span>
-                        <span class="step-title">Set Scale</span>
-                        <button class="help-btn" onclick="showHelp('calibration')" title="What is calibration?">?</button>
-                    </div>
-                    <div class="step-body">
-                        <p id="calibration-status" class="step-instruction">Detecting yorT target&hellip;</p>
-                        <div class="btn-row">
-                            <button id="btn-manual-calibration" class="btn btn-secondary hidden">Set Scale Manually</button>
-                            <button id="btn-redo-calibration" class="btn btn-secondary hidden">Redo</button>
-                            <button id="btn-next-calibration" class="btn btn-primary hidden">Continue</button>
+                        <button class="btn-step-back" aria-label="Back" title="Back">
+                            <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 6 8.5 12 14.5 18"/></svg>
+                        </button>
+                        <div class="step-titles">
+                            <span class="step-kicker">Step 3 of 7</span>
+                            <span class="step-title">Set scale</span>
                         </div>
+                        <button class="hint-btn" onclick="showHelp('calibration')" title="What is calibration?">?</button>
+                    </div>
+                    <p id="calibration-status" class="step-instruction">Detecting yorT target&hellip;</p>
+                    <div class="action-row">
+                        <button id="btn-manual-calibration" class="action hidden">Set scale manually</button>
+                        <button id="btn-redo-calibration" class="action hidden">Redo</button>
+                        <button id="btn-next-calibration" class="action-primary hidden">Continue</button>
                     </div>
                 </section>
 
-                <!-- Step 4: Input Data -->
+                <!-- Step 4: distance & bullet -->
                 <section class="step" id="step-data" data-step="4">
                     <div class="step-header">
-                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
-                        <span class="step-badge">4</span>
-                        <span class="step-title">Distance &amp; Bullet</span>
+                        <button class="btn-step-back" aria-label="Back" title="Back">
+                            <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 6 8.5 12 14.5 18"/></svg>
+                        </button>
+                        <div class="step-titles">
+                            <span class="step-kicker">Step 4 of 7</span>
+                            <span class="step-title">Distance &amp; bullet</span>
+                        </div>
                     </div>
-                    <div class="step-body">
-                        <div class="input-group">
-                            <label for="input-distance">Distance (yards)</label>
+                    <div class="field-row">
+                        <div class="field">
+                            <label class="field-label" for="input-distance">Distance <span class="field-unit">yards</span></label>
                             <input type="number" id="input-distance" min="1" max="1500" step="1" inputmode="numeric" placeholder="100">
                         </div>
-                        <div class="input-group">
-                            <label for="input-bullet-dia">Bullet Diameter (in) <button class="help-btn" onclick="showHelp('bulletDiameter')" title="What is bullet diameter?">?</button></label>
-                            <div class="input-with-presets">
-                                <input type="number" id="input-bullet-dia" min="0.1" max="1.0" step="0.001" inputmode="decimal" placeholder="0.308">
-                                <div class="presets">
-                                    <button class="preset-btn" data-value="0.224">.224</button>
-                                    <button class="preset-btn" data-value="0.243">.243</button>
-                                    <button class="preset-btn" data-value="0.264">.264</button>
-                                    <button class="preset-btn" data-value="0.277">.277</button>
-                                    <button class="preset-btn" data-value="0.284">.284</button>
-                                    <button class="preset-btn" data-value="0.308">.308</button>
-                                    <button class="preset-btn" data-value="0.338">.338</button>
+                        <div class="field">
+                            <label class="field-label" for="input-bullet-dia">Bullet dia <span class="field-unit">in</span>
+                                <button class="hint-btn" onclick="showHelp('bulletDiameter')" title="What is bullet diameter?">?</button>
+                            </label>
+                            <input type="number" id="input-bullet-dia" min="0.1" max="1.0" step="0.001" inputmode="decimal" placeholder="0.308">
+                        </div>
+                    </div>
+                    <div class="preset-row">
+                        <button class="preset-btn" data-value="0.224">.224</button>
+                        <button class="preset-btn" data-value="0.243">.243</button>
+                        <button class="preset-btn" data-value="0.264">.264</button>
+                        <button class="preset-btn" data-value="0.277">.277</button>
+                        <button class="preset-btn" data-value="0.284">.284</button>
+                        <button class="preset-btn" data-value="0.308">.308</button>
+                        <button class="preset-btn" data-value="0.338">.338</button>
+                    </div>
+                    <details class="fold u-mt-14" id="data-optional-details">
+                        <summary>Optional: rounds, velocity &amp; weather</summary>
+                        <div class="fold-body">
+                            <button id="btn-fetch-weather" class="action u-full u-mb-12">
+                                <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18.5A4.5 4.5 0 0 1 6.6 9.5a5.5 5.5 0 0 1 10.8 1.2A4 4 0 0 1 17 18.5H7Z"/></svg>
+                                Get weather
+                            </button>
+                            <div class="field-row">
+                                <div class="field">
+                                    <label class="field-label" for="input-rounds-fired">Rounds fired</label>
+                                    <input type="number" id="input-rounds-fired" min="1" max="999" step="1" inputmode="numeric" placeholder="5">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="input-velocity">Velocity <span class="field-unit">fps</span></label>
+                                    <input type="number" id="input-velocity" min="0" max="5000" step="1" inputmode="numeric" placeholder="2650">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <div class="field">
+                                    <label class="field-label" for="input-temp">Temp <span class="field-unit">&deg;F</span></label>
+                                    <input type="number" id="input-temp" min="-50" max="150" step="1" inputmode="numeric" placeholder="70">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="input-humidity">Humidity <span class="field-unit">%</span></label>
+                                    <input type="number" id="input-humidity" min="0" max="100" step="1" inputmode="numeric" placeholder="50">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <div class="field">
+                                    <label class="field-label" for="input-wind-mph">Wind <span class="field-unit">mph</span></label>
+                                    <input type="number" id="input-wind-mph" min="0" max="100" step="1" inputmode="numeric" placeholder="5">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="input-wind-dir">Wind direction</label>
+                                    <input type="text" id="input-wind-dir" maxlength="20" placeholder="e.g., 3 o'clock">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <div class="field">
+                                    <label class="field-label" for="input-altitude">Altitude <span class="field-unit">ft</span></label>
+                                    <input type="number" id="input-altitude" min="0" max="20000" step="1" inputmode="numeric" placeholder="1000">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="input-pressure">Pressure <span class="field-unit">inHg</span></label>
+                                    <input type="number" id="input-pressure" min="20" max="35" step="0.01" inputmode="decimal" placeholder="29.92">
                                 </div>
                             </div>
                         </div>
-                        <details class="session-details" id="data-optional-details">
-                            <summary class="session-details-summary">Optional: Rounds, Velocity &amp; Weather</summary>
-                            <div class="session-details-body">
-                                <button id="btn-fetch-weather" class="btn btn-primary" style="width:100%;margin-bottom:10px;">Get Weather</button>
-                                <div class="form-row">
-                                    <div class="form-group form-group-half">
-                                        <label for="input-rounds-fired">Rounds Fired</label>
-                                        <input type="number" id="input-rounds-fired" min="1" max="999" step="1" inputmode="numeric" placeholder="5">
-                                    </div>
-                                    <div class="form-group form-group-half">
-                                        <label for="input-velocity">Velocity (fps)</label>
-                                        <input type="number" id="input-velocity" min="0" max="5000" step="1" inputmode="numeric" placeholder="2650">
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group form-group-half">
-                                        <label for="input-temp">Temp (&deg;F)</label>
-                                        <input type="number" id="input-temp" min="-50" max="150" step="1" inputmode="numeric" placeholder="70">
-                                    </div>
-                                    <div class="form-group form-group-half">
-                                        <label for="input-humidity">Humidity (%)</label>
-                                        <input type="number" id="input-humidity" min="0" max="100" step="1" inputmode="numeric" placeholder="50">
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group form-group-half">
-                                        <label for="input-wind-mph">Wind (mph)</label>
-                                        <input type="number" id="input-wind-mph" min="0" max="100" step="1" inputmode="numeric" placeholder="5">
-                                    </div>
-                                    <div class="form-group form-group-half">
-                                        <label for="input-wind-dir">Wind Direction</label>
-                                        <input type="text" id="input-wind-dir" maxlength="20" placeholder="e.g., 3 o'clock">
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group form-group-half">
-                                        <label for="input-altitude">Altitude (ft)</label>
-                                        <input type="number" id="input-altitude" min="0" max="20000" step="1" inputmode="numeric" placeholder="1000">
-                                    </div>
-                                    <div class="form-group form-group-half">
-                                        <label for="input-pressure">Pressure (inHg)</label>
-                                        <input type="number" id="input-pressure" min="20" max="35" step="0.01" inputmode="decimal" placeholder="29.92">
-                                    </div>
-                                </div>
-                            </div>
-                        </details>
-                        <p id="data-validation-hint" class="validation-hint"></p>
-                        <div class="btn-row">
-                            <button id="btn-next-data" class="btn btn-primary" disabled>Continue</button>
-                        </div>
+                    </details>
+                    <p id="data-validation-hint" class="validation-note"></p>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-next-data" class="action-primary" disabled>Continue</button>
                     </div>
                 </section>
 
-                <!-- Step 5: Mark POA -->
+                <!-- Step 5: point of aim -->
                 <section class="step" id="step-poa" data-step="5">
                     <div class="step-header">
-                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
-                        <span class="step-badge">5</span>
-                        <span class="step-title">Mark Point of Aim</span>
-                        <button class="help-btn" onclick="showHelp('poa')" title="What is Point of Aim?">?</button>
-                    </div>
-                    <div class="step-body">
-                        <p id="poa-status" class="step-instruction">Tap your point of aim on the target</p>
-                        <div class="btn-row">
-                            <button id="btn-redo-poa" class="btn btn-secondary hidden">Redo</button>
-                            <button id="btn-next-poa" class="btn btn-primary hidden">Continue</button>
+                        <button class="btn-step-back" aria-label="Back" title="Back">
+                            <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 6 8.5 12 14.5 18"/></svg>
+                        </button>
+                        <div class="step-titles">
+                            <span class="step-kicker">Step 5 of 7</span>
+                            <span class="step-title">Point of aim</span>
                         </div>
+                        <button class="hint-btn" onclick="showHelp('poa')" title="What is Point of Aim?">?</button>
+                    </div>
+                    <p id="poa-status" class="step-instruction">Tap your point of aim on the target</p>
+                    <div class="action-row">
+                        <button id="btn-redo-poa" class="action hidden">Redo</button>
+                        <button id="btn-next-poa" class="action-primary hidden">Continue</button>
                     </div>
                 </section>
 
-                <!-- Step 6: Mark Impacts -->
+                <!-- Step 6: impacts -->
                 <section class="step" id="step-impacts" data-step="6">
                     <div class="step-header">
-                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
-                        <span class="step-badge">6</span>
-                        <span class="step-title">Mark Impacts</span>
-                        <button class="help-btn" onclick="showHelp('impacts')" title="How do I mark impacts?">?</button>
-                    </div>
-                    <div class="step-body">
-                        <p id="impact-status" class="step-instruction">Tap each bullet hole (0/10)</p>
-                        <div class="btn-row">
-                            <button id="btn-undo-impact" class="btn btn-secondary" disabled>Undo Last</button>
-                            <button id="btn-clear-impacts" class="btn btn-secondary" disabled>Clear All</button>
-                            <button id="btn-calculate" class="btn btn-primary" disabled>Calculate</button>
+                        <button class="btn-step-back" aria-label="Back" title="Back">
+                            <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 6 8.5 12 14.5 18"/></svg>
+                        </button>
+                        <div class="step-titles">
+                            <span class="step-kicker">Step 6 of 7</span>
+                            <span class="step-title">Mark impacts</span>
                         </div>
+                        <button class="hint-btn" onclick="showHelp('impacts')" title="How do I mark impacts?">?</button>
+                    </div>
+                    <p id="impact-status" class="step-instruction">Tap each bullet hole (0/10)</p>
+                    <div class="action-row">
+                        <button id="btn-undo-impact" class="action" disabled>Undo</button>
+                        <button id="btn-clear-impacts" class="action" disabled>Clear</button>
+                        <button id="btn-calculate" class="action-primary" disabled>Calculate</button>
                     </div>
                 </section>
 
-                <!-- Step 7: Results -->
+                <!-- Step 7: results -->
                 <section class="step" id="step-results" data-step="7">
                     <div class="step-header">
-                        <button class="btn-step-back" aria-label="Back" title="Back">&lsaquo;</button>
-                        <span class="step-badge">7</span>
-                        <span class="step-title">Results</span>
+                        <button class="btn-step-back" aria-label="Back" title="Back">
+                            <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 6 8.5 12 14.5 18"/></svg>
+                        </button>
+                        <div class="step-titles">
+                            <span class="step-kicker">Step 7 of 7</span>
+                            <span class="step-title">Results</span>
+                        </div>
                     </div>
-                    <div class="step-body">
-                        <div id="results-card"></div>
-                        <div class="btn-row">
-                            <button id="btn-save-session" class="btn btn-primary">Save Session</button>
-                        </div>
-                        <div class="btn-row">
-                            <button id="btn-crop-image" class="btn btn-secondary">Crop Image</button>
-                        </div>
-                        <div class="btn-row">
-                            <button id="btn-save-image" class="btn btn-secondary">Save Image</button>
-                            <button id="btn-share" class="btn btn-secondary">Share</button>
-                            <button id="btn-new-from-results" class="btn btn-secondary">New Session</button>
-                        </div>
+                    <div id="results-card"></div>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-save-session" class="action-primary">
+                            <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 7"/></svg>
+                            Save session
+                        </button>
+                    </div>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-crop-image" class="action">Crop</button>
+                        <button id="btn-save-image" class="action">Save image</button>
+                        <button id="btn-share" class="action">Share</button>
+                    </div>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-new-from-results" class="action-ghost u-center">Start a new session</button>
                     </div>
                 </section>
             </footer>
         </div>
 
-        <!-- Profiles View -->
-        <!-- Home — action-first adaptive surface (default view) -->
+        <!-- ── Manager-rendered views (empty shells) ──────── -->
         <div id="view-home" class="app-view active"></div>
-
         <div id="view-profiles" class="app-view"></div>
-
-        <!-- AI Assistant View -->
         <div id="view-ai" class="app-view"></div>
-
-        <!-- Solver View -->
         <div id="view-solver" class="app-view"></div>
-
-        <!-- Wind Call View (beta feature) -->
         <div id="view-wind" class="app-view"></div>
-
-        <!-- Chrono import view (Garmin ShotView) -->
         <div id="view-chrono" class="app-view"></div>
-
-        <!-- Admin View (admin-only, injected via JS) -->
         <div id="view-admin" class="app-view"></div>
 
-        <!-- Bottom navigation — three destinations, thumb reach.
+        <!-- ── Bottom navigation: three destinations, thumb reach.
              Flow views (session, solver, chrono, admin) are full-screen
-             pushes launched from Home/rifle hub; they never add a tab. -->
-        <nav id="app-nav" class="nav-bar">
-            <button class="nav-tab active" data-view="home">Home</button>
-            <button class="nav-tab" data-view="profiles">Rifles</button>
-            <button class="nav-tab" data-view="ai">Ask yorT</button>
+             pushes launched from Home / rifle hub; never a tab. ────── -->
+        <nav id="app-nav" class="navbar">
+            <button class="nav-item nav-tab active" data-view="home">
+                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.8 12 3l9 7.8"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+                Home
+            </button>
+            <button class="nav-item nav-tab" data-view="profiles">
+                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg>
+                Rifles
+            </button>
+            <button class="nav-item nav-tab" data-view="ai">
+                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 0-3.9 7.4L21 21l-1.1-3.6A8.96 8.96 0 0 0 21 12Z"/></svg>
+                Ask yorT
+            </button>
         </nav>
-
     </div>
 
-    <!-- Help Overlay -->
-    <div id="help-overlay" class="help-overlay hidden" onclick="closeHelp()">
-        <div class="help-popup" onclick="event.stopPropagation()">
-            <div id="help-popup-text" class="help-popup-text"></div>
-            <button class="btn btn-secondary btn-sm help-popup-close" onclick="closeHelp()">Got it</button>
+    <!-- ── Help overlay ───────────────────────────────────── -->
+    <div id="help-overlay" class="overlay hidden" onclick="closeHelp()">
+        <div class="overlay-card" onclick="event.stopPropagation()">
+            <div id="help-popup-text" class="overlay-text"></div>
+            <button class="action u-full" onclick="closeHelp()">Got it</button>
         </div>
     </div>
 
@@ -312,6 +342,7 @@
     <!-- qrcode-generator — certificate QR deep links (optional; QR square stays empty without it) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" onerror="window.__qrcodeLoadFailed=true"></script>
     <script src="js/utils.js"></script>
+    <script src="js/icons.js"></script>
     <script src="js/net.js"></script>
     <script src="js/db.js"></script>
     <script src="js/calculations.js"></script>

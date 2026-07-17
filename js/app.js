@@ -52,22 +52,22 @@
             if (user.id === ADMIN_USER_ID && utility &&
                 !utility.querySelector('[data-view="admin"]')) {
                 var adminBtn = document.createElement('button');
-                adminBtn.className = 'nav-tab utility-btn';
+                adminBtn.className = 'nav-tab util-btn';
                 adminBtn.setAttribute('data-view', 'admin');
                 adminBtn.setAttribute('title', 'Admin');
                 adminBtn.setAttribute('aria-label', 'Admin');
-                adminBtn.textContent = '⚙';
+                adminBtn.innerHTML = Icon('sliders');
                 utility.insertBefore(adminBtn, utility.firstChild);
             }
 
             if (typeof isBetaEnabled === 'function' && isBetaEnabled('windCall') &&
                 utility && !utility.querySelector('[data-view="wind"]')) {
                 var windBtn = document.createElement('button');
-                windBtn.className = 'nav-tab utility-btn';
+                windBtn.className = 'nav-tab util-btn';
                 windBtn.setAttribute('data-view', 'wind');
                 windBtn.setAttribute('title', 'Wind Call');
                 windBtn.setAttribute('aria-label', 'Wind Call');
-                windBtn.textContent = '🌬';
+                windBtn.innerHTML = Icon('wind');
                 utility.insertBefore(windBtn, utility.firstChild);
             }
 
@@ -315,8 +315,8 @@
             var profilesContainer = document.getElementById('view-profiles');
             if (profilesContainer) {
                 profilesContainer.innerHTML =
-                    '<div style="padding:2rem;text-align:center;color:var(--danger);">' +
-                    '<h3>Database Unavailable</h3>' +
+                    '<div class="empty-teach">' +
+                    '<h3 class="t-head u-mb-12">Database unavailable</h3>' +
                     '<p>Close other tabs using this app and reload.</p>' +
                     '</div>';
             }
