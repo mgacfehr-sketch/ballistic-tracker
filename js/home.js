@@ -1,18 +1,22 @@
 /**
- * home.js — HomeManager: Home as a STATUS INSTRUMENT (Surface 1).
+ * home.js — HomeManager: the action-first Home (Proven §3.1).
  *
- * Not a menu. Top to bottom (REDESIGN-SPEC III.1):
- *   HERO      — the last-used rifle with its readiness verdict as the
- *               dominant element (lamp + verdict word, one glance, one truth)
- *   ALERTS    — Budget-A attention strips; silence is a feature
- *   PRIMARY   — the ONE brass action (highest usage count)
- *   SECONDARY — remaining actions as a quiet, subordinate tile row
- *   BELOW     — recent activity + "+ Add a tool", whisper-quiet
+ * Top to bottom:
+ *   BRAND BAR  — W-dial mark + PROVEN wordmark
+ *   ALERTS     — one-sentence monitors; render ONLY when true
+ *   THE FIVE JOB CATEGORIES — "What do you want to do?" as large rows
+ *   RECENT     — last session/rifle rows with status chips
  *
- * Pure ordering logic lives in HomeCore (Node-testable).
+ * The old adaptive per-tool actions and the "+ Add a tool" drawer are
+ * gone: tool activation (ToolRegistry) now governs which rows appear
+ * INSIDE each category screen (js/categories.js). A category with
+ * zero active tools is hidden here.
+ *
+ * HomeCore (pure ordering logic) and Recents are kept: HomeCore is
+ * Node-tested; Recents feeds the rifle chip default and this screen.
  */
 
-// ── Pure core ─────────────────────────────────────────────────
+// ── Pure core (kept for tests + usage counting) ───────────────
 
 var HomeCore = {
     /**
@@ -95,258 +99,98 @@ HomeManager.prototype.init = function () {
     this.container = document.getElementById('view-home');
     if (typeof ToolRegistry !== 'undefined') {
         ToolRegistry.onChange(function () {
-            // Re-render live when activations change (drawer taps)
-            if (self.container && self.container.classList.contains('active')) {
+            // Category visibility can change when activations change
+            if (self.container && self.container.classList.contains('active') &&
+                self.container.getAttribute('data-screen') === 'home') {
                 self.show();
             }
         });
     }
+    this._registerBuiltinAlerts();
 };
 
 /**
- * Budget-A alerts: providers return Promise<[{id, text, onTap?}]>.
- * Ships with zero providers — silence is a feature.
+ * Alerts: providers return Promise<[{id, text, onTap?}]>.
+ * Silence is a feature — nothing renders when nothing is true.
  */
 HomeManager.prototype.registerAlertProvider = function (fn) {
     this._alertProviders.push(fn);
 };
 
+/** The lot-drift monitor feeds Home alerts (mockup's example alert). */
+HomeManager.prototype._registerBuiltinAlerts = function () {
+    var self = this;
+    this.registerAlertProvider(function (db) {
+        if (!db || typeof lotDrift !== 'function') return Promise.resolve([]);
+        return Promise.all([db.getAllRifles(), db.getAllVelocityStrings()]).then(function (res) {
+            var rifles = res[0] || [];
+            var strings = res[1] || [];
+            var byRifle = {};
+            strings.forEach(function (s) {
+                if (!s.rifleId) return;
+                (byRifle[s.rifleId] = byRifle[s.rifleId] || []).push(s);
+            });
+            var alerts = [];
+            rifles.forEach(function (rifle) {
+                var drifts = lotDrift(byRifle[rifle.id] || []);
+                drifts.forEach(function (a, i) {
+                    alerts.push({
+                        id: 'lot-drift-' + rifle.id + '-' + i,
+                        text: 'New lot ' + a.newLot + ' on ' + (rifle.name || 'a rifle') + ' runs ' +
+                            Math.abs(a.deltaFps) + ' fps ' + (a.deltaFps > 0 ? 'faster' : 'slower') +
+                            ' — confirm zero.',
+                        onTap: function () {
+                            if (window.Categories) Categories.show('check', rifle.id);
+                        }
+                    });
+                });
+            });
+            return alerts;
+        }).catch(function () { return []; });
+    });
+};
+
 HomeManager.prototype.show = function () {
     if (!this.container) return;
+    this.container.setAttribute('data-screen', 'home');
 
-    this.container.innerHTML =
-        '<div class="screen">' +
-        '<div class="zone-hero" id="home-hero"></div>' +
-        '<div id="home-alerts"></div>' +
-        '<div id="home-actions"></div>' +
-        '<div class="zone-secondary" id="home-recent"></div>' +
-        '<div id="home-drawer"></div>' +
-        '</div>';
+    var html = UI.brandBar();
+    html += '<div id="home-alerts"></div>';
+    html += UI.sectionHead('What do you want to do?');
+    html += '<div id="home-cats"></div>';
+    html += '<div id="home-recent"></div>';
+    this.container.innerHTML = '<div class="screen">' + html + '</div>';
 
-    var self = this;
-    // The one-brass-object law: with no rifle yet, the hero's "set up my
-    // rifle" is the screen's primary — every action demotes to a tile.
-    this._renderHero().then(function (hasRifles) {
-        self._renderActions(hasRifles !== false);
-    });
-    this._renderRecent();
+    this._renderCategories();
     this._renderAlerts();
-    this._renderDrawer();
+    this._renderRecent();
 };
 
-/**
- * HERO — the shooter's situation at a glance. Most-recent rifle with
- * its readiness verdict dominant: one lamp, one word, one truth.
- */
-HomeManager.prototype._renderHero = function () {
-    var el = document.getElementById('home-hero');
-    if (!el || !this.db) return Promise.resolve(true);
+/** The five job categories as large rows; hidden when toolless. */
+HomeManager.prototype._renderCategories = function () {
+    var el = document.getElementById('home-cats');
+    if (!el || typeof Categories === 'undefined') return;
     var self = this;
-
-    return this.db.getAllRifles().then(function (rifles) {
-        if (!el.isConnected) return true;
-
-        if (!rifles || !rifles.length) {
-            // First run: teach in one sentence + one button
-            el.innerHTML =
-                '<div class="plate empty-teach">' +
-                '<p>Your rifle is the hub everything lands on. Two minutes to set one up, and it answers instantly for life.</p>' +
-                '<button class="action-primary" id="home-first-rifle">' + Icon('plus', 20) + ' Set up my rifle</button>' +
-                '</div>';
-            var btn = document.getElementById('home-first-rifle');
-            if (btn) btn.addEventListener('click', function () {
-                if (window.AppNav) window.AppNav.go('profiles');
-            });
-            return false; // no rifles: the hero owns the screen's primary
-        }
-
-        var recent = Recents.get();
-        var rifle = null;
-        if (recent && recent.rifleId) {
-            for (var i = 0; i < rifles.length; i++) {
-                if (rifles[i].id === recent.rifleId) { rifle = rifles[i]; break; }
-            }
-        }
-        if (!rifle) rifle = rifles[0];
-
-        // Verdict + evidence assemble from the rifle's own record
-        return Promise.all([
-            self.db.getSessionsByRifle(rifle.id).catch(function () { return []; }),
-            self.db.getBarrelsByRifle(rifle.id).catch(function () { return []; })
-        ]).then(function (res) {
-            if (!el.isConnected) return;
-            var sessions = (res[0] || []).slice().sort(function (a, b) {
-                return (b.date || '').localeCompare(a.date || '');
-            });
-            var barrels = res[1] || [];
-            var barrel = null;
-            for (var b = 0; b < barrels.length; b++) {
-                if (barrels[b].isActive) { barrel = barrels[b]; break; }
-            }
-            if (!barrel && barrels.length) barrel = barrels[0];
-
-            // latest session that carries a POA verdict
-            var latest = null;
-            for (var s = 0; s < sessions.length; s++) {
-                if (sessions[s].results && typeof sessions[s].results.atzElevationMOA === 'number') {
-                    latest = sessions[s];
-                    break;
-                }
-            }
-
-            var verdict = null;
-            if (latest && typeof ZeroGuardian !== 'undefined') {
-                verdict = ZeroGuardian.verdictFor(latest.results, rifle.scopeCorrectionFactor);
-            }
-
-            var lampCls, wordCls, word, sub;
-            var dateStr = latest && latest.date ? new Date(latest.date).toLocaleDateString() : '';
-            if (verdict && verdict.confirmed) {
-                lampCls = 'is-go'; wordCls = 'is-go'; word = 'READY';
-                sub = 'Zero confirmed ' + dateStr;
-            } else if (verdict) {
-                lampCls = 'is-hold'; wordCls = 'is-hold'; word = 'CHECK ZERO';
-                var parts = [];
-                if (verdict.elevClicks > 0) parts.push(verdict.elevClicks + ' click' + (verdict.elevClicks === 1 ? '' : 's') + ' ' + verdict.elevDir.toUpperCase());
-                if (verdict.windClicks > 0) parts.push(verdict.windClicks + ' click' + (verdict.windClicks === 1 ? '' : 's') + ' ' + verdict.windDir.toUpperCase());
-                sub = parts.length
-                    ? 'Adjust ' + parts.join(', ') + ' &mdash; last check ' + dateStr
-                    : 'Almost there — confirm with one more group';
-            } else {
-                lampCls = 'is-off'; wordCls = 'is-off'; word = 'NOT CHECKED';
-                sub = 'Photograph a target and yorT confirms your zero';
-            }
-
-            var meta = [];
-            if (rifle.caliber) meta.push(self._escapeHtml(rifle.caliber));
-            if (barrel && barrel.totalRounds) meta.push(Number(barrel.totalRounds).toLocaleString() + ' rounds');
-
-            el.innerHTML =
-                '<button class="plate plate-tap" id="home-hero-card">' +
-                '<span class="instrument-label">Rifle</span>' +
-                '<span class="t-title">' + self._escapeHtml(rifle.name || 'Rifle') + '</span>' +
-                (meta.length ? '<span class="t-micro">' + meta.join(' &middot; ') + '</span>' : '') +
-                '<div class="verdict u-mt-14">' +
-                '<span class="verdict-lamp lamp-lg ' + lampCls + '"></span>' +
-                '<div>' +
-                '<div class="verdict-word ' + wordCls + '">' + word + '</div>' +
-                '<div class="verdict-sub">' + sub + '</div>' +
-                '</div></div>' +
-                '</button>';
-
-            var card = document.getElementById('home-hero-card');
-            if (card) card.addEventListener('click', function () {
-                if (window.AppNav) window.AppNav.openRifle(rifle.id);
-            });
-        });
-    }).catch(function () { /* hero is best-effort; actions still render */ });
-};
-
-HomeManager.prototype._counts = function () {
-    try {
-        var raw = localStorage.getItem('yort_home_counts');
-        return raw ? JSON.parse(raw) : {};
-    } catch (e) { return {}; }
-};
-
-/**
- * ONE visually primary action (what they most likely came to do, from
- * usage data); the rest as a compact, subordinate tile row.
- */
-HomeManager.prototype._renderActions = function (withPrimary) {
-    var self = this;
-    var el = document.getElementById('home-actions');
-    if (!el || typeof ToolRegistry === 'undefined') return;
-
-    var actions = HomeCore.orderActions(ToolRegistry.getHomeActions(), this._counts());
-    if (!actions.length) return;
 
     var html = '';
-    var rest;
-    if (withPrimary === false) {
-        rest = actions.map(function (t) { return t.homeAction; });
-    } else {
-        var primary = actions[0].homeAction;
-        rest = actions.slice(1).map(function (t) { return t.homeAction; });
-        html +=
-            '<button class="action-primary" data-action-id="' + primary.id + '"' +
-            (primary.view ? ' data-view="' + primary.view + '"' : '') +
-            (primary.run ? ' data-run="' + primary.run + '"' : '') + '>' +
-            Icon(primary.icon, 22) + '<span>' + primary.label + '</span>' +
-            '</button>';
-    }
-
-    if (rest.length) {
-        var cols = (rest.length === 2 || rest.length === 4) ? ' is-2' : '';
-        html += '<div class="tile-row u-mt-10' + cols + '">';
-        for (var i = 0; i < rest.length; i++) {
-            html += '<button class="tile-action" data-action-id="' + rest[i].id + '"' +
-                (rest[i].view ? ' data-view="' + rest[i].view + '"' : '') +
-                (rest[i].run ? ' data-run="' + rest[i].run + '"' : '') + '>' +
-                Icon(rest[i].icon, 22) + '<span>' + rest[i].label + '</span>' +
-                '</button>';
-        }
-        html += '</div>';
-    }
+    Categories.KEYS.forEach(function (key) {
+        var def = Categories.DEFS[key];
+        if (!Categories.hasActiveTools(key)) return; // zero active tools → hidden
+        html += UI.catRow({
+            icon: def.icon,
+            title: def.title,
+            desc: def.desc,
+            data: { cat: key }
+        });
+    });
     el.innerHTML = html;
 
-    var buttons = el.querySelectorAll('[data-action-id]');
-    for (var b = 0; b < buttons.length; b++) {
-        buttons[b].addEventListener('click', function () {
-            var id = this.getAttribute('data-action-id');
-            var view = this.getAttribute('data-view');
-            var run = this.getAttribute('data-run');
-            try {
-                localStorage.setItem('yort_home_counts',
-                    JSON.stringify(HomeCore.bumpCount(self._counts(), id)));
-            } catch (e) { /* adaptivity is best-effort */ }
-            if (run && window.ToolActions && window.ToolActions[run]) {
-                window.ToolActions[run](self.db);
-            } else if (view && window.AppNav) {
-                window.AppNav.go(view);
-            }
+    var rows = el.querySelectorAll('[data-cat]');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].addEventListener('click', function () {
+            Categories.show(this.getAttribute('data-cat'));
         });
     }
-};
-
-/** RECENT — whisper-quiet, below the fold. */
-HomeManager.prototype._renderRecent = function () {
-    var el = document.getElementById('home-recent');
-    if (!el) return;
-    var self = this;
-    var recent = Recents.get();
-    if (!recent || !recent.sessionId || !this.db) return; // nothing yet — render nothing
-
-    this.db.getSession(recent.sessionId).then(function (session) {
-        if (!session || !el.isConnected) return;
-        var bits = [];
-        if (session.impacts && session.impacts.length) bits.push(session.impacts.length + '-shot group');
-        if (session.results && session.results.groupSizeMOA != null) {
-            bits.push(formatFixed(session.results.groupSizeMOA, 2) + ' MOA');
-        }
-        var when = session.date ? new Date(session.date).toLocaleDateString() : '';
-        if (!bits.length) return;
-
-        el.innerHTML =
-            '<hr class="divider">' +
-            '<div class="qcard-kicker">Recent</div>' +
-            '<button class="action-ghost u-full drawer-tool" id="home-recent-session">' +
-            '<span class="u-quiet">' + bits.join(' &middot; ') +
-            (when ? ' <span class="t-micro">&mdash; ' + when + '</span>' : '') + '</span>' +
-            Icon('chevron-right', 18) +
-            '</button>';
-
-        var row = document.getElementById('home-recent-session');
-        if (row) row.addEventListener('click', function () {
-            if (window.AppNav && recent.rifleId) window.AppNav.openRifle(recent.rifleId);
-        });
-    }).catch(function () { /* quiet */ });
-};
-
-HomeManager.prototype._escapeHtml = function (text) {
-    var div = document.createElement('div');
-    div.textContent = text === null || text === undefined ? '' : String(text);
-    return div.innerHTML;
 };
 
 HomeManager.prototype._renderAlerts = function () {
@@ -359,10 +203,11 @@ HomeManager.prototype._renderAlerts = function () {
         var alerts = [];
         lists.forEach(function (l) { alerts = alerts.concat(l || []); });
         if (!alerts.length || !el.isConnected) return;
-        var html = '';
+        var html = UI.sectionHead('Alerts');
         for (var i = 0; i < alerts.length; i++) {
-            html += '<button class="alert-strip u-mb-12" data-alert-id="' + alerts[i].id + '">' +
-                Icon('alert', 18) + '<span>' + alerts[i].text + '</span></button>';
+            html += '<button class="alert-strip' + (i > 0 ? ' u-mt-10' : '') +
+                '" data-alert-id="' + UI.esc(alerts[i].id) + '">' +
+                '<span>' + UI.esc(alerts[i].text) + '</span></button>';
         }
         el.innerHTML = html;
         var nodes = el.querySelectorAll('.alert-strip');
@@ -374,53 +219,52 @@ HomeManager.prototype._renderAlerts = function () {
     });
 };
 
-/**
- * "+ Add a tool" — the tool drawer, phrased as user problems.
- * One tap wakes a dormant tool; hiding keeps all its data.
- */
-HomeManager.prototype._renderDrawer = function () {
-    var el = document.getElementById('home-drawer');
-    if (!el || typeof ToolRegistry === 'undefined') return;
+/** RECENT — the last session's rifle with its status chip. */
+HomeManager.prototype._renderRecent = function () {
+    var el = document.getElementById('home-recent');
+    if (!el || !this.db) return;
+    var self = this;
+    var recent = Recents.get();
+    if (!recent || !recent.rifleId) return; // nothing yet — render nothing
 
-    var dormant = ToolRegistry.getDormant();
-    var activeExtras = [];
-    for (var k in TOOLS) {
-        if (!TOOLS.hasOwnProperty(k)) continue;
-        if (!TOOLS[k].core && ToolRegistry.isVisible(k)) activeExtras.push(TOOLS[k]);
-    }
-    if (!dormant.length && !activeExtras.length) return; // nothing to manage
+    Promise.all([
+        this.db.getRifle(recent.rifleId).catch(function () { return null; }),
+        recent.sessionId ? this.db.getSession(recent.sessionId).catch(function () { return null; }) : Promise.resolve(null)
+    ]).then(function (res) {
+        var rifle = res[0];
+        var session = res[1];
+        if (!rifle || !el.isConnected) return;
 
-    var html = '<details class="fold u-mt-14"><summary>' + Icon('plus', 18) + '&nbsp; Add a tool</summary>';
-    html += '<div class="fold-body">';
-    for (var d = 0; d < dormant.length; d++) {
-        html += '<button class="action-ghost u-full drawer-tool" data-tool="' + dormant[d].key + '" data-on="1">' +
-            '<span>' + dormant[d].problem + '</span>' +
-            '<span class="chip">Add</span>' +
-            '</button>';
-    }
-    for (var a = 0; a < activeExtras.length; a++) {
-        html += '<button class="action-ghost u-full drawer-tool" data-tool="' + activeExtras[a].key + '" data-on="0">' +
-            '<span>' + activeExtras[a].problem + '</span>' +
-            '<span class="chip">Hide</span>' +
-            '</button>';
-    }
-    html += '<p class="t-micro u-mt-10">Hiding a tool keeps all its data &mdash; it just leaves your way.</p>';
-    html += '</div></details>';
-    el.innerHTML = html;
-
-    var buttons = el.querySelectorAll('.drawer-tool[data-tool]');
-    for (var b = 0; b < buttons.length; b++) {
-        buttons[b].addEventListener('click', function () {
-            var key = this.getAttribute('data-tool');
-            if (this.getAttribute('data-on') === '1') {
-                ToolRegistry.activate(key);
-            } else {
-                ToolRegistry.deactivate(key);
+        return Readiness.assess(self.db, rifle).then(function (r) {
+            if (!el.isConnected) return;
+            var bits = [];
+            if (session && session.results && session.results.groupSizeMOA != null) {
+                bits.push(formatFixed(session.results.groupSizeMOA, 2) + ' MOA');
             }
-            // onChange listener re-renders Home (drawer open state resets —
-            // acceptable; the changed action row is the feedback)
+            if (session && session.impacts && session.impacts.length) {
+                bits.push(session.impacts.length + ' shots');
+            }
+            var when = session && session.date ? new Date(session.date).toLocaleDateString() : '';
+            if (when) bits.push(when);
+
+            var title = rifle.name || 'Rifle';
+            if (rifle.caliber) title += ' · ' + rifle.caliber;
+
+            el.innerHTML = UI.sectionHead('Recent') + UI.card(
+                UI.rowlink({
+                    button: true,
+                    id: 'home-recent-row',
+                    title: title,
+                    sub: bits.length ? bits.join(' · ') : r.note,
+                    chip: r.chip
+                })
+            );
+            var row = document.getElementById('home-recent-row');
+            if (row) row.addEventListener('click', function () {
+                if (window.AppNav) window.AppNav.openRifle(rifle.id);
+            });
         });
-    }
+    }).catch(function () { /* quiet */ });
 };
 
 // Export for Node unit tests

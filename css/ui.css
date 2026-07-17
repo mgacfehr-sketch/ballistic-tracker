@@ -379,6 +379,9 @@ img { max-width: 100%; }
     opacity: 0.35;
     border-radius: 1px;
 }
+.card-pad { padding: var(--space-md); }
+.cat-note { font: var(--type-label); color: var(--text-secondary); padding: 6px var(--edge) 0; }
+
 /* legacy kicker → same rhythm, quieter */
 .qcard-kicker {
     font: var(--type-label);

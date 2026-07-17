@@ -631,7 +631,8 @@ ChronoManager.prototype.showAssignmentReview = function (rifleId) {
 
     Promise.all([
         this.db.getVelocityStringsByRifle(rifleId),
-        this.db.getLoadsByRifle(rifleId)
+        this.db.getLoadsByRifle(rifleId),
+        this.db.getRifle(rifleId).catch(function () { return null; })
     ]).then(function (results) {
         var strings = results[0] || [];
         var pending = strings.filter(function (s) { return s.assignmentStatus !== 'confirmed'; });
@@ -648,6 +649,7 @@ ChronoManager.prototype.showAssignmentReview = function (rifleId) {
 
         self._review = {
             rifleId: rifleId,
+            rifle: results[2] || null,
             strings: strings,
             loads: results[1] || [],
             pending: pending,
@@ -750,8 +752,10 @@ ChronoManager.prototype._renderAssignmentReview = function () {
             '">Load</label>';
         out += '<select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' + loadOptions + '</select>';
         out += '<input type="text" class="chrono-newload-name u-mt-10 hidden" maxlength="80" placeholder="New load name">';
+        // Wrong-rifle protection: the confirm restates the rifle it writes to
         out += '<button type="button" class="action u-full u-mt-10 chrono-cluster-confirm" data-cluster="' + c +
-            '" data-select="chrono-cluster-load-' + c + '">Assign group (' + members.length + ')</button>';
+            '" data-select="chrono-cluster-load-' + c + '">Assign group (' + members.length + ')' +
+            (r.rifle && r.rifle.name ? ' to ' + this._escapeHtml(r.rifle.name) : '') + '</button>';
         out += '</div>';
         out += '</div>'; // .plate
     }
@@ -781,7 +785,8 @@ ChronoManager.prototype._renderAssignmentReview = function () {
             out += '<input type="text" class="chrono-newload-name u-mt-10 hidden" maxlength="80" placeholder="New load name">';
             out += '<button type="button" class="action u-full u-mt-10 chrono-split-confirm" data-id="' +
                 this._escapeHtml(ss.id) + '" data-select="chrono-split-load-' + this._escapeHtml(ss.id) +
-                '">Assign (1)</button>';
+                '">Assign (1)' +
+                (r.rifle && r.rifle.name ? ' to ' + this._escapeHtml(r.rifle.name) : '') + '</button>';
             out += '</div>';
             out += '</div>'; // .plate
         }

@@ -211,6 +211,15 @@ SessionFlow.prototype._showStep = function (index) {
     this.currentStep = index;
     var stepName = STEPS[index];
 
+    // Wrong-rifle protection (Proven §3.2): the final confirm control
+    // restates the rifle it will write to. No silent cross-rifle saves.
+    if (stepName === 'results' && this.els.btnSaveSession && !this.savedSessionId) {
+        this.els.btnSaveSession.innerHTML = Icon('check', 20) + ' ' +
+            (this.selectedRifle && this.selectedRifle.name
+                ? 'Save to ' + escapeHtml(this.selectedRifle.name)
+                : 'Save session');
+    }
+
     // Toggle step visibility
     for (var key in this.els.steps) {
         var el = this.els.steps[key];

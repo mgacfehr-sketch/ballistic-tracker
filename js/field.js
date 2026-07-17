@@ -215,21 +215,21 @@ var FieldLog = (function () {
         return html;
     }
 
-    function open(db) {
+    function open(db, rifleId) {
         db.getAllRifles().then(function (rifles) {
             if (!rifles.length) {
                 if (window.AppNav) window.AppNav.go('profiles');
                 return;
             }
-            render(db, rifles);
+            render(db, rifles, rifleId);
         });
     }
 
-    function render(db, rifles) {
+    function render(db, rifles, presetRifleId) {
         var prev = last();
         var recent = typeof Recents !== 'undefined' ? Recents.get() : null;
         var state = {
-            rifleId: prev.rifleId || (recent && recent.rifleId) || rifles[0].id,
+            rifleId: presetRifleId || prev.rifleId || (recent && recent.rifleId) || rifles[0].id,
             distance: prev.distance || 300,
             shots: prev.shots || 10,
             hits: null,
@@ -249,7 +249,7 @@ var FieldLog = (function () {
             var html = '<div class="overlay-card">';
             html += '<button class="overlay-close" aria-label="Close">' + Icon('x', 20) + '</button>';
             html += '<h3 class="overlay-title">Log field shots</h3>';
-            html += '<p class="overlay-text">Log your hits on steel or targets — yorT computes your real effective range.</p>';
+            html += '<p class="overlay-text">Log your hits on steel or targets — Proven computes your real effective range.</p>';
 
             html += '<div class="field"><select id="field-rifle" class="field-input">';
             rifles.forEach(function (r) {
@@ -291,7 +291,10 @@ var FieldLog = (function () {
             html += '</div></details>';
 
             html += '<p class="field-error" id="field-error"></p>';
-            html += '<button class="action-primary u-mt-10" id="field-save">Save</button>';
+            // Wrong-rifle protection: the confirm restates the rifle
+            var saveRifle = rifles.filter(function (r) { return r.id === state.rifleId; })[0];
+            html += '<button class="action-primary u-mt-10" id="field-save">Save to ' +
+                escapeHtml(saveRifle ? saveRifle.name : 'rifle') + '</button>';
             html += '</div>';
             overlay.innerHTML = html;
             bind();
@@ -318,8 +321,8 @@ var FieldLog = (function () {
                 state.rifleId = this.value;
                 if (unitFor(rifles, state.rifleId) !== prevUnit) {
                     state.windActual = null; // chips are in the turret unit — a stale pick would lie
-                    draw();
                 }
+                draw(); // save button restates the rifle — keep it honest
             });
             bindChips('field-distance', function (v) { state.distance = parseInt(v, 10); });
             bindChips('field-shots', function (v) {
@@ -423,8 +426,8 @@ var FieldLog = (function () {
 
 if (typeof window !== 'undefined') {
     window.ToolActions = window.ToolActions || {};
-    window.ToolActions.fieldLog = function (db) {
-        FieldLog.open(db);
+    window.ToolActions.fieldLog = function (db, rifleId) {
+        FieldLog.open(db, rifleId);
     };
 }
 

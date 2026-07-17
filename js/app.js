@@ -257,7 +257,7 @@
 
             // ── AppNav facade ──────────────────────────────────
             // The single string-addressable way to open closure-scoped
-            // views from anywhere (Home actions, cards, deep links).
+            // views from anywhere (Home, categories, cards, deep links).
             // switchView is hoisted from below.
             window.AppNav = {
                 go: function (viewName) {
@@ -274,7 +274,60 @@
                 openReport: function (rifleId) {
                     switchView('profiles');
                     profileManager.reportManager.show(rifleId);
+                },
+                openCategory: function (key, rifleId) {
+                    if (typeof Categories !== 'undefined') Categories.show(key, rifleId);
                 }
+            };
+
+            // The five category screens (Proven §3.2)
+            if (typeof Categories !== 'undefined') {
+                Categories.init(db, {
+                    profile: profileManager,
+                    history: historyManager,
+                    report: profileManager.reportManager,
+                    certificate: profileManager.certificateManager,
+                    home: homeManager
+                });
+            }
+
+            // Launch seams the category screens use ─────────────
+            // SessionLaunch: enter the session flow against a known
+            // rifle (last-used load auto-picked) or in Quick Mode.
+            window.SessionLaunch = {
+                start: function (opts) {
+                    opts = opts || {};
+                    switchView('session');
+                    if (!sessionFlow || sessionFlow.currentStep !== 0) return;
+                    if (opts.quickMode) {
+                        sessionFlow._selectQuickMode();
+                        return;
+                    }
+                    if (!opts.rifleId) return;
+                    Promise.all([
+                        db.getLoadsByRifle(opts.rifleId),
+                        db.getSessionsByRifle(opts.rifleId)
+                    ]).then(function (res) {
+                        var loads = res[0] || [];
+                        if (!loads.length || sessionFlow.currentStep !== 0) return;
+                        var sessions = (res[1] || []).slice().sort(function (a, b) {
+                            return (b.date || '').localeCompare(a.date || '');
+                        });
+                        var loadId = null;
+                        for (var i = 0; i < sessions.length && !loadId; i++) {
+                            if (!sessions[i].loadId) continue;
+                            for (var l = 0; l < loads.length; l++) {
+                                if (loads[l].id === sessions[i].loadId) { loadId = loads[l].id; break; }
+                            }
+                        }
+                        sessionFlow._selectProfile(opts.rifleId, loadId || loads[0].id);
+                    }).catch(function () { /* picker stays — user chooses */ });
+                }
+            };
+            // TargetSheet: the blank calibration target's two real handlers
+            window.TargetSheet = {
+                print: function () { sessionFlow._printBlankTarget(); },
+                share: function () { sessionFlow._shareBlankTarget(); }
             };
             // Back-compat delegates (existing call sites keep working)
             window.ChronoNav = { openReview: window.AppNav.openChronoReview };
