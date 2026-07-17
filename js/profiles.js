@@ -273,6 +273,12 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
         html += '</details>';
     }
 
+    // Suppressor configurations
+    html += '<div class="form-group"><label class="chrono-add-rounds" style="min-height:44px;">';
+    html += '<input type="checkbox" id="rf-has-configs"' + (rifle && rifle.hasConfigs ? ' checked' : '') + '> ';
+    html += 'This rifle sometimes runs a suppressor</label>';
+    html += '<p class="chrono-hint">Adds a 🔊/🔇 toggle — every session and chrono string is tagged, and yorT measures the POI/velocity shift for you.</p></div>';
+
     // Build sheet (certificate fields) — collapsed by default
     html += '<details class="session-details" style="margin:0 0 12px;"' + (rifle && (rifle.serialNumber || rifle.action || rifle.barrelSpec || rifle.triggerSpec || rifle.chassis || rifle.muzzleDevice) ? ' open' : '') + '>';
     html += '<summary class="session-details-summary">Build Sheet (for certificate)</summary>';
@@ -349,6 +355,8 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
             scopeHeight: parseFloat(document.getElementById('rf-scope-height').value) || 0,
             zeroRange: parseFloat(document.getElementById('rf-zero-range').value) || 0,
             notes: document.getElementById('rf-notes').value.trim(),
+            hasConfigs: document.getElementById('rf-has-configs').checked,
+            activeConfig: document.getElementById('rf-has-configs').checked ? 'bare' : null,
             serialNumber: document.getElementById('rf-serial').value.trim() || null,
             action: document.getElementById('rf-action').value.trim() || null,
             barrelSpec: document.getElementById('rf-barrel-spec').value.trim() || null,
@@ -382,6 +390,8 @@ ProfileManager.prototype._bindRifleFormEvents = function (rifle, barrel) {
             rifle.scopeHeight = data.scopeHeight;
             rifle.zeroRange = data.zeroRange;
             rifle.notes = data.notes;
+            rifle.hasConfigs = data.hasConfigs;
+            if (data.hasConfigs && !rifle.activeConfig) rifle.activeConfig = 'bare';
             rifle.serialNumber = data.serialNumber;
             rifle.action = data.action;
             rifle.barrelSpec = data.barrelSpec;

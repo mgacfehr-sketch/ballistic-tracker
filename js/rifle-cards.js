@@ -148,10 +148,13 @@ RifleCards.register({
             });
             var latest = null;
             for (var i = 0; i < sessions.length; i++) {
-                if (sessions[i].results && typeof sessions[i].results.atzElevationMOA === 'number') {
-                    latest = sessions[i];
-                    break;
-                }
+                if (!sessions[i].results || typeof sessions[i].results.atzElevationMOA !== 'number') continue;
+                // Respect the active suppressor configuration: a bare zero
+                // says nothing about the suppressed state
+                if (ctx.rifle.hasConfigs && sessions[i].config &&
+                    sessions[i].config !== (ctx.rifle.activeConfig || 'bare')) continue;
+                latest = sessions[i];
+                break;
             }
             var verdict = latest && typeof ZeroGuardian !== 'undefined'
                 ? ZeroGuardian.verdictFor(latest.results) : null;
@@ -172,6 +175,79 @@ RifleCards.register({
         }).catch(function () {
             emptyState();
         });
+    }
+});
+
+// ── truth: suppressor configuration (only when the rifle has one) ──
+RifleCards.register({
+    id: 'config-toggle',
+    slot: 'truth',
+    tool: null,
+    isVisible: function (ctx) { return !!(ctx.rifle && ctx.rifle.hasConfigs); },
+    render: function (el, ctx) {
+        var rifle = ctx.rifle;
+        var active = rifle.activeConfig === 'suppressed' ? 'suppressed' : 'bare';
+
+        var html = '<div class="detail-card">';
+        html += '<div class="config-row">';
+        html += '<button class="config-btn' + (active === 'bare' ? ' config-active' : '') + '" data-config="bare">🔊 Bare</button>';
+        html += '<button class="config-btn' + (active === 'suppressed' ? ' config-active' : '') + '" data-config="suppressed">🔇 Suppressed</button>';
+        html += '</div>';
+        html += '<div id="config-shift" class="chrono-hint" style="margin-top:8px;"></div>';
+        html += '</div>';
+        el.innerHTML = html;
+
+        // Measured shift — computed from tagged sessions/strings, and
+        // persisted onto the rifle so the solver can respect it
+        Promise.all([
+            ctx.db.getSessionsByRifle(rifle.id),
+            ctx.db.getVelocityStringsByRifle(rifle.id)
+        ]).then(function (res) {
+            var shift = typeof configShift === 'function' ? configShift(res[0], res[1]) : null;
+            var line = el.querySelector('#config-shift');
+            if (!line) return;
+            if (!shift) {
+                line.textContent = 'Shoot tagged sessions in both states and yorT measures the shift for you.';
+                return;
+            }
+            var parts = [];
+            if (shift.poi) {
+                var e = shift.poi.elevMOA;
+                var w = shift.poi.windMOA;
+                if (Math.abs(e) >= 0.1) parts.push(formatNum(Math.abs(e), 1) + ' MOA ' + (e > 0 ? 'high' : 'low'));
+                if (Math.abs(w) >= 0.1) parts.push(formatNum(Math.abs(w), 1) + ' MOA ' + (w > 0 ? 'right' : 'left'));
+            }
+            if (shift.velocityDelta !== null && Math.abs(shift.velocityDelta) >= 5) {
+                parts.push(formatNum(Math.abs(shift.velocityDelta), 0) + ' fps ' + (shift.velocityDelta > 0 ? 'faster' : 'slower'));
+            }
+            line.innerHTML = parts.length
+                ? '<strong>Can ON shifts POI ' + parts.join(', ') + '</strong> — accounted for.'
+                : 'No meaningful shift measured between configurations.';
+
+            // Persist measurements for the solver (best-effort)
+            var changed = false;
+            if (shift.velocityDelta !== null && rifle.configVelocityDelta !== shift.velocityDelta) {
+                rifle.configVelocityDelta = shift.velocityDelta;
+                changed = true;
+            }
+            if (shift.poi && JSON.stringify(rifle.configPoiShift) !== JSON.stringify(shift.poi)) {
+                rifle.configPoiShift = shift.poi;
+                changed = true;
+            }
+            if (changed) ctx.db.updateRifle(rifle).catch(function () {});
+        }).catch(function () {});
+
+        var btns = el.querySelectorAll('.config-btn');
+        for (var b = 0; b < btns.length; b++) {
+            btns[b].addEventListener('click', function () {
+                var next = this.getAttribute('data-config');
+                if (next === active) return;
+                rifle.activeConfig = next;
+                ctx.db.updateRifle(rifle).then(function () {
+                    ctx.managers.profile.showRifleDetail(rifle.id);
+                });
+            });
+        }
     }
 });
 
@@ -346,7 +422,7 @@ RifleCards.register({
     tool: null,
     isVisible: function () { return typeof ColdBoreManager !== 'undefined'; },
     render: function (el, ctx) {
-        new ColdBoreManager(ctx.db).renderSection(el, ctx.rifle.id);
+        new ColdBoreManager(ctx.db).renderSection(el, ctx.rifle.id, ctx.rifle);
     }
 });
 

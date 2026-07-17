@@ -3400,3 +3400,28 @@ html, body {
     margin: 10px 0;
     cursor: crosshair;
 }
+
+/* Suppressor config toggle */
+.config-row {
+    display: flex;
+    gap: 10px;
+}
+
+.config-btn {
+    flex: 1;
+    min-height: 48px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.config-active {
+    border-color: var(--primary);
+    color: var(--text);
+    background: rgba(76, 175, 80, 0.12);
+}

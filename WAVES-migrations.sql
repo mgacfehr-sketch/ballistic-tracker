@@ -25,6 +25,8 @@ ALTER TABLE public.rifles ADD COLUMN IF NOT EXISTS scope_cant_warn boolean;
 -- ────────────────────────────────────────────────────────────
 ALTER TABLE public.rifles           ADD COLUMN IF NOT EXISTS has_configs boolean;
 ALTER TABLE public.rifles           ADD COLUMN IF NOT EXISTS active_config text;
+ALTER TABLE public.rifles           ADD COLUMN IF NOT EXISTS config_velocity_delta real;  -- suppressed minus bare, fps (measured)
+ALTER TABLE public.rifles           ADD COLUMN IF NOT EXISTS config_poi_shift jsonb;      -- {elevMOA, windMOA} suppressed minus bare
 ALTER TABLE public.sessions         ADD COLUMN IF NOT EXISTS config text;
 ALTER TABLE public.velocity_strings ADD COLUMN IF NOT EXISTS config text;
 ALTER TABLE public.cold_bore_shots  ADD COLUMN IF NOT EXISTS config text;

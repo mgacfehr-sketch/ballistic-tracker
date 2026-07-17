@@ -294,6 +294,58 @@ function assignRoundCounts(baseCount, sessions) {
     return out;
 }
 
+// ── Suppressor configuration shift ────────────────────────────
+
+/**
+ * Measure the suppressed-vs-bare shift from tagged data.
+ * Needs ≥1 session per config for POI and ≥1 confirmed string per
+ * config for velocity; returns null when nothing is measurable yet.
+ *
+ * @param {Array} sessions - with .config and results.meanElevationMOA /
+ *   meanWindageMOA (POA-relative)
+ * @param {Array} strings - with .config, .avgFps, confirmed
+ * @returns {{poi: {elevMOA, windMOA}|null, velocityDelta: number|null}|null}
+ *   Values are suppressed MINUS bare.
+ */
+function configShift(sessions, strings) {
+    function avgPoi(list) {
+        var xs = list.filter(function (s) {
+            return s.results && typeof s.results.meanElevationMOA === 'number' &&
+                typeof s.results.meanWindageMOA === 'number';
+        });
+        if (!xs.length) return null;
+        var e = 0, w = 0;
+        xs.forEach(function (s) { e += s.results.meanElevationMOA; w += s.results.meanWindageMOA; });
+        return { elevMOA: e / xs.length, windMOA: w / xs.length, n: xs.length };
+    }
+    function avgV(list) {
+        var xs = list.filter(function (s) {
+            return s.assignmentStatus === 'confirmed' && typeof s.avgFps === 'number';
+        });
+        if (!xs.length) return null;
+        var sum = 0, n = 0;
+        xs.forEach(function (s) {
+            var w = s.shots && s.shots.length ? s.shots.length : 1;
+            sum += s.avgFps * w;
+            n += w;
+        });
+        return { avg: sum / n, n: xs.length };
+    }
+
+    var supPoi = avgPoi((sessions || []).filter(function (s) { return s.config === 'suppressed'; }));
+    var barePoi = avgPoi((sessions || []).filter(function (s) { return s.config === 'bare'; }));
+    var supV = avgV((strings || []).filter(function (s) { return s.config === 'suppressed'; }));
+    var bareV = avgV((strings || []).filter(function (s) { return s.config === 'bare'; }));
+
+    var poi = (supPoi && barePoi)
+        ? { elevMOA: supPoi.elevMOA - barePoi.elevMOA, windMOA: supPoi.windMOA - barePoi.windMOA }
+        : null;
+    var velocityDelta = (supV && bareV) ? supV.avg - bareV.avg : null;
+
+    if (!poi && velocityDelta === null) return null;
+    return { poi: poi, velocityDelta: velocityDelta };
+}
+
 // ── Per-rifle aggregation ─────────────────────────────────────
 
 var MIN_GROUP_SHOTS = 3;      // sessions below this never count as a "group"
@@ -426,6 +478,7 @@ if (typeof module !== 'undefined' && module.exports) {
         velocityFingerprint,
         assignRoundCounts,
         aggregateRifle,
+        configShift,
         DEFAULT_STRING_SD
     };
 }

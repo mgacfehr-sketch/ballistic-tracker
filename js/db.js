@@ -86,6 +86,11 @@ BallisticDB.prototype.addRifle = function (data) {
                 zeroRange: data.zeroRange || 0,
                 angleUnit: data.angleUnit || 'MOA',
                 notes: data.notes || '',
+                // Suppressor configurations — optional
+                hasConfigs: typeof data.hasConfigs === 'boolean' ? data.hasConfigs : null,
+                activeConfig: data.activeConfig || null,
+                configVelocityDelta: data.configVelocityDelta || null,
+                configPoiShift: data.configPoiShift || null,
                 // Scope facts (tall-target test) — all optional
                 scopeClickValue: data.scopeClickValue || null,
                 scopeCorrectionFactor: data.scopeCorrectionFactor || null,
@@ -403,6 +408,7 @@ BallisticDB.prototype.addSession = function (data) {
         coldBore: data.coldBore || null,
         sightInComments: data.sightInComments || '',
         isZeroSession: data.isZeroSession || false,
+        config: data.config || null,
         createdAt: new Date().toISOString()
     };
     var row = _jsToRow(session, self.userId);
@@ -536,6 +542,7 @@ BallisticDB.prototype.addZeroRecord = function (data) {
         date: data.date || new Date().toISOString().split('T')[0],
         rangeYards: data.rangeYards || 0,
         weather: data.weather || null,
+        config: data.config || null,
         notes: data.notes || ''
     };
     var row = _jsToRow(record, self.userId);
@@ -708,6 +715,7 @@ BallisticDB.prototype.addColdBoreShot = function (data) {
         rifleId: data.rifleId,
         distanceYards: data.distanceYards || 100,
         condition: data.condition || 'clean_cold',
+        config: data.config || null,
         elevationOffsetMOA: data.elevationOffsetMOA || 0,
         windageOffsetMOA: data.windageOffsetMOA || 0,
         notes: data.notes || '',
@@ -760,6 +768,7 @@ BallisticDB.prototype.addVelocityString = function (data) {
         esFps: typeof data.esFps === 'number' ? data.esFps : null,
         roundCountAt: typeof data.roundCountAt === 'number' ? data.roundCountAt : null,
         assignmentStatus: data.assignmentStatus || 'unassigned',
+        config: data.config || null,
         notes: data.notes || '',
         createdAt: new Date().toISOString()
     };

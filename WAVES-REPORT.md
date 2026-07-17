@@ -9,7 +9,7 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 | # | Feature | Status |
 |---|---|---|
 | 1 | Scope tracking (tall-target) | ✅ code done |
-| 2 | Suppressor configs | — |
+| 2 | Suppressor configs | ✅ code done |
 | 3 | DOPE cards | — |
 | 4 | Field/steel logging | — |
 | 5 | Wind grader | — |
@@ -29,6 +29,16 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 - Applied silently: solver come-up column (+footnote when >1%), Zero Guardian click counts (effective click = nominal × factor), DOPE cards (F3).
 - Truth-slot card: silent one-liner when healthy+fresh; speaks when off >1%, cant-warned, or stale (>1 yr); empty state teaches. Tool `scopeTruth` in the drawer ("Verify my scope dials true") + Home action; presets: compete/all.
 - **Judgment calls:** distance fixed at "a measured 100 yards" (the wizard instructs; not asked as a step); measurement canvas has no pinch-zoom in v1 (tall-target holes are far apart — acceptable; noted for polish).
+
+## F2 — Suppressor / bare configurations
+
+**Question:** Is my equipment telling the truth? · **Budget:** A after one-time setup (a checkbox on the rifle form; the toggle is one tap) · **Verdict:** "Can ON shifts POI 0.6 MOA low, 28 fps faster — accounted for." · **Empty state:** "Shoot tagged sessions in both states and yorT measures the shift for you." · **Taps:** 1 (the 🔊/🔇 toggle).
+
+- Pure `configShift(sessions, strings)` in velocity-stats.js (+7 tests): suppressed-minus-bare POI (mean POA offsets) and weighted velocity delta; null until both states have data.
+- Card appears in the truth slot ONLY when the rifle has configurations (UX doc rule). Toggle persists `active_config`; the measured shift persists onto the rifle (`config_velocity_delta`, `config_poi_shift`) so the solver can respect it.
+- Tagging is automatic everywhere: sessions (save), chrono strings (import), cold-bore manual entries, zero records (field pass-through) — all null for single-config rifles.
+- Respected by: the solver (suppressed MV = load MV + measured delta) and the zero-status card (a bare zero no longer masquerades as a suppressed zero).
+- **Judgment calls:** shift requires ≥1 session per config (not 2) to speak early but is labeled measured, not promised; "accounted for" claims only what's wired (MV delta in solver, config-aware zero status) — POI shift is reported but not auto-dialed anywhere.
 
 ## Notes so far
 

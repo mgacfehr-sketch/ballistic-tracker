@@ -1111,7 +1111,10 @@ SessionFlow.prototype._saveSession = function () {
         coldBore: this.coldBore,
         // Zero Guardian: a confirmed verdict marks this as a zero session
         isZeroSession: typeof ZeroGuardian !== 'undefined' && this.poa
-            ? ZeroGuardian.isConfirmed(this.results) : false
+            ? ZeroGuardian.isConfirmed(this.results) : false,
+        // Suppressor configuration tag (null when the rifle has no configs)
+        config: this.selectedRifle && this.selectedRifle.hasConfigs
+            ? (this.selectedRifle.activeConfig || 'bare') : null
     };
 
     // Store snapshot of rifle/load names for historical reference

@@ -852,6 +852,13 @@ BallisticSolverManager.prototype._calculate = function () {
     var mv = parseFloat(load.muzzleVelocity);
     if (!bc || !mv) return;
 
+    // Suppressor configuration: apply the measured velocity delta when
+    // the rifle is currently running suppressed
+    if (rifle && rifle.hasConfigs && rifle.activeConfig === 'suppressed' &&
+        typeof rifle.configVelocityDelta === 'number' && isFinite(rifle.configVelocityDelta)) {
+        mv += rifle.configVelocityDelta;
+    }
+
     var maxRange = parseInt(document.getElementById('solver-max-range').value) || 1000;
     var rangeStep = parseInt(document.getElementById('solver-range-step').value) || 50;
     var windSpeed = parseFloat(document.getElementById('solver-wind').value) || 0;

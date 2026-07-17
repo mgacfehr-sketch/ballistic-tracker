@@ -226,6 +226,36 @@ check('single string includes its own shots',
 check('sessions without shots arrays count as 0',
     V.assignRoundCounts(10, [{ shots: null }, { shots: fakeShots(3) }]).join(','), '10,13');
 
+// ── Config shift (suppressed vs bare) ─────────────────────────
+console.log('\nconfigShift:');
+
+function cfgSession(config, elev, wind) {
+    return { config: config, results: { meanElevationMOA: elev, meanWindageMOA: wind } };
+}
+function cfgString(config, avg, n) {
+    return { config: config, assignmentStatus: 'confirmed', avgFps: avg, shots: new Array(n || 5).fill({ fps: avg }) };
+}
+
+var cs1 = V.configShift(
+    [cfgSession('bare', 0.1, 0.0), cfgSession('suppressed', -0.5, -0.6), cfgSession('suppressed', -0.5, -0.6)],
+    [cfgString('bare', 2700), cfgString('suppressed', 2728)]
+);
+check('POI shift elev (suppressed − bare)', Math.abs(cs1.poi.elevMOA - (-0.6)) < 1e-9, true);
+check('POI shift wind', Math.abs(cs1.poi.windMOA - (-0.6)) < 1e-9, true);
+check('velocity delta +28 fps', Math.abs(cs1.velocityDelta - 28) < 1e-9, true);
+
+check('one config only → null', V.configShift([cfgSession('bare', 0, 0)], [cfgString('bare', 2700)]), null);
+var cs2 = V.configShift(
+    [cfgSession('bare', 0, 0), cfgSession('suppressed', -0.3, 0.2)],
+    [cfgString('bare', 2700)] // no suppressed strings
+);
+check('POI measurable without velocity → velocityDelta null', cs2.velocityDelta, null);
+check('…but POI present', !!cs2.poi, true);
+check('unconfirmed strings ignored', V.configShift([], [
+    { config: 'bare', assignmentStatus: 'suggested', avgFps: 2700, shots: [] },
+    { config: 'suppressed', assignmentStatus: 'suggested', avgFps: 2730, shots: [] }
+]), null);
+
 // ── Per-rifle aggregation ─────────────────────────────────────
 console.log('\naggregateRifle:');
 

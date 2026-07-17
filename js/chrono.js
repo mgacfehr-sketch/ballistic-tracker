@@ -455,9 +455,16 @@ ChronoManager.prototype._importSelected = function () {
             if (isFinite(edited) && edited >= 0) roundCountAt = edited;
         }
 
+        // Suppressor configuration tag from the selected rifle
+        var importRifle = null;
+        for (var ir = 0; ir < self.rifles.length; ir++) {
+            if (self.rifles[ir].id === rifleId) { importRifle = self.rifles[ir]; break; }
+        }
         records.push({
             rifleId: rifleId,
             barrelId: rifleId && self.activeBarrel ? self.activeBarrel.id : null,
+            config: importRifle && importRifle.hasConfigs
+                ? (importRifle.activeConfig || 'bare') : null,
             date: dateObj && !isNaN(dateObj.getTime()) ? dateObj.toISOString() : new Date().toISOString(),
             source: s.source,
             sheetName: s.name || '',

@@ -18,8 +18,9 @@ function ColdBoreManager(db) {
 /**
  * Render Cold Bore section inside rifle detail.
  */
-ColdBoreManager.prototype.renderSection = function (container, rifleId) {
+ColdBoreManager.prototype.renderSection = function (container, rifleId, rifle) {
     var self = this;
+    this._rifle = rifle || null; // for suppressor-config tagging on manual entries
     var html = '';
 
     html += '<div class="detail-section">';
@@ -382,6 +383,8 @@ ColdBoreManager.prototype._showAddForm = function (rifleId) {
             rifleId: rifleId,
             distanceYards: parseFloat(document.getElementById('cb-distance').value) || 100,
             condition: document.getElementById('cb-condition').value,
+            config: self._rifle && self._rifle.hasConfigs
+                ? (self._rifle.activeConfig || 'bare') : null,
             elevationOffsetMOA: elev,
             windageOffsetMOA: wind,
             notes: document.getElementById('cb-notes').value.trim(),
