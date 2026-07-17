@@ -37,10 +37,10 @@ AIAssistantManager.prototype.init = function () {
 AIAssistantManager.prototype.show = function () {
     if (!this.db) {
         this.container.innerHTML =
-            '<div class="ai-no-key">' +
-            '<div class="ai-no-key-title">Database Unavailable</div>' +
-            '<div class="ai-no-key-text">Close other tabs and reload.</div>' +
-            '</div>';
+            '<div class="screen"><div class="plate">' +
+            '<div class="t-head">Database unavailable</div>' +
+            '<p class="t-body u-mt-10">Close other tabs and reload.</p>' +
+            '</div></div>';
         return;
     }
 
@@ -61,10 +61,10 @@ AIAssistantManager.prototype.show = function () {
 
     if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
         this.container.innerHTML =
-            '<div class="ai-no-key">' +
-            '<div class="ai-no-key-title">No Connection</div>' +
-            '<div class="ai-no-key-text">yorT requires an internet connection.</div>' +
-            '</div>';
+            '<div class="screen"><div class="plate">' +
+            '<div class="t-head">No connection</div>' +
+            '<p class="t-body u-mt-10">yorT requires an internet connection.</p>' +
+            '</div></div>';
         return;
     }
 
@@ -72,18 +72,17 @@ AIAssistantManager.prototype.show = function () {
 };
 
 /**
- * Build the full chat UI: rifle selector, messages area, input bar.
+ * Build the full chat UI: context bar, messages area, composer.
  */
 AIAssistantManager.prototype._renderChat = function () {
     var self = this;
 
     this.db.getAllRifles().then(function (rifles) {
-        var html = '';
+        var html = '<div class="chat">';
 
-        // Rifle selector header
-        html += '<div class="ai-chat-header">';
-        html += '<label for="ai-rifle-select">Rifle:</label>';
-        html += '<select id="ai-rifle-select">';
+        // Context bar: rifle selector, weather, new chat, history
+        html += '<div class="chat-context">';
+        html += '<select class="field-input" id="ai-rifle-select" aria-label="Rifle">';
         html += '<option value="">General (no rifle)</option>';
         for (var i = 0; i < rifles.length; i++) {
             var selected = rifles[i].id === self.selectedRifleId ? ' selected' : '';
@@ -93,35 +92,35 @@ AIAssistantManager.prototype._renderChat = function () {
                 '</option>';
         }
         html += '</select>';
-        html += '<button class="btn btn-secondary btn-sm" id="ai-weather-btn" title="Get current weather">Get Weather</button>';
-        html += '</div>';
-
-        // Conversation toolbar
-        html += '<div class="ai-conv-toolbar">';
-        html += '<button class="btn btn-secondary btn-sm" id="ai-new-chat-btn">New Chat</button>';
-        html += '<button class="btn btn-secondary btn-sm" id="ai-history-btn">History</button>';
+        html += '<button class="action-ghost" id="ai-weather-btn" title="Get current weather">' + Icon('cloud', 18) + 'Weather</button>';
+        html += '<button class="action-ghost" id="ai-new-chat-btn">' + Icon('plus', 18) + 'New chat</button>';
+        html += '<button class="action-ghost" id="ai-history-btn">' + Icon('clock', 18) + 'History</button>';
         if (self.conversationTitle) {
-            html += '<span class="ai-conv-title">' + self._escapeHtml(self.conversationTitle) + '</span>';
+            html += '<span class="t-micro u-quiet">' + self._escapeHtml(self.conversationTitle) + '</span>';
         }
         html += '</div>';
 
-        // Conversation history panel (hidden by default)
-        html += '<div class="ai-conv-history" id="ai-conv-history" style="display:none;">';
-        html += '<div class="ai-conv-history-loading">Loading...</div>';
+        // Conversation history overlay (hidden by default)
+        html += '<div class="overlay hidden" id="ai-conv-history">';
+        html += '<div class="overlay-card">';
+        html += '<button class="overlay-close" id="ai-conv-history-close" title="Close">' + Icon('x', 20) + '</button>';
+        html += '<div class="overlay-title">History</div>';
+        html += '<div id="ai-conv-list"><div class="t-micro u-quiet">Loading...</div></div>';
+        html += '</div>';
         html += '</div>';
 
         // Messages area
-        html += '<div class="ai-messages" id="ai-messages">';
+        html += '<div class="chat-scroll" id="ai-messages">';
         if (self.messages.length === 0) {
-            html += '<div class="ai-welcome">' +
-                'I can help with:<br>' +
-                '\u2022 Dial-ups and come-ups for any range<br>' +
-                '\u2022 Group analysis and performance trends<br>' +
-                '\u2022 Load comparisons across your profiles<br>' +
-                '\u2022 Target image analysis<br>' +
-                '\u2022 General ballistics questions<br><br>' +
+            html += '<div class="chat-msg-ai" data-welcome>' +
+                'I can help with:\n' +
+                'Dial-ups and come-ups for any range\n' +
+                'Group analysis and performance trends\n' +
+                'Load comparisons across your profiles\n' +
+                'Target image analysis\n' +
+                'General ballistics questions\n\n' +
                 'Select a rifle above for personalized data. ' +
-                'Tap <b>Get Weather</b> to auto-fill current conditions.</div>';
+                'Tap Weather to auto-fill current conditions.</div>';
         } else {
             for (var j = 0; j < self.messages.length; j++) {
                 var msg = self.messages[j];
@@ -142,38 +141,36 @@ AIAssistantManager.prototype._renderChat = function () {
                 }
                 displayText = _stripActionBlocks(displayText);
                 if (msg.role === 'user') {
-                    html += '<div class="ai-message ai-message-user">';
+                    html += '<div class="chat-msg-user">';
                     // Show the actual photo, not a "[Image attached]" tag —
                     // the user needs to see which target they sent
-                    if (imgSrc) html += '<img class="ai-msg-thumb" src="' + imgSrc + '" alt="Attached image">';
+                    if (imgSrc) html += '<img class="thumb" src="' + imgSrc + '" alt="Attached image">';
                     html += self._escapeHtml(displayText);
                     html += '</div>';
                 } else {
-                    html += '<div class="ai-message ai-message-assistant">' + self._escapeHtml(displayText) + '</div>';
+                    html += '<div class="chat-msg-ai">' + self._escapeHtml(displayText) + '</div>';
                 }
             }
         }
         if (self.isLoading) {
-            html += '<div class="ai-loading"><div class="ai-loading-dot"></div><div class="ai-loading-dot"></div><div class="ai-loading-dot"></div></div>';
+            html += '<div class="chat-thinking"><i></i><i></i><i></i></div>';
         }
         html += '</div>';
 
-        // Image preview strip (hidden by default)
-        html += '<div class="ai-img-preview" id="ai-img-preview" style="display:none;">';
-        html += '<img class="ai-img-preview-thumb" id="ai-img-preview-thumb" src="" alt="Preview">';
-        html += '<button class="ai-img-preview-remove" id="ai-img-preview-remove" title="Remove image">&times;</button>';
+        // Image preview strip (hidden until an image is staged)
+        html += '<div class="chip-row hidden" id="ai-img-preview">';
+        html += '<img class="thumb" id="ai-img-preview-thumb" src="" alt="Preview">';
+        html += '<button class="action-ghost" id="ai-img-preview-remove" title="Remove image">' + Icon('x', 14) + '</button>';
         html += '</div>';
 
-        // Input bar
-        html += '<div class="ai-input-bar">';
-        html += '<button class="ai-img-btn" id="ai-img-btn" title="Attach image">';
-        html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
-        html += '</button>';
+        // Composer
+        html += '<div class="chat-composer">';
+        html += '<button class="chat-attach" id="ai-img-btn" title="Attach image">' + Icon('image', 20) + '</button>';
         html += '<input type="file" id="ai-img-input" accept="image/*" capture="environment" hidden>';
-        html += '<textarea class="ai-input" id="ai-input" placeholder="Ask about your shooting data..." rows="1"></textarea>';
-        html += '<button class="ai-send-btn" id="ai-send-btn" title="Send">';
-        html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
-        html += '</button>';
+        html += '<textarea id="ai-input" placeholder="Ask about your shooting data..." rows="1"></textarea>';
+        html += '<button class="chat-send" id="ai-send-btn" title="Send">' + Icon('arrow-up', 20) + '</button>';
+        html += '</div>';
+
         html += '</div>';
 
         self.container.innerHTML = html;
@@ -277,18 +274,23 @@ AIAssistantManager.prototype._bindChatEvents = function () {
         });
     }
 
-    // History button
+    // History button + overlay close
     var historyBtn = document.getElementById('ai-history-btn');
-    if (historyBtn) {
+    var historyPanel = document.getElementById('ai-conv-history');
+    if (historyBtn && historyPanel) {
         historyBtn.addEventListener('click', function () {
-            var panel = document.getElementById('ai-conv-history');
-            if (!panel) return;
-            if (panel.style.display === 'none') {
-                panel.style.display = 'block';
+            if (historyPanel.classList.contains('hidden')) {
+                historyPanel.classList.remove('hidden');
                 self._loadConversationHistory();
             } else {
-                panel.style.display = 'none';
+                historyPanel.classList.add('hidden');
             }
+        });
+    }
+    var historyClose = document.getElementById('ai-conv-history-close');
+    if (historyClose && historyPanel) {
+        historyClose.addEventListener('click', function () {
+            historyPanel.classList.add('hidden');
         });
     }
 };
@@ -299,20 +301,15 @@ AIAssistantManager.prototype._bindChatEvents = function () {
  */
 AIAssistantManager.prototype._renderConsent = function (previouslyDeclined) {
     var self = this;
-    var html = '<div class="ai-consent">';
-    html += '<h3>Before you use Ask yorT</h3>';
-    html += '<p>Ask yorT is powered by Anthropic’s Claude. When you use it, the following is sent to Anthropic through our server to generate answers:</p>';
-    html += '<ul>';
-    html += '<li>your questions and any photos you attach</li>';
-    html += '<li>shooting data for the rifle you select (sessions, stats, logs)</li>';
-    html += '</ul>';
-    html += '<p>Nothing is sent until you ask a question. Usage (token counts) is logged for cost tracking. See the <a href="privacy-policy.html">Privacy Policy</a>.</p>';
+    var html = '<div class="screen"><div class="plate">';
+    html += '<div class="t-head">Before you use Ask yorT</div>';
+    html += '<p class="t-body u-mt-10">Ask yorT is powered by Anthropic’s Claude. When you use it, your questions and any photos you attach are sent to Anthropic through our server to generate answers, along with shooting data for the rifle you select (sessions, stats, logs).</p>';
+    html += '<p class="t-body u-mt-10">Nothing is sent until you ask a question. Usage (token counts) is logged for cost tracking. See the <a href="privacy-policy.html">Privacy Policy</a>.</p>';
     if (previouslyDeclined) {
-        html += '<p class="ai-consent-declined">You previously declined — Ask yorT is disabled until you accept.</p>';
+        html += '<p class="field-error">You previously declined — Ask yorT is disabled until you accept.</p>';
     }
-    html += '<div class="btn-row">';
-    html += '<button class="btn btn-secondary" id="ai-consent-decline">Not now</button>';
-    html += '<button class="btn btn-primary" id="ai-consent-accept">I understand — enable</button>';
+    html += '<button class="action-primary u-full u-mt-14" id="ai-consent-accept">I understand — enable</button>';
+    html += '<button class="action-ghost u-full u-mt-10" id="ai-consent-decline">Not now</button>';
     html += '</div></div>';
     this.container.innerHTML = html;
 
@@ -334,7 +331,7 @@ AIAssistantManager.prototype._renderConsent = function (previouslyDeclined) {
  */
 AIAssistantManager.prototype._fetchAndInsertWeather = function () {
     var btn = document.getElementById('ai-weather-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Locating...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = Icon('cloud', 18) + 'Locating...'; }
 
     NetService.getConditions().then(function (cond) {
         var text = 'Current conditions: ' +
@@ -352,9 +349,9 @@ AIAssistantManager.prototype._fetchAndInsertWeather = function () {
             input.style.height = Math.min(input.scrollHeight, 120) + 'px';
             input.focus();
         }
-        if (btn) { btn.disabled = false; btn.textContent = 'Get Weather'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = Icon('cloud', 18) + 'Weather'; }
     }).catch(function (err) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Get Weather'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = Icon('cloud', 18) + 'Weather'; }
         alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
             err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
             'Failed to fetch weather data.');
@@ -387,7 +384,7 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
     var stagedImage = this.pendingImage;
     this.pendingImage = null;
     var previewEl = document.getElementById('ai-img-preview');
-    if (previewEl) previewEl.style.display = 'none';
+    if (previewEl) previewEl.classList.add('hidden');
 
     // Build user message content (possibly multipart with image)
     var userContent;
@@ -453,16 +450,20 @@ AIAssistantManager.prototype._sendMessage = function (userText) {
                 console.warn('[AI] Failed to log usage:', e);
             });
 
-            // Cost transparency: tiny per-answer footer (consent screen
-            // already discloses that usage is tracked)
+            // Cost transparency: tiny per-answer footer inside the answer
+            // readout (consent screen already discloses that usage is tracked)
             var messagesEl = document.getElementById('ai-messages');
             if (messagesEl) {
-                var costEl = document.createElement('div');
-                costEl.className = 'ai-cost';
-                costEl.textContent = '~$' + (estimatedCost < 0.01
-                    ? estimatedCost.toFixed(4) : estimatedCost.toFixed(2));
-                messagesEl.appendChild(costEl);
-                messagesEl.scrollTop = messagesEl.scrollHeight;
+                var aiMsgs = messagesEl.querySelectorAll('.chat-msg-ai');
+                var lastAiMsg = aiMsgs.length > 0 ? aiMsgs[aiMsgs.length - 1] : null;
+                if (lastAiMsg) {
+                    var costEl = document.createElement('span');
+                    costEl.className = 'msg-cost';
+                    costEl.textContent = '~$' + (estimatedCost < 0.01
+                        ? estimatedCost.toFixed(4) : estimatedCost.toFixed(2));
+                    lastAiMsg.appendChild(costEl);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
             }
         }
 
@@ -1131,20 +1132,20 @@ AIAssistantManager.prototype._appendMessage = function (role, content, hasImage,
     if (!messagesEl) return;
 
     // Remove welcome message if present
-    var welcome = messagesEl.querySelector('.ai-welcome');
+    var welcome = messagesEl.querySelector('[data-welcome]');
     if (welcome) welcome.remove();
 
     var div = document.createElement('div');
-    div.className = 'ai-message ai-message-' + role;
+    div.className = role === 'user' ? 'chat-msg-user' : 'chat-msg-ai';
     if (hasImage && role === 'user' && imageSrc) {
         var imgEl = document.createElement('img');
-        imgEl.className = 'ai-msg-thumb';
+        imgEl.className = 'thumb';
         imgEl.alt = 'Attached image';
         imgEl.src = imageSrc;
         div.appendChild(imgEl);
     } else if (hasImage && role === 'user') {
         var imgTag = document.createElement('div');
-        imgTag.className = 'ai-message-img-tag';
+        imgTag.className = 't-micro u-quiet';
         imgTag.textContent = '[Image attached]';
         div.appendChild(imgTag);
     }
@@ -1163,8 +1164,9 @@ AIAssistantManager.prototype._appendError = function (message) {
     if (!messagesEl) return;
 
     var div = document.createElement('div');
-    div.className = 'ai-error';
-    div.textContent = message;
+    div.className = 'chat-msg-ai';
+    div.innerHTML = '<span class="chip is-stop">Error</span>\n';
+    div.appendChild(document.createTextNode(message));
     messagesEl.appendChild(div);
     this._scrollToBottom();
 };
@@ -1179,13 +1181,13 @@ AIAssistantManager.prototype._showLoading = function (show) {
     if (!messagesEl) return;
 
     // Remove existing loading indicator
-    var existing = messagesEl.querySelector('.ai-loading');
+    var existing = messagesEl.querySelector('.chat-thinking');
     if (existing) existing.remove();
 
     if (show) {
         var loading = document.createElement('div');
-        loading.className = 'ai-loading';
-        loading.innerHTML = '<div class="ai-loading-dot"></div><div class="ai-loading-dot"></div><div class="ai-loading-dot"></div>';
+        loading.className = 'chat-thinking';
+        loading.innerHTML = '<i></i><i></i><i></i>';
         messagesEl.appendChild(loading);
         this._scrollToBottom();
     }
@@ -1254,7 +1256,7 @@ AIAssistantManager.prototype._stageImage = function (file) {
             var thumbEl = document.getElementById('ai-img-preview-thumb');
             if (previewEl && thumbEl) {
                 thumbEl.src = dataUrl;
-                previewEl.style.display = 'flex';
+                previewEl.classList.remove('hidden');
             }
         };
         img.src = e.target.result;
@@ -1268,7 +1270,7 @@ AIAssistantManager.prototype._stageImage = function (file) {
 AIAssistantManager.prototype._clearStagedImage = function () {
     this.pendingImage = null;
     var previewEl = document.getElementById('ai-img-preview');
-    if (previewEl) previewEl.style.display = 'none';
+    if (previewEl) previewEl.classList.add('hidden');
 };
 
 /**
@@ -1459,29 +1461,33 @@ AIAssistantManager.prototype._escapeHtml = function (str) {
  */
 AIAssistantManager.prototype._loadConversationHistory = function () {
     var self = this;
-    var panel = document.getElementById('ai-conv-history');
+    var panel = document.getElementById('ai-conv-list');
     if (!panel) return;
 
     self.db.getConversationsByRifle(self.selectedRifleId).then(function (convs) {
         if (!convs || convs.length === 0) {
-            panel.innerHTML = '<div class="ai-conv-history-empty">No past conversations.</div>';
+            panel.innerHTML = '<div class="t-body u-quiet">No past conversations.</div>';
             return;
         }
 
         var html = '';
         for (var i = 0; i < convs.length; i++) {
             var c = convs[i];
-            var isActive = c.id === self.conversationId ? ' ai-conv-item-active' : '';
             var dateStr = c.updatedAt ? c.updatedAt.split('T')[0] : '';
-            html += '<div class="ai-conv-item' + isActive + '" data-conv-id="' + c.id + '">';
-            html += '<div class="ai-conv-item-title">' + self._escapeHtml(c.title || 'Untitled') + '</div>';
-            html += '<div class="ai-conv-item-date">' + dateStr + '</div>';
+            html += '<button class="row-item" data-conv-id="' + c.id + '">';
+            html += '<div class="row-main">';
+            html += '<div class="row-title">' + self._escapeHtml(c.title || 'Untitled') + '</div>';
+            html += '<div class="row-sub">' + dateStr + '</div>';
             html += '</div>';
+            if (c.id === self.conversationId) {
+                html += '<span class="row-aside t-micro">Current</span>';
+            }
+            html += '</button>';
         }
         panel.innerHTML = html;
 
         // Bind click events on conversation items
-        var items = panel.querySelectorAll('.ai-conv-item');
+        var items = panel.querySelectorAll('[data-conv-id]');
         for (var j = 0; j < items.length; j++) {
             items[j].addEventListener('click', function () {
                 var convId = this.getAttribute('data-conv-id');
@@ -1490,7 +1496,7 @@ AIAssistantManager.prototype._loadConversationHistory = function () {
         }
     }).catch(function (e) {
         console.warn('[AI] Failed to load conversation history:', e);
-        panel.innerHTML = '<div class="ai-conv-history-empty">Failed to load history.</div>';
+        panel.innerHTML = '<div class="t-body u-quiet">Failed to load history.</div>';
     });
 };
 
@@ -1643,7 +1649,7 @@ AIAssistantManager.prototype._appendActionStatus = function (text) {
     if (!messagesEl) return;
 
     var div = document.createElement('div');
-    div.className = 'ai-action-status';
+    div.className = 'chat-msg-ai t-micro u-quiet';
     div.textContent = text;
     messagesEl.appendChild(div);
     this._scrollToBottom();

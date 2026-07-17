@@ -2,9 +2,10 @@
  * profiles.js — Rifle and Load profile management UI.
  *
  * Manages views: rifle list, rifle form (create/edit), rifle detail
- * (with loads + barrel), load form (create/edit).
+ * (with loads + barrel), load form (create/edit), load detail.
  *
- * All rendering targets the #view-profiles container.
+ * All rendering targets the #view-profiles container and emits the
+ * ui.css vocabulary (docs/REDESIGN-SPEC.md Part IV).
  */
 
 function ProfileManager(db) {
@@ -40,71 +41,67 @@ ProfileManager.prototype.showRifleList = function () {
 };
 
 ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed) {
-    var html = '<div class="profile-screen">';
-    html += '<div class="profile-toolbar">';
-    html += '<h2 class="profile-title">Rifles</h2>';
-    html += '<button class="btn btn-primary btn-sm" id="btn-add-rifle">+ Add Rifle</button>';
+    var html = '<div class="view-toolbar">';
+    html += '<h2 class="toolbar-title">Rifles</h2>';
     html += '</div>';
+
+    html += '<div class="screen">';
 
     // One-time workflow pointer — the certificate chain spans several
     // surfaces and is otherwise undiscoverable (dismissible, never returns)
     if (!workflowDismissed && typeof hasFeature === 'function' && hasFeature('certificate')) {
-        html += '<div class="detail-card workflow-card" id="workflow-card">';
-        html += '<button id="workflow-dismiss" class="workflow-dismiss" aria-label="Dismiss" title="Dismiss">×</button>';
-        html += '<h4>From ammo box to certificate</h4>';
-        html += '<ol class="workflow-steps">';
-        html += '<li>Create a rifle + load here</li>';
-        html += '<li>Home → <strong>Import chrono data</strong> for your ShotView strings</li>';
-        html += '<li>Home → <strong>Check a target</strong> to shoot and save groups</li>';
-        html += '<li>Rifle → <strong>Performance Report</strong> → Generate Certificate</li>';
-        html += '</ol>';
+        html += '<div class="plate u-mb-12" id="workflow-card">';
+        html += '<h4 class="t-head">From ammo box to certificate</h4>';
+        html += '<p class="t-body u-quiet u-mt-10">Create a rifle and load here. Import chrono data and check targets from Home. When a load proves out, generate its certificate from the rifle’s performance report.</p>';
+        html += '<button type="button" class="action-ghost u-mt-10" id="workflow-dismiss">Got it</button>';
         html += '</div>';
     }
 
     if (rifles.length === 0) {
-        html += '<div class="empty-state">';
-        html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
-        html += '<p class="empty-state-text">No rifles yet</p>';
-        html += '<p class="empty-state-sub">Your rifle is the hub — every target photo, chrono string, and insight lands on it. Add yours to start.</p>';
+        html += '<div class="empty-teach">';
+        html += '<p>Every target photo, chrono string, and insight lands on a rifle &mdash; add yours to start.</p>';
+        html += '<button type="button" class="action-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
         html += '</div>';
     } else {
-        html += '<div class="profile-list">';
         for (var i = 0; i < rifles.length; i++) {
             var r = rifles[i];
-            html += '<div class="profile-card" data-rifle-id="' + r.id + '">';
-            html += '<div class="profile-card-main">';
-            html += '<span class="profile-card-name">' + escapeHtml(r.name) + '</span>';
-            html += '<span class="profile-card-sub">' + escapeHtml(r.caliber) + '</span>';
+            html += '<button type="button" class="row-item" data-rifle-id="' + r.id + '">';
+            html += '<div class="row-main">';
+            html += '<div class="row-title">' + escapeHtml(r.name) + '</div>';
+            html += '<div class="row-sub">' + escapeHtml(r.caliber) + '</div>';
             html += '</div>';
-            html += '<span class="profile-card-arrow">&rsaquo;</span>';
-            html += '</div>';
+            html += '<span class="row-aside">' + Icon('chevron-right', 18) + '</span>';
+            html += '</button>';
         }
-        html += '</div>';
-        html += '<p class="profile-count">' + rifles.length + ' / ' + MAX_RIFLES + ' profiles</p>';
+        html += '<p class="t-micro u-mt-10">' + rifles.length + ' / ' + MAX_RIFLES + ' profiles</p>';
     }
 
     // Misc sessions link
-    html += '<div class="detail-section">';
-    html += '<div class="profile-list" style="padding:0 16px;">';
-    html += '<div class="profile-card" id="btn-misc-sessions">';
-    html += '<div class="profile-card-main">';
-    html += '<span class="profile-card-name">Misc Sessions</span>';
-    html += '<span class="profile-card-sub">Sessions saved without a rifle profile</span>';
+    html += '<button type="button" class="row-item u-mt-14" id="btn-misc-sessions">';
+    html += '<div class="row-main">';
+    html += '<div class="row-title">Misc sessions</div>';
+    html += '<div class="row-sub">Sessions saved without a rifle profile</div>';
     html += '</div>';
-    html += '<span class="profile-card-arrow">&rsaquo;</span>';
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
+    html += '<span class="row-aside">' + Icon('chevron-right', 18) + '</span>';
+    html += '</button>';
 
     // Account (privacy + deletion — store compliance)
-    html += '<details class="account-section"><summary>Account</summary>';
-    html += '<div class="account-body">';
-    html += '<p><a href="privacy-policy.html">Privacy Policy</a></p>';
-    html += '<p class="account-warning">Deleting your account permanently removes every rifle, session, photo, and chrono string. This cannot be undone.</p>';
-    html += '<button class="btn btn-danger" id="btn-delete-account">Delete Account…</button>';
+    html += '<details class="fold u-mt-14"><summary>Account</summary>';
+    html += '<div class="fold-body">';
+    html += '<p class="t-body"><a href="privacy-policy.html">Privacy policy</a></p>';
+    html += '<p class="t-body u-quiet u-mt-10">Deleting your account permanently removes every rifle, session, photo, and chrono string. This cannot be undone.</p>';
+    html += '<button type="button" class="action-danger u-mt-10" id="btn-delete-account">Delete account&hellip;</button>';
     html += '</div></details>';
 
-    html += '</div>';
+    html += '</div>'; // close .screen
+
+    // The screen's single primary, pinned in thumb reach
+    if (rifles.length > 0) {
+        html += '<div class="fab-zone">';
+        html += '<button type="button" class="action-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
+        html += '</div>';
+    }
+
     this.container.innerHTML = html;
     this._bindRifleListEvents();
 };
@@ -123,11 +120,11 @@ ProfileManager.prototype._bindRifleListEvents = function () {
         workflowDismiss.addEventListener('click', function () {
             self.db.setSetting('workflowCardDismissed', true);
             var card = document.getElementById('workflow-card');
-            if (card) card.style.display = 'none';
+            if (card) card.classList.add('hidden');
         });
     }
 
-    var cards = this.container.querySelectorAll('.profile-card[data-rifle-id]');
+    var cards = this.container.querySelectorAll('.row-item[data-rifle-id]');
     for (var i = 0; i < cards.length; i++) {
         cards[i].addEventListener('click', function () {
             var id = this.getAttribute('data-rifle-id');
@@ -147,7 +144,7 @@ ProfileManager.prototype._bindRifleListEvents = function () {
                 window.location.href = window.location.pathname;
             }).catch(function (err) {
                 deleteAccountBtn.disabled = false;
-                deleteAccountBtn.textContent = 'Delete Account…';
+                deleteAccountBtn.textContent = 'Delete account…';
                 alert('Account deletion failed: ' + err.message);
             });
         });
@@ -186,7 +183,7 @@ ProfileManager.prototype.showRifleForm = function (rifleId) {
 
 ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     var isEdit = !!rifle;
-    var title = isEdit ? 'Edit Rifle' : 'New Rifle';
+    var title = isEdit ? 'Edit rifle' : 'New rifle';
 
     // Parse existing twist rate number from stored string (e.g. "1:8" → "8", "1:8.5" → "8.5")
     var twistNum = '';
@@ -195,40 +192,39 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
         twistNum = parts.length > 1 ? parts[1] : parts[0];
     }
 
-    var html = '<div class="profile-screen">';
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-form-back">&lsaquo; Back</button>';
-    html += '<h2 class="profile-title">' + title + '</h2>';
-    html += '<div class="toolbar-spacer"></div>';
+    var html = '<div class="view-toolbar">';
+    html += '<button type="button" class="toolbar-back" id="btn-form-back">' + Icon('chevron-left', 20) + 'Back</button>';
+    html += '<h2 class="toolbar-title">' + title + '</h2>';
     html += '</div>';
 
-    html += '<form id="rifle-form" class="profile-form">';
+    html += '<div class="screen">';
+    html += '<form id="rifle-form">';
 
-    html += '<div class="form-group">';
-    html += '<label for="rf-name">Rifle Name *</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="rf-name">Rifle name *</label>';
     html += '<input type="text" id="rf-name" maxlength="80" placeholder="e.g., Bergara B14 HMR" value="' + escapeAttr(rifle ? rifle.name : '') + '">';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="rf-caliber">Caliber *</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="rf-caliber">Caliber *</label>';
     html += '<input type="text" id="rf-caliber" maxlength="40" placeholder="e.g., .308 Win" value="' + escapeAttr(rifle ? rifle.caliber : '') + '">';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="rf-scope-height">Scope Height (in) <button class="help-btn" onclick="showHelp(\'scopeHeight\')" title="What is scope height?">?</button></label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="rf-scope-height">Scope height <span class="field-unit">in</span> <button type="button" class="hint-btn" onclick="showHelp(\'scopeHeight\')" title="What is scope height?">?</button></label>';
     html += '<input type="number" id="rf-scope-height" min="0" max="5" step="0.01" inputmode="decimal" placeholder="1.5" value="' + (rifle && rifle.scopeHeight ? rifle.scopeHeight : '') + '">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="rf-zero-range">Zero Range (yds) <button class="help-btn" onclick="showHelp(\'zeroRange\')" title="What is zero range?">?</button></label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="rf-zero-range">Zero range <span class="field-unit">yd</span> <button type="button" class="hint-btn" onclick="showHelp(\'zeroRange\')" title="What is zero range?">?</button></label>';
     html += '<input type="number" id="rf-zero-range" min="0" max="1500" step="1" inputmode="numeric" placeholder="100" value="' + (rifle && rifle.zeroRange ? rifle.zeroRange : '') + '">';
     html += '</div>';
     html += '</div>';
 
     // Turret units — wind grading and insights speak this unit
     var unitVal = rifle && String(rifle.angleUnit || '').toUpperCase() === 'MIL' ? 'MIL' : 'MOA';
-    html += '<div class="form-group">';
-    html += '<label for="rf-angle-unit">Turret Units</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="rf-angle-unit">Turret units</label>';
     html += '<select id="rf-angle-unit">';
     html += '<option value="MOA"' + (unitVal === 'MOA' ? ' selected' : '') + '>MOA</option>';
     html += '<option value="MIL"' + (unitVal === 'MIL' ? ' selected' : '') + '>MIL (mrad)</option>';
@@ -236,19 +232,16 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     html += '</div>';
 
     // ── Barrel fields merged into rifle form ──
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="rf-twist">Barrel Twist</label>';
-    html += '<div style="display:flex;align-items:center;gap:4px;">';
-    html += '<span style="font-size:1rem;color:var(--ink-2);white-space:nowrap;">1:</span>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="rf-twist">Barrel twist <span class="field-unit">1:</span></label>';
     html += '<input type="number" id="rf-twist" min="1" max="20" step="0.5" inputmode="decimal" placeholder="8" value="' + escapeAttr(twistNum) + '">';
-    html += '</div>';
     html += '</div>';
 
     if (isEdit) {
         // Show twist direction on edit
-        html += '<div class="form-group form-group-half">';
-        html += '<label for="rf-twist-dir">Twist Direction</label>';
+        html += '<div class="field">';
+        html += '<label class="field-label" for="rf-twist-dir">Twist direction</label>';
         html += '<select id="rf-twist-dir">';
         html += '<option value="Right"' + (barrel && barrel.twistDirection === 'Right' ? ' selected' : (!barrel ? ' selected' : '')) + '>Right</option>';
         html += '<option value="Left"' + (barrel && barrel.twistDirection === 'Left' ? ' selected' : '') + '>Left</option>';
@@ -256,27 +249,27 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
         html += '</div>';
     } else {
         // On create, skip twist direction (default Right)
-        html += '<div class="form-group form-group-half"></div>';
+        html += '<div class="field"></div>';
     }
     html += '</div>';
 
     if (isEdit) {
-        html += '<div class="form-row">';
-        html += '<div class="form-group form-group-half">';
-        html += '<label for="rf-rounds">Round Count</label>';
+        html += '<div class="field-row">';
+        html += '<div class="field">';
+        html += '<label class="field-label" for="rf-rounds">Round count</label>';
         html += '<input type="number" id="rf-rounds" min="0" step="1" inputmode="numeric" placeholder="0" value="' + (barrel ? (barrel.totalRounds || 0) : 0) + '">';
         html += '</div>';
-        html += '<div class="form-group form-group-half">';
-        html += '<label>Since Cleaned</label>';
-        html += '<span id="rf-since-cleaned" class="form-static-value" style="display:block;padding:8px 0;color:var(--ink-2);">&mdash;</span>';
+        html += '<div class="field">';
+        html += '<span class="field-label">Since cleaned</span>';
+        html += '<p class="t-body u-quiet" id="rf-since-cleaned">&mdash;</p>';
         html += '</div>';
         html += '</div>';
 
         // Install date — collapsed by default
-        html += '<details class="session-details" style="margin:0 0 12px;">';
-        html += '<summary class="session-details-summary">Install Date</summary>';
-        html += '<div class="session-details-body" style="padding:8px 0 0;">';
-        html += '<div class="form-group">';
+        html += '<details class="fold u-mb-12">';
+        html += '<summary>Install date</summary>';
+        html += '<div class="fold-body">';
+        html += '<div class="field">';
         html += '<input type="date" id="rf-install-date" value="' + escapeAttr(barrel ? barrel.installDate : new Date().toISOString().split('T')[0]) + '">';
         html += '</div>';
         html += '</div>';
@@ -284,44 +277,44 @@ ProfileManager.prototype._renderRifleForm = function (rifle, barrel) {
     }
 
     // Suppressor configurations
-    html += '<div class="form-group"><label class="chrono-add-rounds" style="min-height:44px;">';
+    html += '<div class="field">';
+    html += '<label class="t-body">';
     html += '<input type="checkbox" id="rf-has-configs"' + (rifle && rifle.hasConfigs ? ' checked' : '') + '> ';
     html += 'This rifle sometimes runs a suppressor</label>';
-    html += '<p class="chrono-hint">Adds a 🔊/🔇 toggle — every session and chrono string is tagged, and yorT measures the POI/velocity shift for you.</p></div>';
+    html += '<p class="field-hint">Bare and suppressed configurations get their own zero and velocity records</p>';
+    html += '</div>';
 
     // Build sheet (certificate fields) — collapsed by default
-    html += '<details class="session-details" style="margin:0 0 12px;"' + (rifle && (rifle.serialNumber || rifle.action || rifle.barrelSpec || rifle.triggerSpec || rifle.chassis || rifle.muzzleDevice) ? ' open' : '') + '>';
-    html += '<summary class="session-details-summary">Build Sheet (for certificate)</summary>';
-    html += '<div class="session-details-body" style="padding:8px 0 0;">';
-    html += '<div class="form-group"><label for="rf-serial">Serial Number</label>';
+    html += '<details class="fold u-mb-12"' + (rifle && (rifle.serialNumber || rifle.action || rifle.barrelSpec || rifle.triggerSpec || rifle.chassis || rifle.muzzleDevice) ? ' open' : '') + '>';
+    html += '<summary>Build sheet (for certificate)</summary>';
+    html += '<div class="fold-body">';
+    html += '<div class="field"><label class="field-label" for="rf-serial">Serial number</label>';
     html += '<input type="text" id="rf-serial" placeholder="e.g. WH-0042" value="' + escapeAttr(rifle && rifle.serialNumber ? rifle.serialNumber : '') + '"></div>';
-    html += '<div class="form-group"><label for="rf-action">Action</label>';
+    html += '<div class="field"><label class="field-label" for="rf-action">Action</label>';
     html += '<input type="text" id="rf-action" placeholder="e.g. Defiance Deviant Elite" value="' + escapeAttr(rifle && rifle.action ? rifle.action : '') + '"></div>';
-    html += '<div class="form-group"><label for="rf-barrel-spec">Barrel</label>';
+    html += '<div class="field"><label class="field-label" for="rf-barrel-spec">Barrel</label>';
     html += '<input type="text" id="rf-barrel-spec" placeholder="e.g. Proof Research CF 24&quot; Sendero" value="' + escapeAttr(rifle && rifle.barrelSpec ? rifle.barrelSpec : '') + '"></div>';
-    html += '<div class="form-group"><label for="rf-trigger">Trigger</label>';
+    html += '<div class="field"><label class="field-label" for="rf-trigger">Trigger</label>';
     html += '<input type="text" id="rf-trigger" placeholder="e.g. TriggerTech Diamond" value="' + escapeAttr(rifle && rifle.triggerSpec ? rifle.triggerSpec : '') + '"></div>';
-    html += '<div class="form-group"><label for="rf-chassis">Chassis / Stock</label>';
+    html += '<div class="field"><label class="field-label" for="rf-chassis">Chassis / stock</label>';
     html += '<input type="text" id="rf-chassis" placeholder="e.g. MPA BA Comp" value="' + escapeAttr(rifle && rifle.chassis ? rifle.chassis : '') + '"></div>';
-    html += '<div class="form-group"><label for="rf-muzzle">Muzzle Device</label>';
+    html += '<div class="field"><label class="field-label" for="rf-muzzle">Muzzle device</label>';
     html += '<input type="text" id="rf-muzzle" placeholder="e.g. Area 419 Hellfire" value="' + escapeAttr(rifle && rifle.muzzleDevice ? rifle.muzzleDevice : '') + '"></div>';
     html += '</div>';
     html += '</details>';
 
-    html += '<div class="form-group">';
-    html += '<label for="rf-notes">Notes</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="rf-notes">Notes</label>';
     html += '<textarea id="rf-notes" rows="3" placeholder="Optional notes">' + escapeHtml(rifle ? rifle.notes : '') + '</textarea>';
     html += '</div>';
 
-    html += '<div class="btn-row">';
+    html += '<button type="submit" class="action-primary u-mt-14">' + (isEdit ? 'Save changes' : 'Create rifle') + '</button>';
     if (isEdit) {
-        html += '<button type="button" class="btn btn-danger" id="btn-delete-rifle">Delete Rifle</button>';
+        html += '<button type="button" class="action-danger u-full u-mt-10" id="btn-delete-rifle">Delete rifle</button>';
     }
-    html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Rifle') + '</button>';
-    html += '</div>';
 
     html += '</form>';
-    html += '</div>';
+    html += '</div>'; // close .screen
 
     this.container.innerHTML = html;
     this._bindRifleFormEvents(rifle, barrel);
@@ -516,26 +509,24 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         return (a.name || '').localeCompare(b.name || '');
     });
 
-    var html = '<div class="profile-screen">';
-
-    // Toolbar
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-detail-back">&lsaquo; Rifles</button>';
-    html += '<h2 class="profile-title">' + escapeHtml(rifle.name) + '</h2>';
-    html += '<button class="btn-icon" id="btn-edit-rifle" title="Edit">&#9998;</button>';
+    // Toolbar: back · engraved name · edit
+    var html = '<div class="view-toolbar">';
+    html += '<button type="button" class="toolbar-back" id="btn-detail-back">' + Icon('chevron-left', 20) + 'Rifles</button>';
+    html += '<h2 class="toolbar-title">' + escapeHtml(rifle.name) + '</h2>';
+    html += '<button type="button" class="toolbar-act" id="btn-edit-rifle" title="Edit" aria-label="Edit rifle">' + Icon('pencil', 20) + '</button>';
     html += '</div>';
 
-    // (Build-info and barrel stats moved into cards — rifle-cards.js)
+    // Build line (caliber · twist · barrel, when known)
+    var buildBits = [];
+    if (rifle.caliber) buildBits.push(escapeHtml(rifle.caliber));
+    if (activeBarrel && activeBarrel.twistRate) buildBits.push(escapeHtml(activeBarrel.twistRate));
+    if (rifle.barrelSpec) buildBits.push(escapeHtml(rifle.barrelSpec));
+    if (buildBits.length) {
+        html += '<div class="toolbar-sub">' + buildBits.join(' &middot; ') + '</div>';
+    }
 
-    // (Report promo moved into the 'report-promo' card, prove slot)
-
-    // Rifle cards — the seven-question stack. Legacy sections below
-    // migrate into cards one commit at a time (foundation step 6).
-    html += '<div id="rifle-cards"></div>';
-
-    // (History links, cold bore, and DOPE log all live in cards now)
-
-    html += '</div>'; // close .profile-screen
+    // Rifle cards — the seven-question stack (rifle-cards.js fills it)
+    html += '<div id="rifle-cards" class="screen"></div>';
 
     this.container.innerHTML = html;
     this._bindRifleDetailEvents(rifle, activeBarrel);
@@ -580,24 +571,22 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
 
 ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
     var isEdit = !!barrel;
-    var title = isEdit ? 'Edit Barrel' : 'New Barrel';
 
-    var html = '<div class="profile-screen">';
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-form-back">&lsaquo; Back</button>';
-    html += '<h2 class="profile-title">' + title + '</h2>';
-    html += '<div class="toolbar-spacer"></div>';
+    var html = '<div class="view-toolbar">';
+    html += '<button type="button" class="toolbar-back" id="btn-form-back">' + Icon('chevron-left', 20) + 'Back</button>';
+    html += '<h2 class="toolbar-title">Barrel</h2>';
     html += '</div>';
 
-    html += '<form id="barrel-form" class="profile-form">';
+    html += '<div class="screen">';
+    html += '<form id="barrel-form">';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="br-twist-rate">Twist Rate <button class="help-btn" onclick="showHelp(\'twistRate\')" title="What is twist rate?">?</button></label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="br-twist-rate">Twist rate <button type="button" class="hint-btn" onclick="showHelp(\'twistRate\')" title="What is twist rate?">?</button></label>';
     html += '<input type="text" id="br-twist-rate" maxlength="20" placeholder="e.g., 1:10" value="' + escapeAttr(barrel ? barrel.twistRate : '') + '">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="br-twist-dir">Twist Direction</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="br-twist-dir">Twist direction</label>';
     html += '<select id="br-twist-dir">';
     html += '<option value="Right"' + (barrel && barrel.twistDirection === 'Right' ? ' selected' : '') + '>Right</option>';
     html += '<option value="Left"' + (barrel && barrel.twistDirection === 'Left' ? ' selected' : '') + '>Left</option>';
@@ -605,28 +594,26 @@ ProfileManager.prototype.showBarrelForm = function (rifleId, barrel) {
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="br-install-date">Install Date</label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="br-install-date">Install date</label>';
     html += '<input type="date" id="br-install-date" value="' + escapeAttr(barrel ? barrel.installDate : new Date().toISOString().split('T')[0]) + '">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="br-total-rounds">Total Rounds</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="br-total-rounds">Total rounds</label>';
     html += '<input type="number" id="br-total-rounds" min="0" step="1" inputmode="numeric" placeholder="0" value="' + (barrel ? (barrel.totalRounds || 0) : 0) + '">';
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="br-notes">Notes</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="br-notes">Notes</label>';
     html += '<textarea id="br-notes" rows="2" placeholder="Optional notes">' + escapeHtml(barrel ? barrel.notes : '') + '</textarea>';
     html += '</div>';
 
-    html += '<div class="btn-row">';
-    html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Barrel') + '</button>';
-    html += '</div>';
+    html += '<button type="submit" class="action-primary u-mt-14">' + (isEdit ? 'Save changes' : 'Create barrel') + '</button>';
 
     html += '</form>';
-    html += '</div>';
+    html += '</div>'; // close .screen
 
     this.container.innerHTML = html;
 
@@ -686,55 +673,54 @@ ProfileManager.prototype.showLoadForm = function (rifleId, loadId) {
 
 ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     var isEdit = !!load;
-    var title = isEdit ? 'Edit Load' : 'New Load';
+    var title = isEdit ? 'Edit load' : 'New load';
 
-    var html = '<div class="profile-screen">';
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-form-back">&lsaquo; Back</button>';
-    html += '<h2 class="profile-title">' + title + '</h2>';
-    html += '<div class="toolbar-spacer"></div>';
+    var html = '<div class="view-toolbar">';
+    html += '<button type="button" class="toolbar-back" id="btn-form-back">' + Icon('chevron-left', 20) + 'Back</button>';
+    html += '<h2 class="toolbar-title">' + title + '</h2>';
     html += '</div>';
 
-    html += '<form id="load-form" class="profile-form">';
+    html += '<div class="screen">';
+    html += '<form id="load-form">';
 
     // Ammo-box OCR scan (feature-gated; returns '' when off)
     if (typeof Onboarding !== 'undefined') {
         html += Onboarding.scanButtonHtml();
     }
 
-    html += '<div class="form-group">';
-    html += '<label for="ld-name">Load Name *</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-name">Load name *</label>';
     html += '<input type="text" id="ld-name" maxlength="80" placeholder="e.g., Hornady 168gr ELD-M" value="' + escapeAttr(load ? load.name : '') + '">';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="ld-lot">Lot Number</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-lot">Lot number</label>';
     html += '<input type="text" id="ld-lot" maxlength="40" placeholder="From the box flap — catches lot-to-lot velocity shifts" value="' + escapeAttr(load && load.lotNumber ? load.lotNumber : '') + '">';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="ld-bullet-name">Bullet Name</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-bullet-name">Bullet name</label>';
     html += '<input type="text" id="ld-bullet-name" maxlength="80" placeholder="e.g., ELD Match" value="' + escapeAttr(load ? load.bulletName : '') + '">';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-bullet-weight">Weight (gr) *</label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-bullet-weight">Weight <span class="field-unit">gr</span> *</label>';
     html += '<input type="number" id="ld-bullet-weight" min="1" max="1000" step="0.1" inputmode="decimal" placeholder="168" value="' + (load && load.bulletWeight ? load.bulletWeight : '') + '">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-bullet-dia">Diameter (in) *</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-bullet-dia">Diameter <span class="field-unit">in</span> *</label>';
     html += '<input type="number" id="ld-bullet-dia" min="0.1" max="1.0" step="0.001" inputmode="decimal" placeholder="0.308" value="' + (load && load.bulletDiameter ? load.bulletDiameter : '') + '">';
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-bullet-bc">BC <button class="help-btn" onclick="showHelp(\'bc\')" title="What is BC?">?</button></label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-bullet-bc">BC <button type="button" class="hint-btn" onclick="showHelp(\'bc\')" title="What is BC?">?</button></label>';
     html += '<input type="number" id="ld-bullet-bc" min="0" max="2" step="0.001" inputmode="decimal" placeholder="0.462" value="' + (load && load.bulletBC ? load.bulletBC : '') + '">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-drag-model">Drag Model <button class="help-btn" onclick="showHelp(\'dragModel\')" title="What is drag model?">?</button></label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-drag-model">Drag model <button type="button" class="hint-btn" onclick="showHelp(\'dragModel\')" title="What is drag model?">?</button></label>';
     html += '<select id="ld-drag-model">';
     html += '<option value="G1"' + (load && load.dragModel === 'G1' ? ' selected' : '') + '>G1</option>';
     html += '<option value="G7"' + (load && load.dragModel === 'G7' ? ' selected' : '') + '>G7</option>';
@@ -742,14 +728,14 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-mv">Muzzle Velocity (fps)</label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-mv">Muzzle velocity <span class="field-unit">fps</span></label>';
     html += '<input type="number" id="ld-mv" min="0" max="5000" step="1" inputmode="numeric" placeholder="2650" value="' + (load && load.muzzleVelocity ? load.muzzleVelocity : '') + '">';
-    html += '<p class="chrono-hint">BC + muzzle velocity are needed for the Solver — leave blank if unknown.</p>';
+    html += '<p class="field-hint">BC and muzzle velocity are needed for the Solver — leave blank if unknown</p>';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="ld-bullet-len">Bullet Length (in)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-bullet-len">Bullet length <span class="field-unit">in</span></label>';
     html += '<input type="number" id="ld-bullet-len" min="0" max="3" step="0.001" inputmode="decimal" placeholder="1.275" value="' + (load && load.bulletLength ? load.bulletLength : '') + '">';
     html += '</div>';
     html += '</div>';
@@ -758,43 +744,44 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench')) {
         var rec = (load && load.recipe) || {};
         var rb = rec.brass || {}, rp = rec.primer || {}, rw = rec.powder || {}, ru = rec.bullet || {};
-        html += '<details class="session-details" style="margin:0 0 12px;"' + (load && load.recipe ? ' open' : '') + '>';
-        html += '<summary class="session-details-summary">Recipe (handload)</summary>';
-        html += '<div class="session-details-body" style="padding:8px 0 0;">';
-        html += '<div class="form-row">';
-        html += '<div class="form-group form-group-half"><label for="rc-brass">Brass</label><input type="text" id="rc-brass" list="mem-brass" maxlength="40" placeholder="Lapua" value="' + escapeAttr(rb.make || '') + '"></div>';
-        html += '<div class="form-group form-group-half"><label for="rc-brass-lot">Brass lot · fired</label><div style="display:flex;gap:6px;"><input type="text" id="rc-brass-lot" maxlength="20" placeholder="lot" value="' + escapeAttr(rb.lot || '') + '" style="flex:1;"><input type="number" id="rc-brass-fired" min="0" step="1" placeholder="0" value="' + (typeof rb.timesFired === 'number' ? rb.timesFired : '') + '" style="width:70px;"></div></div>';
+        html += '<details class="fold u-mb-12"' + (load && load.recipe ? ' open' : '') + '>';
+        html += '<summary>Recipe (handload)</summary>';
+        html += '<div class="fold-body">';
+        html += '<div class="field-row">';
+        html += '<div class="field"><label class="field-label" for="rc-brass">Brass</label><input type="text" id="rc-brass" list="mem-brass" maxlength="40" placeholder="Lapua" value="' + escapeAttr(rb.make || '') + '"></div>';
+        html += '<div class="field"><label class="field-label" for="rc-brass-lot">Lot</label><input type="text" id="rc-brass-lot" maxlength="20" placeholder="lot" value="' + escapeAttr(rb.lot || '') + '"></div>';
+        html += '<div class="field"><label class="field-label" for="rc-brass-fired">Fired</label><input type="number" id="rc-brass-fired" min="0" step="1" placeholder="0" value="' + (typeof rb.timesFired === 'number' ? rb.timesFired : '') + '"></div>';
         html += '</div>';
-        html += '<div class="form-row">';
-        html += '<div class="form-group form-group-half"><label for="rc-primer">Primer</label><input type="text" id="rc-primer" list="mem-primer" maxlength="40" placeholder="CCI BR-2" value="' + escapeAttr(rp.make || '') + '"></div>';
-        html += '<div class="form-group form-group-half"><label for="rc-primer-lot">Primer lot</label><input type="text" id="rc-primer-lot" maxlength="20" value="' + escapeAttr(rp.lot || '') + '"></div>';
+        html += '<div class="field-row">';
+        html += '<div class="field"><label class="field-label" for="rc-primer">Primer</label><input type="text" id="rc-primer" list="mem-primer" maxlength="40" placeholder="CCI BR-2" value="' + escapeAttr(rp.make || '') + '"></div>';
+        html += '<div class="field"><label class="field-label" for="rc-primer-lot">Primer lot</label><input type="text" id="rc-primer-lot" maxlength="20" value="' + escapeAttr(rp.lot || '') + '"></div>';
         html += '</div>';
-        html += '<div class="form-row">';
-        html += '<div class="form-group form-group-half"><label for="rc-powder">Powder · charge (gr)</label><div style="display:flex;gap:6px;"><input type="text" id="rc-powder" list="mem-powder" maxlength="40" placeholder="H4350" value="' + escapeAttr(rw.make || '') + '" style="flex:1;"><input type="number" id="rc-charge" min="0" max="150" step="0.1" placeholder="41.8" value="' + (typeof rw.chargeGr === 'number' ? rw.chargeGr : '') + '" style="width:80px;"></div></div>';
-        html += '<div class="form-group form-group-half"><label for="rc-powder-lot">Powder LOT</label><input type="text" id="rc-powder-lot" maxlength="20" placeholder="matters: 30-60 fps between lots" value="' + escapeAttr(rw.lot || '') + '"></div>';
+        html += '<div class="field-row">';
+        html += '<div class="field"><label class="field-label" for="rc-powder">Powder</label><input type="text" id="rc-powder" list="mem-powder" maxlength="40" placeholder="H4350" value="' + escapeAttr(rw.make || '') + '"></div>';
+        html += '<div class="field"><label class="field-label" for="rc-charge">Charge <span class="field-unit">gr</span></label><input type="number" id="rc-charge" min="0" max="150" step="0.1" placeholder="41.8" value="' + (typeof rw.chargeGr === 'number' ? rw.chargeGr : '') + '"></div>';
+        html += '<div class="field"><label class="field-label" for="rc-powder-lot">Powder lot</label><input type="text" id="rc-powder-lot" maxlength="20" placeholder="matters: 30-60 fps between lots" value="' + escapeAttr(rw.lot || '') + '"></div>';
         html += '</div>';
-        html += '<div class="form-row">';
-        html += '<div class="form-group form-group-half"><label for="rc-bullet">Bullet make · lot</label><div style="display:flex;gap:6px;"><input type="text" id="rc-bullet" list="mem-bullet" maxlength="40" placeholder="Berger" value="' + escapeAttr(ru.make || '') + '" style="flex:1;"><input type="text" id="rc-bullet-lot" maxlength="20" placeholder="lot" value="' + escapeAttr(ru.lot || '') + '" style="width:80px;"></div></div>';
-        html += '<div class="form-group form-group-half"><label for="rc-seating">Seating depth (in)</label><input type="number" id="rc-seating" min="0" max="5" step="0.001" placeholder="2.810 CBTO" value="' + (typeof rec.seatingDepthIn === 'number' ? rec.seatingDepthIn : '') + '"></div>';
+        html += '<div class="field-row">';
+        html += '<div class="field"><label class="field-label" for="rc-bullet">Bullet make</label><input type="text" id="rc-bullet" list="mem-bullet" maxlength="40" placeholder="Berger" value="' + escapeAttr(ru.make || '') + '"></div>';
+        html += '<div class="field"><label class="field-label" for="rc-bullet-lot">Bullet lot</label><input type="text" id="rc-bullet-lot" maxlength="20" placeholder="lot" value="' + escapeAttr(ru.lot || '') + '"></div>';
         html += '</div>';
+        html += '<div class="field"><label class="field-label" for="rc-seating">Seating depth <span class="field-unit">in</span></label><input type="number" id="rc-seating" min="0" max="5" step="0.001" placeholder="2.810 CBTO" value="' + (typeof rec.seatingDepthIn === 'number' ? rec.seatingDepthIn : '') + '"></div>';
         html += '<datalist id="mem-brass"></datalist><datalist id="mem-primer"></datalist><datalist id="mem-powder"></datalist><datalist id="mem-bullet"></datalist>';
         html += '</div></details>';
     }
 
-    html += '<div class="form-group">';
-    html += '<label for="ld-notes">Notes</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="ld-notes">Notes</label>';
     html += '<textarea id="ld-notes" rows="2" placeholder="Optional notes">' + escapeHtml(load ? load.notes : '') + '</textarea>';
     html += '</div>';
 
-    html += '<div class="btn-row">';
+    html += '<button type="submit" class="action-primary u-mt-14">' + (isEdit ? 'Save changes' : 'Create load') + '</button>';
     if (isEdit) {
-        html += '<button type="button" class="btn btn-danger" id="btn-delete-load">Delete Load</button>';
+        html += '<button type="button" class="action-danger u-full u-mt-10" id="btn-delete-load">Delete load</button>';
     }
-    html += '<button type="submit" class="btn btn-primary">' + (isEdit ? 'Save Changes' : 'Create Load') + '</button>';
-    html += '</div>';
 
     html += '</form>';
-    html += '</div>';
+    html += '</div>'; // close .screen
 
     this.container.innerHTML = html;
     this._bindLoadFormEvents(rifleId, load);
@@ -953,7 +940,7 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
 /**
  * F10 — the load-development logbook: every session (ladder tests
  * called out), every confirmed chrono string, in date order, with the
- * best group starred. A view over existing data — the binder they
+ * best group marked. A view over existing data — the binder they
  * always meant to keep, kept for them.
  */
 ProfileManager.prototype._renderLoadLogbook = function (rifleId, load) {
@@ -969,7 +956,7 @@ ProfileManager.prototype._renderLoadLogbook = function (rifleId, load) {
             return s.loadId === load.id && s.assignmentStatus === 'confirmed';
         });
 
-        // Best (smallest) eligible group gets the star
+        // Best (smallest) eligible group gets the mark
         var bestId = null, bestMOA = Infinity;
         sessions.forEach(function (s) {
             if (s.results && typeof s.results.groupSizeMOA === 'number' &&
@@ -982,39 +969,56 @@ ProfileManager.prototype._renderLoadLogbook = function (rifleId, load) {
         var entries = [];
         sessions.forEach(function (s) {
             var isLadder = s.sessionType === 'ladder' && s.ladder;
-            var text;
             if (isLadder) {
-                text = '🧪 Ladder — ' + (s.ladder.sentence || 'series recorded');
+                entries.push({
+                    date: s.date || '',
+                    icon: 'flask',
+                    text: 'Ladder — ' + (s.ladder.sentence || 'series recorded')
+                });
             } else {
-                text = '🎯 Group — ' + (s.results && typeof s.results.groupSizeMOA === 'number'
-                    ? formatNum(s.results.groupSizeMOA, 2) + ' MOA · ' + (s.impacts ? s.impacts.length : 0) + ' shots'
-                    : 'session') + (s.id === bestId ? ' ★ best' : '');
+                entries.push({
+                    date: s.date || '',
+                    icon: 'target',
+                    text: 'Group — ' + (s.results && typeof s.results.groupSizeMOA === 'number'
+                        ? formatNum(s.results.groupSizeMOA, 2) + ' MOA · ' + (s.impacts ? s.impacts.length : 0) + ' shots'
+                        : 'session'),
+                    best: s.id === bestId
+                });
             }
-            entries.push({ date: s.date || '', text: text });
         });
         strings.forEach(function (s) {
             entries.push({
                 date: s.date || '',
-                text: '📥 String — avg ' + formatNum(s.avgFps, 0) + ' · SD ' + formatNum(s.sdFps, 1) +
-                    (s.lotNumber ? ' · lot ' + s.lotNumber : '') +
-                    (s.config === 'suppressed' ? ' · 🔇' : '')
+                icon: 'import',
+                text: 'String — avg ' + formatNum(s.avgFps, 0) + ' · SD ' + formatNum(s.sdFps, 1) +
+                    (s.lotNumber ? ' · lot ' + s.lotNumber : ''),
+                suppressed: s.config === 'suppressed'
             });
         });
         entries.sort(function (a, b) { return b.date.localeCompare(a.date); });
 
         if (!entries.length) {
-            el.innerHTML = '<p class="empty-state-sub" style="padding:0;">Nothing logged with this load yet — sessions and chrono strings will assemble here by themselves.</p>';
+            el.innerHTML = '<p class="t-body u-quiet">Nothing logged with this load yet — sessions and chrono strings will assemble here by themselves.</p>';
             return;
         }
-        var html = '<ul class="chrono-string-list" style="margin:0;">';
+        var html = '';
         entries.forEach(function (e) {
-            var when = e.date ? new Date(e.date).toLocaleDateString() : '—';
-            html += '<li><span class="chrono-hint">' + when + '</span> &nbsp;' + escapeHtml(e.text) + '</li>';
+            var when = e.date ? new Date(e.date).toLocaleDateString() : '&mdash;';
+            html += '<div class="row-item">';
+            html += Icon(e.icon, 18, 'u-quiet');
+            html += '<div class="row-main">';
+            html += '<div class="row-title">' + escapeHtml(e.text) +
+                (e.suppressed ? ' ' + Icon('sound-off', 14, 'u-quiet') : '') + '</div>';
+            html += '<div class="row-sub">' + when + '</div>';
+            html += '</div>';
+            if (e.best) {
+                html += '<div class="row-aside"><span class="chip is-go">' + Icon('star', 14) + 'Best</span></div>';
+            }
+            html += '</div>';
         });
-        html += '</ul>';
         el.innerHTML = html;
     }).catch(function () {
-        el.innerHTML = '<p class="chrono-hint" style="margin:0;">Could not load the development log.</p>';
+        el.innerHTML = '<p class="t-body u-quiet">Could not load the development log.</p>';
     });
 };
 
@@ -1027,45 +1031,47 @@ ProfileManager.prototype.showLoadDetail = function (rifleId, loadId) {
 };
 
 ProfileManager.prototype._renderLoadDetail = function (rifleId, load) {
-    var html = '<div class="profile-screen">';
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-form-back">&lsaquo; Back</button>';
-    html += '<h2 class="profile-title">' + escapeHtml(load.name) + '</h2>';
-    html += '<button class="btn-icon" id="btn-edit-load" title="Edit">&#9998;</button>';
+    var html = '<div class="view-toolbar">';
+    html += '<button type="button" class="toolbar-back" id="btn-form-back">' + Icon('chevron-left', 20) + 'Back</button>';
+    html += '<h2 class="toolbar-title">' + escapeHtml(load.name) + '</h2>';
+    html += '<button type="button" class="toolbar-act" id="btn-edit-load" title="Edit" aria-label="Edit load">' + Icon('pencil', 20) + '</button>';
     html += '</div>';
 
-    html += '<div class="detail-card">';
+    html += '<div class="screen">';
+
+    // Spec card
+    html += '<div class="plate">';
     if (load.bulletName) {
-        html += '<div class="detail-row"><span class="detail-label">Bullet</span><span class="detail-value">' + escapeHtml(load.bulletName) + '</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Bullet</span><span class="spec-val">' + escapeHtml(load.bulletName) + '</span></div>';
     }
-    html += '<div class="detail-row"><span class="detail-label">Weight</span><span class="detail-value">' + load.bulletWeight + ' gr</span></div>';
-    html += '<div class="detail-row"><span class="detail-label">Diameter</span><span class="detail-value">' + load.bulletDiameter + '"</span></div>';
+    html += '<div class="spec-row"><span class="spec-key">Weight</span><span class="spec-val">' + load.bulletWeight + ' gr</span></div>';
+    html += '<div class="spec-row"><span class="spec-key">Diameter</span><span class="spec-val">' + load.bulletDiameter + '&Prime;</span></div>';
     if (load.bulletBC) {
-        html += '<div class="detail-row"><span class="detail-label">BC (' + load.dragModel + ')</span><span class="detail-value">' + load.bulletBC + '</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">BC (' + load.dragModel + ')</span><span class="spec-val">' + load.bulletBC + '</span></div>';
     }
     if (load.muzzleVelocity) {
-        html += '<div class="detail-row"><span class="detail-label">Muzzle Velocity</span><span class="detail-value">' + load.muzzleVelocity + ' fps</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Muzzle velocity</span><span class="spec-val">' + load.muzzleVelocity + ' fps</span></div>';
     }
     if (load.bulletLength) {
-        html += '<div class="detail-row"><span class="detail-label">Bullet Length</span><span class="detail-value">' + load.bulletLength + '"</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Bullet length</span><span class="spec-val">' + load.bulletLength + '&Prime;</span></div>';
     }
     if (load.lotNumber) {
-        html += '<div class="detail-row"><span class="detail-label">Lot</span><span class="detail-value">' + escapeHtml(load.lotNumber) + '</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Lot</span><span class="spec-val">' + escapeHtml(load.lotNumber) + '</span></div>';
     }
     if (load.notes) {
-        html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(load.notes) + '</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Notes</span><span class="spec-val">' + escapeHtml(load.notes) + '</span></div>';
     }
     html += '</div>';
 
     // Recipe block (bench)
     if (load.recipe) {
         var rec = load.recipe;
-        html += '<div class="detail-card">';
-        html += '<h4 style="margin:0 0 6px;">Recipe</h4>';
+        html += '<div class="qcard-kicker">Recipe</div>';
+        html += '<div class="plate">';
         var recRows = [
             ['Brass', rec.brass && rec.brass.make ? rec.brass.make +
                 (rec.brass.lot ? ' · lot ' + rec.brass.lot : '') +
-                (typeof rec.brass.timesFired === 'number' ? ' · fired ' + rec.brass.timesFired + '×' : '') : null],
+                (typeof rec.brass.timesFired === 'number' ? ' · fired ' + rec.brass.timesFired + 'x' : '') : null],
             ['Primer', rec.primer && rec.primer.make ? rec.primer.make + (rec.primer.lot ? ' · lot ' + rec.primer.lot : '') : null],
             ['Powder', rec.powder && rec.powder.make ? rec.powder.make +
                 (typeof rec.powder.chargeGr === 'number' ? ' · ' + rec.powder.chargeGr + ' gr' : '') +
@@ -1075,8 +1081,8 @@ ProfileManager.prototype._renderLoadDetail = function (rifleId, load) {
         ];
         recRows.forEach(function (row) {
             if (row[1]) {
-                html += '<div class="detail-row"><span class="detail-label">' + row[0] +
-                    '</span><span class="detail-value">' + escapeHtml(row[1]) + '</span></div>';
+                html += '<div class="spec-row"><span class="spec-key">' + row[0] +
+                    '</span><span class="spec-val">' + escapeHtml(row[1]) + '</span></div>';
             }
         });
         html += '</div>';
@@ -1084,17 +1090,13 @@ ProfileManager.prototype._renderLoadDetail = function (rifleId, load) {
 
     // Development logbook (bench) — the binder, kept for them
     if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench')) {
-        html += '<div class="detail-section"><div class="detail-section-header">';
-        html += '<h3 class="detail-section-title">Development Log</h3></div>';
-        html += '<div class="detail-card" id="load-logbook"><p class="chrono-hint" style="margin:0;">Loading…</p></div>';
-        html += '</div>';
+        html += '<div class="qcard-kicker">Development log</div>';
+        html += '<div id="load-logbook"><p class="t-body u-quiet">Loading&hellip;</p></div>';
     }
 
-    html += '<div class="btn-row" style="padding: 0 16px;">';
-    html += '<button class="btn btn-danger" id="btn-delete-load">Delete Load</button>';
-    html += '</div>';
+    html += '<button type="button" class="action-danger u-full u-mt-14" id="btn-delete-load">Delete load</button>';
 
-    html += '</div>';
+    html += '</div>'; // close .screen
 
     this.container.innerHTML = html;
 

@@ -1,8 +1,11 @@
 /**
  * history.js — Session history, cleaning logs, scope adjustments.
  *
+ * Render layer emits the REDESIGN-SPEC vocabulary (css/ui.css):
+ * view toolbars + .screen wrappers, .row-item lists grouped under
+ * .month-label dividers, verdict-first session detail (.plate hero,
+ * .stat-strip, .fold sections), teaching empty states.
  * Renders into the ProfileManager's container (#view-profiles).
- * Navigated to from rifle detail view in profiles.
  */
 
 function HistoryManager(db, profileManager) {
@@ -10,6 +13,74 @@ function HistoryManager(db, profileManager) {
     this.profileManager = profileManager;
     this._thumbnailUrls = [];
 }
+
+// ── Shared render helpers ───────────────────────────────────────
+
+/**
+ * View toolbar: back chevron + label, title.
+ * @param {string} backId - element id for the back button
+ * @param {string} backLabel - already-escaped label text
+ * @param {string} title - already-escaped title text
+ */
+HistoryManager.prototype._toolbarHtml = function (backId, backLabel, title) {
+    var html = '<div class="view-toolbar">';
+    html += '<button class="toolbar-back" id="' + backId + '">' + Icon('chevron-left', 22) + '<span>' + backLabel + '</span></button>';
+    html += '<h2 class="toolbar-title">' + title + '</h2>';
+    html += '</div>';
+    return html;
+};
+
+/**
+ * Month divider label for a session date, e.g. "JULY 2026".
+ */
+HistoryManager.prototype._monthLabel = function (dateStr) {
+    if (!dateStr) return 'Undated';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Undated';
+    return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }).toUpperCase();
+};
+
+/**
+ * Session rows grouped by month with .month-label dividers.
+ * Rows are buttons carrying data-session-id; thumbnails load async.
+ */
+HistoryManager.prototype._sessionRowsHtml = function (sessions) {
+    var html = '';
+    var lastLabel = null;
+
+    for (var i = 0; i < sessions.length; i++) {
+        var s = sessions[i];
+        var label = this._monthLabel(s.date);
+        if (label !== lastLabel) {
+            html += '<div class="month-label">' + escapeHtml(label) + '</div>';
+            lastLabel = label;
+        }
+
+        var dateStr = s.date ? new Date(s.date).toLocaleDateString() : 'Unknown date';
+        var groupStr = s.results && s.results.groupSizeMOA != null
+            ? formatFixed(s.results.groupSizeMOA, 2) + ' MOA'
+            : '&mdash;';
+        var shotCount = s.impacts ? s.impacts.length : 0;
+
+        html += '<button type="button" class="row-item" data-session-id="' + escapeAttr(s.id) + '">';
+        html += '<img class="thumb" data-session-id="' + escapeAttr(s.id) + '" alt="">';
+        html += '<div class="row-main">';
+        html += '<div class="row-title">' + shotCount + ' shots &middot; ' + formatNum(s.distanceYards, 0) + ' yd</div>';
+        html += '<div class="row-sub">' + escapeHtml(dateStr) + '</div>';
+        html += '</div>';
+        html += '<div class="row-aside">' + groupStr + '</div>';
+        html += '</button>';
+    }
+
+    return html;
+};
+
+/**
+ * One key/value spec row.
+ */
+HistoryManager.prototype._specRow = function (key, valHtml) {
+    return '<div class="spec-row"><span class="spec-key">' + key + '</span><span class="spec-val">' + valHtml + '</span></div>';
+};
 
 // ── Session List ────────────────────────────────────────────────
 
@@ -36,40 +107,17 @@ HistoryManager.prototype.showSessionList = function (rifleId) {
 
 HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
     var container = this.profileManager.container;
-    var html = '<div class="profile-screen">';
 
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-history-back">&lsaquo; ' + escapeHtml(rifle.name) + '</button>';
-    html += '<h2 class="profile-title">Session History</h2>';
-    html += '<div class="toolbar-spacer"></div>';
-    html += '</div>';
+    var html = this._toolbarHtml('btn-history-back', escapeHtml(rifle.name), 'History');
+    html += '<div class="screen">';
 
     if (sessions.length === 0) {
-        html += '<div class="empty-state">';
-        html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
-        html += '<p class="empty-state-text">No sessions yet</p>';
-        html += '<p class="empty-state-sub">Check a target from Home and save it — every session is remembered here, photo and all.</p>';
+        html += '<div class="empty-teach">';
+        html += '<p>Check a target from Home and the session lands here, photo and all.</p>';
+        html += '<button class="action-primary" id="btn-history-start">' + Icon('camera', 20) + 'Check a target</button>';
         html += '</div>';
     } else {
-        html += '<div class="profile-list">';
-        for (var i = 0; i < sessions.length; i++) {
-            var s = sessions[i];
-            var dateStr = s.date ? new Date(s.date).toLocaleDateString() : 'Unknown date';
-            var groupStr = s.results && s.results.groupSizeMOA != null
-                ? formatFixed(s.results.groupSizeMOA, 2) + ' MOA'
-                : '—';
-            var shotCount = s.impacts ? s.impacts.length : 0;
-
-            html += '<div class="profile-card session-card" data-session-id="' + escapeAttr(s.id) + '">';
-            html += '<img class="session-thumbnail" data-session-id="' + escapeAttr(s.id) + '">';
-            html += '<div class="profile-card-main">';
-            html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + formatNum(s.distanceYards, 0) + ' yds</span>';
-            html += '<span class="profile-card-sub">' + shotCount + ' shots &middot; ES: ' + groupStr + '</span>';
-            html += '</div>';
-            html += '<span class="profile-card-arrow">&rsaquo;</span>';
-            html += '</div>';
-        }
-        html += '</div>';
+        html += this._sessionRowsHtml(sessions);
     }
 
     html += '</div>';
@@ -81,9 +129,16 @@ HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
         self.profileManager.showRifleDetail(rifle.id);
     });
 
-    var cards = container.querySelectorAll('.session-card');
-    for (var i = 0; i < cards.length; i++) {
-        cards[i].addEventListener('click', function () {
+    var startBtn = document.getElementById('btn-history-start');
+    if (startBtn) {
+        startBtn.addEventListener('click', function () {
+            if (window.AppNav) window.AppNav.go('session');
+        });
+    }
+
+    var rows = container.querySelectorAll('.row-item[data-session-id]');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].addEventListener('click', function () {
             var sid = this.getAttribute('data-session-id');
             self.showSessionDetail(sid, rifle.id);
         });
@@ -102,109 +157,103 @@ HistoryManager.prototype.showSessionDetail = function (sessionId, rifleId) {
     });
 };
 
-HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
-    var container = this.profileManager.container;
+/**
+ * Verdict-first session detail body (shared by rifle and misc detail):
+ * hero plate (GROUP SIZE), stat strip, "All stats" fold, "Session
+ * details" fold, annotated image plate, save/share actions, delete.
+ */
+HistoryManager.prototype._sessionDetailBodyHtml = function (session) {
     var r = session.results;
-    var dateStr = session.date ? new Date(session.date).toLocaleDateString() : 'Unknown date';
+    var shotCount = session.impacts ? session.impacts.length : 0;
+    var html = '';
 
-    var html = '<div class="profile-screen">';
-
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-session-detail-back">&lsaquo; History</button>';
-    html += '<h2 class="profile-title">' + escapeHtml(dateStr) + '</h2>';
-    html += '<div class="toolbar-spacer"></div>';
-    html += '</div>';
-
-    // Results card
+    // Hero: the verdict number first
     if (r) {
-        html += '<div class="detail-card">';
-        html += '<div class="detail-row"><span class="detail-label">Distance</span><span class="detail-value">' + formatNum(session.distanceYards, 0) + ' yds</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Shots</span><span class="detail-value">' + (session.impacts ? session.impacts.length : 0) + '</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Extreme Spread</span><span class="detail-value">' + formatFixed(r.groupSizeInches, 3) + '&quot; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Mean Radius</span><span class="detail-value">' + formatFixed(r.meanRadiusInches, 3) + '&quot; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Vertical Spread</span><span class="detail-value">' + formatFixed(r.verticalSpreadInches, 3) + '&quot;</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Horizontal Spread</span><span class="detail-value">' + formatFixed(r.horizontalSpreadInches, 3) + '&quot;</span></div>';
+        html += '<div class="plate">';
+        html += '<div class="instrument">';
+        html += '<div class="instrument-label">Group size</div>';
+        html += '<div class="instrument-value t-display">' + formatFixed(r.groupSizeMOA, 2) + '<span class="instrument-unit">MOA</span></div>';
+        html += '</div>';
+        html += '<div class="t-micro u-mt-10">' + formatFixed(r.groupSizeInches, 3) + '&Prime; &middot; ' + shotCount + ' shots at ' + formatNum(session.distanceYards, 0) + ' yd</div>';
+
+        html += '<div class="stat-strip">';
+        html += '<div class="instrument"><div class="instrument-label">Mean radius</div><div class="instrument-value">' + formatFixed(r.meanRadiusMOA, 2) + '<span class="instrument-unit">MOA</span></div></div>';
+        html += '<div class="instrument"><div class="instrument-label">Vertical</div><div class="instrument-value">' + formatFixed(r.verticalSpreadInches, 2) + '<span class="instrument-unit">in</span></div></div>';
+        html += '<div class="instrument"><div class="instrument-label">Horizontal</div><div class="instrument-value">' + formatFixed(r.horizontalSpreadInches, 2) + '<span class="instrument-unit">in</span></div></div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Remaining stats: offsets + advanced, one quiet fold
+        var statRows = '';
         if (r.elevationOffsetMOA != null) {
-            var elevSign = r.elevationOffsetInches >= 0 ? 'High' : 'Low';
-            html += '<div class="detail-row"><span class="detail-label">Elevation Offset</span><span class="detail-value">' + formatFixed(Math.abs(r.elevationOffsetInches), 3) + '&quot; ' + elevSign + '</span></div>';
+            var elevSign = r.elevationOffsetInches >= 0 ? 'high' : 'low';
+            statRows += this._specRow('Elevation offset', formatFixed(Math.abs(r.elevationOffsetInches), 3) + '&Prime; ' + elevSign);
         }
         if (r.windageOffsetMOA != null) {
-            var windSign = r.windageOffsetInches >= 0 ? 'Right' : 'Left';
-            html += '<div class="detail-row"><span class="detail-label">Windage Offset</span><span class="detail-value">' + formatFixed(Math.abs(r.windageOffsetInches), 3) + '&quot; ' + windSign + '</span></div>';
+            var windSign = r.windageOffsetInches >= 0 ? 'right' : 'left';
+            statRows += this._specRow('Windage offset', formatFixed(Math.abs(r.windageOffsetInches), 3) + '&Prime; ' + windSign);
         }
-
-        // Advanced Stats (collapsible)
         if (r.cepInches != null) {
-            html += '<details class="session-details" style="margin-top:8px;">';
-            html += '<summary class="session-details-summary">Advanced Stats</summary>';
-            html += '<div class="session-details-body">';
-            html += '<div class="detail-row"><span class="detail-label">CEP (50%)</span><span class="detail-value">' + formatFixed(r.cepInches, 3) + '&quot; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span></div>';
-            html += '<div class="detail-row"><span class="detail-label">Radial SD</span><span class="detail-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span></div>';
-            html += '<div class="detail-row"><span class="detail-label">Vertical SD</span><span class="detail-value">' + formatFixed(r.verticalSDInches, 3) + '&quot; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA</span></div>';
-            html += '<div class="detail-row"><span class="detail-label">Horizontal SD</span><span class="detail-value">' + formatFixed(r.horizontalSDInches, 3) + '&quot; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA</span></div>';
-            var mElevSign = r.meanElevationInches >= 0 ? 'High' : 'Low';
-            html += '<div class="detail-row"><span class="detail-label">Mean Elevation</span><span class="detail-value">' + formatFixed(Math.abs(r.meanElevationInches), 3) + '&quot; ' + mElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA</span></div>';
-            var mWindSign = r.meanWindageInches >= 0 ? 'Right' : 'Left';
-            html += '<div class="detail-row"><span class="detail-label">Mean Windage</span><span class="detail-value">' + formatFixed(Math.abs(r.meanWindageInches), 3) + '&quot; ' + mWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA</span></div>';
-            html += '</div></details>';
+            statRows += this._specRow('CEP (50%)', formatFixed(r.cepInches, 3) + '&Prime; / ' + formatFixed(r.cepMOA, 2) + ' MOA');
+            statRows += this._specRow('Radial SD', formatFixed(r.radialSDInches, 3) + '&Prime; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA');
+            statRows += this._specRow('Vertical SD', formatFixed(r.verticalSDInches, 3) + '&Prime; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA');
+            statRows += this._specRow('Horizontal SD', formatFixed(r.horizontalSDInches, 3) + '&Prime; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA');
+            var mElevSign = r.meanElevationInches >= 0 ? 'high' : 'low';
+            statRows += this._specRow('Mean elevation', formatFixed(Math.abs(r.meanElevationInches), 3) + '&Prime; ' + mElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA');
+            var mWindSign = r.meanWindageInches >= 0 ? 'right' : 'left';
+            statRows += this._specRow('Mean windage', formatFixed(Math.abs(r.meanWindageInches), 3) + '&Prime; ' + mWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA');
         }
-
-        html += '</div>';
+        if (statRows) {
+            html += '<details class="fold"><summary>All stats</summary><div class="fold-body">' + statRows + '</div></details>';
+        }
     }
 
-    // Session details (collapsible)
-    html += '<details class="session-details">';
-    html += '<summary class="session-details-summary">Session Details</summary>';
-    html += '<div class="session-details-body">';
-    html += '<div class="detail-card">';
-
+    // Session details fold: bullet, rounds, velocity, weather
+    var detailRows = '';
     if (session.bulletDiameter) {
-        html += '<div class="detail-row"><span class="detail-label">Bullet Diameter</span><span class="detail-value">' + session.bulletDiameter + '&quot;</span></div>';
+        detailRows += this._specRow('Bullet diameter', session.bulletDiameter + '&Prime;');
     }
     if (session.roundsFired) {
-        html += '<div class="detail-row"><span class="detail-label">Rounds Fired</span><span class="detail-value">' + session.roundsFired + '</span></div>';
+        detailRows += this._specRow('Rounds fired', session.roundsFired);
     }
     if (session.measuredVelocity) {
-        html += '<div class="detail-row"><span class="detail-label">Measured Velocity</span><span class="detail-value">' + session.measuredVelocity + ' fps</span></div>';
+        detailRows += this._specRow('Measured velocity', session.measuredVelocity + ' fps');
     }
-
-    // Weather
     var w = session.weather;
     if (w) {
-        if (w.tempF != null) {
-            html += '<div class="detail-row"><span class="detail-label">Temperature</span><span class="detail-value">' + w.tempF + '&deg;F</span></div>';
-        }
-        if (w.humidity != null) {
-            html += '<div class="detail-row"><span class="detail-label">Humidity</span><span class="detail-value">' + w.humidity + '%</span></div>';
-        }
-        if (w.windMph != null) {
-            html += '<div class="detail-row"><span class="detail-label">Wind</span><span class="detail-value">' + w.windMph + ' mph' + (w.windDir ? ' ' + escapeHtml(w.windDir) : '') + '</span></div>';
-        }
-        if (w.altitudeFt != null) {
-            html += '<div class="detail-row"><span class="detail-label">Altitude</span><span class="detail-value">' + w.altitudeFt + ' ft</span></div>';
-        }
-        if (w.pressureInHg != null) {
-            html += '<div class="detail-row"><span class="detail-label">Pressure</span><span class="detail-value">' + w.pressureInHg + '&quot; Hg</span></div>';
-        }
+        if (w.tempF != null) detailRows += this._specRow('Temperature', w.tempF + '&deg;F');
+        if (w.humidity != null) detailRows += this._specRow('Humidity', w.humidity + '%');
+        if (w.windMph != null) detailRows += this._specRow('Wind', w.windMph + ' mph' + (w.windDir ? ' ' + escapeHtml(w.windDir) : ''));
+        if (w.altitudeFt != null) detailRows += this._specRow('Altitude', w.altitudeFt + ' ft');
+        if (w.pressureInHg != null) detailRows += this._specRow('Pressure', w.pressureInHg + '&Prime; Hg');
+    }
+    if (detailRows) {
+        html += '<details class="fold"><summary>Session details</summary><div class="fold-body">' + detailRows + '</div></details>';
     }
 
-    html += '</div></div></details>';
-
     // Annotated image
-    html += '<div class="session-image-container">';
-    html += '<p class="session-image-loading" id="session-image-loading">Loading image...</p>';
-    html += '<img class="session-full-image" id="session-full-image" style="display:none">';
+    html += '<div class="plate u-mt-14">';
+    html += '<p class="u-quiet" id="session-image-loading">Loading image&hellip;</p>';
+    html += '<img class="plate-img hidden" id="session-full-image" alt="Annotated target">';
     html += '</div>';
-    html += '<div class="btn-row" id="session-image-actions" style="display:none;padding:0 16px 8px;">';
-    html += '<button class="btn btn-secondary" id="btn-session-save-image">Save Image</button>';
-    html += '<button class="btn btn-secondary" id="btn-session-share-image">Share</button>';
-    html += '</div>';
-
-    // Delete button
-    html += '<div class="btn-row" style="padding: 16px;">';
-    html += '<button class="btn btn-danger" id="btn-delete-session">Delete Session</button>';
+    html += '<div class="action-row u-mt-10 hidden" id="session-image-actions">';
+    html += '<button class="action" id="btn-session-save-image">' + Icon('download', 18) + 'Save image</button>';
+    html += '<button class="action" id="btn-session-share-image">' + Icon('share', 18) + 'Share</button>';
     html += '</div>';
 
+    // Destructive action last, quiet outline
+    html += '<button class="action-danger u-full u-mt-14" id="btn-delete-session">' + Icon('trash', 18) + 'Delete session</button>';
+
+    return html;
+};
+
+HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
+    var container = this.profileManager.container;
+    var dateStr = session.date ? new Date(session.date).toLocaleDateString() : 'Unknown date';
+
+    var html = this._toolbarHtml('btn-session-detail-back', 'History', escapeHtml(dateStr));
+    html += '<div class="screen">';
+    html += this._sessionDetailBodyHtml(session);
     html += '</div>';
     container.innerHTML = html;
 
@@ -256,42 +305,38 @@ HistoryManager.prototype.showCleaningLog = function (rifleId, barrelId) {
 HistoryManager.prototype._renderCleaningLog = function (rifle, barrelId, logs, totalRounds, roundsSinceCleaning) {
     var container = this.profileManager.container;
 
-    var html = '<div class="profile-screen">';
+    var html = this._toolbarHtml('btn-cleaning-back', escapeHtml(rifle.name), 'Cleaning log');
+    html += '<div class="screen">';
 
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-cleaning-back">&lsaquo; ' + escapeHtml(rifle.name) + '</button>';
-    html += '<h2 class="profile-title">Cleaning Log</h2>';
-    html += '<button class="btn btn-sm btn-primary" id="btn-add-cleaning">+ Add</button>';
-    html += '</div>';
-
-    // Dashboard stats
-    html += '<div style="display:flex;gap:8px;padding:0 16px 12px;">';
-    html += '<div class="dashboard-stat"><span class="dashboard-stat-value">' + totalRounds + '</span><span class="dashboard-stat-label">Total Rounds</span></div>';
-    html += '<div class="dashboard-stat"><span class="dashboard-stat-value">' + roundsSinceCleaning + '</span><span class="dashboard-stat-label">Since Cleaning</span></div>';
+    // Barrel round-count instruments
+    html += '<div class="stat-strip">';
+    html += '<div class="instrument"><div class="instrument-label">Total rounds</div><div class="instrument-value">' + totalRounds + '</div></div>';
+    html += '<div class="instrument"><div class="instrument-label">Since cleaning</div><div class="instrument-value">' + roundsSinceCleaning + '</div></div>';
     html += '</div>';
 
     if (logs.length === 0) {
-        html += '<div class="empty-state">';
-        html += '<p class="empty-state-text">No cleaning entries</p>';
-        html += '<p class="empty-state-sub">Tap "+ Add" to log a cleaning</p>';
+        html += '<div class="empty-teach">';
+        html += '<p>Log each cleaning and yorT keeps an honest count of rounds since.</p>';
+        html += '<button class="action-primary" id="btn-add-cleaning">' + Icon('plus', 20) + 'Add cleaning</button>';
         html += '</div>';
     } else {
-        html += '<div class="profile-list">';
+        html += '<div class="u-mt-14">';
         for (var i = 0; i < logs.length; i++) {
             var log = logs[i];
             var dateStr = log.date ? new Date(log.date).toLocaleDateString() : 'Unknown date';
-            html += '<div class="log-entry" data-log-id="' + escapeAttr(log.id) + '">';
-            html += '<div class="log-entry-main">';
-            html += '<span class="log-entry-date">' + escapeHtml(dateStr) + '</span>';
-            html += '<span class="log-entry-detail">' + log.roundCountAtCleaning + ' rounds at cleaning</span>';
-            if (log.notes) {
-                html += '<span class="log-entry-detail">' + escapeHtml(log.notes) + '</span>';
-            }
+            var sub = escapeHtml(dateStr) + (log.notes ? ' &mdash; ' + escapeHtml(log.notes) : '');
+            html += '<div class="row-item" data-log-id="' + escapeAttr(log.id) + '">';
+            html += '<div class="row-main">';
+            html += '<div class="row-title">' + log.roundCountAtCleaning + ' rounds</div>';
+            html += '<div class="row-sub">' + sub + '</div>';
             html += '</div>';
-            html += '<button class="btn-icon btn-delete-log" data-log-id="' + escapeAttr(log.id) + '" title="Delete">&times;</button>';
+            html += '<div class="row-aside">';
+            html += '<button class="toolbar-act" data-log-id="' + escapeAttr(log.id) + '" aria-label="Delete entry">' + Icon('trash', 18) + '</button>';
+            html += '</div>';
             html += '</div>';
         }
         html += '</div>';
+        html += '<button class="action-primary u-mt-14" id="btn-add-cleaning">' + Icon('plus', 20) + 'Add cleaning</button>';
     }
 
     html += '</div>';
@@ -307,7 +352,7 @@ HistoryManager.prototype._renderCleaningLog = function (rifle, barrelId, logs, t
         self.showCleaningForm(rifle.id, barrelId);
     });
 
-    var delBtns = container.querySelectorAll('.btn-delete-log');
+    var delBtns = container.querySelectorAll('.toolbar-act[data-log-id]');
     for (var i = 0; i < delBtns.length; i++) {
         delBtns[i].addEventListener('click', function (e) {
             e.stopPropagation();
@@ -342,35 +387,28 @@ HistoryManager.prototype._renderCleaningForm = function (rifle, barrelId, totalR
     var container = this.profileManager.container;
     var today = new Date().toISOString().split('T')[0];
 
-    var html = '<div class="profile-screen">';
+    var html = this._toolbarHtml('btn-form-back', 'Back', 'Add cleaning');
+    html += '<div class="screen">';
 
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-form-back">&lsaquo; Back</button>';
-    html += '<h2 class="profile-title">Add Cleaning</h2>';
-    html += '<div class="toolbar-spacer"></div>';
-    html += '</div>';
+    html += '<form id="cleaning-form">';
 
-    html += '<form id="cleaning-form" class="profile-form">';
-
-    html += '<div class="form-group">';
-    html += '<label for="cl-date">Date</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="cl-date">Date</label>';
     html += '<input type="date" id="cl-date" value="' + today + '">';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="cl-rounds">Round Count at Cleaning</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="cl-rounds">Round count at cleaning</label>';
     html += '<input type="number" id="cl-rounds" min="0" step="1" inputmode="numeric" placeholder="' + totalRounds + '" value="' + totalRounds + '">';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="cl-notes">Notes</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="cl-notes">Notes</label>';
     html += '<textarea id="cl-notes" rows="2" placeholder="Optional notes"></textarea>';
     html += '</div>';
-    html += '<p id="cl-error" class="form-error"></p>';
+    html += '<p id="cl-error" class="field-error"></p>';
 
-    html += '<div class="btn-row">';
-    html += '<button type="submit" class="btn btn-primary">Save</button>';
-    html += '</div>';
+    html += '<button type="submit" class="action-primary u-mt-10">Save</button>';
 
     html += '</form>';
     html += '</div>';
@@ -428,42 +466,35 @@ HistoryManager.prototype.showScopeAdjustments = function (rifleId) {
 HistoryManager.prototype._renderScopeAdjustments = function (rifle, adjustments) {
     var container = this.profileManager.container;
 
-    var html = '<div class="profile-screen">';
-
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-scope-back">&lsaquo; ' + escapeHtml(rifle.name) + '</button>';
-    html += '<h2 class="profile-title">Scope Adjustments</h2>';
-    html += '<button class="btn btn-sm btn-primary" id="btn-add-scope-adj">+ Add</button>';
-    html += '</div>';
+    var html = this._toolbarHtml('btn-scope-back', escapeHtml(rifle.name), 'Scope adjustments');
+    html += '<div class="screen">';
 
     if (adjustments.length === 0) {
-        html += '<div class="empty-state">';
-        html += '<p class="empty-state-text">No scope adjustments</p>';
-        html += '<p class="empty-state-sub">Tap "+ Add" to log a scope change</p>';
+        html += '<div class="empty-teach">';
+        html += '<p>Log every turret change and yorT keeps a paper trail of where your zero has moved.</p>';
+        html += '<button class="action-primary" id="btn-add-scope-adj">' + Icon('plus', 20) + 'Add adjustment</button>';
         html += '</div>';
     } else {
-        html += '<div class="profile-list">';
         for (var i = 0; i < adjustments.length; i++) {
             var adj = adjustments[i];
             var dateStr = adj.date ? new Date(adj.date).toLocaleDateString() : 'Unknown date';
-            var elevDir = adj.elevationChange >= 0 ? 'Up' : 'Down';
-            var windDir = adj.windageChange >= 0 ? 'Right' : 'Left';
+            var elevDir = adj.elevationChange >= 0 ? 'UP' : 'DOWN';
+            var windDir = adj.windageChange >= 0 ? 'RIGHT' : 'LEFT';
+            var title = formatFixed(Math.abs(adj.elevationChange), 2) + ' MOA ' + elevDir +
+                ' &middot; ' + formatFixed(Math.abs(adj.windageChange), 2) + ' MOA ' + windDir;
+            var sub = escapeHtml(dateStr) + (adj.reason ? ' &mdash; ' + escapeHtml(adj.reason) : '');
 
-            html += '<div class="log-entry" data-adj-id="' + escapeAttr(adj.id) + '">';
-            html += '<div class="log-entry-main">';
-            html += '<span class="log-entry-date">' + escapeHtml(dateStr) + '</span>';
-            html += '<span class="log-entry-detail">';
-            html += elevDir + ' ' + formatFixed(Math.abs(adj.elevationChange), 2) + ' MOA, ';
-            html += windDir + ' ' + formatFixed(Math.abs(adj.windageChange), 2) + ' MOA';
-            html += '</span>';
-            if (adj.reason) {
-                html += '<span class="log-entry-detail">' + escapeHtml(adj.reason) + '</span>';
-            }
+            html += '<div class="row-item" data-adj-id="' + escapeAttr(adj.id) + '">';
+            html += '<div class="row-main">';
+            html += '<div class="row-title">' + title + '</div>';
+            html += '<div class="row-sub">' + sub + '</div>';
             html += '</div>';
-            html += '<button class="btn-icon btn-delete-adj" data-adj-id="' + escapeAttr(adj.id) + '" title="Delete">&times;</button>';
+            html += '<div class="row-aside">';
+            html += '<button class="toolbar-act" data-adj-id="' + escapeAttr(adj.id) + '" aria-label="Delete entry">' + Icon('trash', 18) + '</button>';
+            html += '</div>';
             html += '</div>';
         }
-        html += '</div>';
+        html += '<button class="action-primary u-mt-14" id="btn-add-scope-adj">' + Icon('plus', 20) + 'Add adjustment</button>';
     }
 
     html += '</div>';
@@ -479,7 +510,7 @@ HistoryManager.prototype._renderScopeAdjustments = function (rifle, adjustments)
         self.showScopeAdjustmentForm(rifle.id);
     });
 
-    var delBtns = container.querySelectorAll('.btn-delete-adj');
+    var delBtns = container.querySelectorAll('.toolbar-act[data-adj-id]');
     for (var i = 0; i < delBtns.length; i++) {
         delBtns[i].addEventListener('click', function (e) {
             e.stopPropagation();
@@ -507,48 +538,41 @@ HistoryManager.prototype._renderScopeAdjustmentForm = function (rifle) {
     var container = this.profileManager.container;
     var today = new Date().toISOString().split('T')[0];
 
-    var html = '<div class="profile-screen">';
+    var html = this._toolbarHtml('btn-form-back', 'Back', 'Add adjustment');
+    html += '<div class="screen">';
 
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-form-back">&lsaquo; Back</button>';
-    html += '<h2 class="profile-title">Add Adjustment</h2>';
-    html += '<div class="toolbar-spacer"></div>';
-    html += '</div>';
+    html += '<form id="scope-adj-form">';
 
-    html += '<form id="scope-adj-form" class="profile-form">';
-
-    html += '<div class="form-group">';
-    html += '<label for="sa-date">Date</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="sa-date">Date</label>';
     html += '<input type="date" id="sa-date" value="' + today + '">';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="sa-elev">Elevation (MOA)</label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="sa-elev">Elevation <span class="field-unit">MOA</span></label>';
     html += '<input type="number" id="sa-elev" step="0.25" inputmode="decimal" placeholder="0">';
-    html += '<span class="form-hint">+ Up / - Down</span>';
+    html += '<p class="field-hint">+ up / - down</p>';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="sa-wind">Windage (MOA)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="sa-wind">Windage <span class="field-unit">MOA</span></label>';
     html += '<input type="number" id="sa-wind" step="0.25" inputmode="decimal" placeholder="0">';
-    html += '<span class="form-hint">+ Right / - Left</span>';
+    html += '<p class="field-hint">+ right / - left</p>';
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="sa-reason">Reason</label>';
-    html += '<input type="text" id="sa-reason" maxlength="100" placeholder="e.g., Zero confirmation, Load change">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="sa-reason">Reason</label>';
+    html += '<input type="text" id="sa-reason" maxlength="100" placeholder="e.g. zero confirmation, load change">';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label for="sa-notes">Notes</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="sa-notes">Notes</label>';
     html += '<textarea id="sa-notes" rows="2" placeholder="Optional notes"></textarea>';
     html += '</div>';
-    html += '<p id="sa-error" class="form-error"></p>';
+    html += '<p id="sa-error" class="field-error"></p>';
 
-    html += '<div class="btn-row">';
-    html += '<button type="submit" class="btn btn-primary">Save</button>';
-    html += '</div>';
+    html += '<button type="submit" class="action-primary u-mt-10">Save</button>';
 
     html += '</form>';
     html += '</div>';
@@ -601,40 +625,17 @@ HistoryManager.prototype.showMiscSessionList = function () {
 
 HistoryManager.prototype._renderMiscSessionList = function (sessions) {
     var container = this.profileManager.container;
-    var html = '<div class="profile-screen">';
 
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-misc-back">&lsaquo; Profiles</button>';
-    html += '<h2 class="profile-title">Misc Sessions</h2>';
-    html += '<div class="toolbar-spacer"></div>';
-    html += '</div>';
+    var html = this._toolbarHtml('btn-misc-back', 'Profiles', 'Misc sessions');
+    html += '<div class="screen">';
 
     if (sessions.length === 0) {
-        html += '<div class="empty-state">';
-        html += '<img src="assets/logo.png" alt="" class="empty-state-logo" onerror="this.style.display=\'none\'">';
-        html += '<p class="empty-state-text">No misc sessions</p>';
-        html += '<p class="empty-state-sub">Sessions saved without a rifle profile appear here</p>';
+        html += '<div class="empty-teach">';
+        html += '<p>Sessions saved without a rifle profile land here.</p>';
+        html += '<button class="action-primary" id="btn-misc-start">' + Icon('camera', 20) + 'Check a target</button>';
         html += '</div>';
     } else {
-        html += '<div class="profile-list">';
-        for (var i = 0; i < sessions.length; i++) {
-            var s = sessions[i];
-            var dateStr = s.date ? new Date(s.date).toLocaleDateString() : 'Unknown date';
-            var groupStr = s.results && s.results.groupSizeMOA != null
-                ? formatFixed(s.results.groupSizeMOA, 2) + ' MOA'
-                : '—';
-            var shotCount = s.impacts ? s.impacts.length : 0;
-
-            html += '<div class="profile-card session-card" data-session-id="' + escapeAttr(s.id) + '">';
-            html += '<img class="session-thumbnail" data-session-id="' + escapeAttr(s.id) + '">';
-            html += '<div class="profile-card-main">';
-            html += '<span class="profile-card-name">' + escapeHtml(dateStr) + ' &middot; ' + formatNum(s.distanceYards, 0) + ' yds</span>';
-            html += '<span class="profile-card-sub">' + shotCount + ' shots &middot; ES: ' + groupStr + '</span>';
-            html += '</div>';
-            html += '<span class="profile-card-arrow">&rsaquo;</span>';
-            html += '</div>';
-        }
-        html += '</div>';
+        html += this._sessionRowsHtml(sessions);
     }
 
     html += '</div>';
@@ -646,9 +647,16 @@ HistoryManager.prototype._renderMiscSessionList = function (sessions) {
         self.profileManager.showRifleList();
     });
 
-    var cards = container.querySelectorAll('.session-card');
-    for (var i = 0; i < cards.length; i++) {
-        cards[i].addEventListener('click', function () {
+    var startBtn = document.getElementById('btn-misc-start');
+    if (startBtn) {
+        startBtn.addEventListener('click', function () {
+            if (window.AppNav) window.AppNav.go('session');
+        });
+    }
+
+    var rows = container.querySelectorAll('.row-item[data-session-id]');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].addEventListener('click', function () {
             var sid = this.getAttribute('data-session-id');
             self.showMiscSessionDetail(sid);
         });
@@ -670,106 +678,11 @@ HistoryManager.prototype.showMiscSessionDetail = function (sessionId) {
 
 HistoryManager.prototype._renderMiscSessionDetail = function (session) {
     var container = this.profileManager.container;
-    var r = session.results;
     var dateStr = session.date ? new Date(session.date).toLocaleDateString() : 'Unknown date';
 
-    var html = '<div class="profile-screen">';
-
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-misc-detail-back">&lsaquo; Misc Sessions</button>';
-    html += '<h2 class="profile-title">' + escapeHtml(dateStr) + '</h2>';
-    html += '<div class="toolbar-spacer"></div>';
-    html += '</div>';
-
-    // Results card
-    if (r) {
-        html += '<div class="detail-card">';
-        html += '<div class="detail-row"><span class="detail-label">Distance</span><span class="detail-value">' + formatNum(session.distanceYards, 0) + ' yds</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Shots</span><span class="detail-value">' + (session.impacts ? session.impacts.length : 0) + '</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Extreme Spread</span><span class="detail-value">' + formatFixed(r.groupSizeInches, 3) + '&quot; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Mean Radius</span><span class="detail-value">' + formatFixed(r.meanRadiusInches, 3) + '&quot; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Vertical Spread</span><span class="detail-value">' + formatFixed(r.verticalSpreadInches, 3) + '&quot;</span></div>';
-        html += '<div class="detail-row"><span class="detail-label">Horizontal Spread</span><span class="detail-value">' + formatFixed(r.horizontalSpreadInches, 3) + '&quot;</span></div>';
-        if (r.elevationOffsetMOA != null) {
-            var elevSign = r.elevationOffsetInches >= 0 ? 'High' : 'Low';
-            html += '<div class="detail-row"><span class="detail-label">Elevation Offset</span><span class="detail-value">' + formatFixed(Math.abs(r.elevationOffsetInches), 3) + '&quot; ' + elevSign + '</span></div>';
-        }
-        if (r.windageOffsetMOA != null) {
-            var windSign = r.windageOffsetInches >= 0 ? 'Right' : 'Left';
-            html += '<div class="detail-row"><span class="detail-label">Windage Offset</span><span class="detail-value">' + formatFixed(Math.abs(r.windageOffsetInches), 3) + '&quot; ' + windSign + '</span></div>';
-        }
-
-        // Advanced Stats (collapsible)
-        if (r.cepInches != null) {
-            html += '<details class="session-details" style="margin-top:8px;">';
-            html += '<summary class="session-details-summary">Advanced Stats</summary>';
-            html += '<div class="session-details-body">';
-            html += '<div class="detail-row"><span class="detail-label">CEP (50%)</span><span class="detail-value">' + formatFixed(r.cepInches, 3) + '&quot; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span></div>';
-            html += '<div class="detail-row"><span class="detail-label">Radial SD</span><span class="detail-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span></div>';
-            html += '<div class="detail-row"><span class="detail-label">Vertical SD</span><span class="detail-value">' + formatFixed(r.verticalSDInches, 3) + '&quot; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA</span></div>';
-            html += '<div class="detail-row"><span class="detail-label">Horizontal SD</span><span class="detail-value">' + formatFixed(r.horizontalSDInches, 3) + '&quot; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA</span></div>';
-            var mElevSign = r.meanElevationInches >= 0 ? 'High' : 'Low';
-            html += '<div class="detail-row"><span class="detail-label">Mean Elevation</span><span class="detail-value">' + formatFixed(Math.abs(r.meanElevationInches), 3) + '&quot; ' + mElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA</span></div>';
-            var mWindSign = r.meanWindageInches >= 0 ? 'Right' : 'Left';
-            html += '<div class="detail-row"><span class="detail-label">Mean Windage</span><span class="detail-value">' + formatFixed(Math.abs(r.meanWindageInches), 3) + '&quot; ' + mWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA</span></div>';
-            html += '</div></details>';
-        }
-
-        html += '</div>';
-    }
-
-    // Session details (collapsible)
-    html += '<details class="session-details">';
-    html += '<summary class="session-details-summary">Session Details</summary>';
-    html += '<div class="session-details-body">';
-    html += '<div class="detail-card">';
-
-    if (session.bulletDiameter) {
-        html += '<div class="detail-row"><span class="detail-label">Bullet Diameter</span><span class="detail-value">' + session.bulletDiameter + '&quot;</span></div>';
-    }
-    if (session.roundsFired) {
-        html += '<div class="detail-row"><span class="detail-label">Rounds Fired</span><span class="detail-value">' + session.roundsFired + '</span></div>';
-    }
-    if (session.measuredVelocity) {
-        html += '<div class="detail-row"><span class="detail-label">Measured Velocity</span><span class="detail-value">' + session.measuredVelocity + ' fps</span></div>';
-    }
-
-    var w = session.weather;
-    if (w) {
-        if (w.tempF != null) {
-            html += '<div class="detail-row"><span class="detail-label">Temperature</span><span class="detail-value">' + w.tempF + '&deg;F</span></div>';
-        }
-        if (w.humidity != null) {
-            html += '<div class="detail-row"><span class="detail-label">Humidity</span><span class="detail-value">' + w.humidity + '%</span></div>';
-        }
-        if (w.windMph != null) {
-            html += '<div class="detail-row"><span class="detail-label">Wind</span><span class="detail-value">' + w.windMph + ' mph' + (w.windDir ? ' ' + escapeHtml(w.windDir) : '') + '</span></div>';
-        }
-        if (w.altitudeFt != null) {
-            html += '<div class="detail-row"><span class="detail-label">Altitude</span><span class="detail-value">' + w.altitudeFt + ' ft</span></div>';
-        }
-        if (w.pressureInHg != null) {
-            html += '<div class="detail-row"><span class="detail-label">Pressure</span><span class="detail-value">' + w.pressureInHg + '&quot; Hg</span></div>';
-        }
-    }
-
-    html += '</div></div></details>';
-
-    // Annotated image
-    html += '<div class="session-image-container">';
-    html += '<p class="session-image-loading" id="session-image-loading">Loading image...</p>';
-    html += '<img class="session-full-image" id="session-full-image" style="display:none">';
-    html += '</div>';
-    html += '<div class="btn-row" id="session-image-actions" style="display:none;padding:0 16px 8px;">';
-    html += '<button class="btn btn-secondary" id="btn-session-save-image">Save Image</button>';
-    html += '<button class="btn btn-secondary" id="btn-session-share-image">Share</button>';
-    html += '</div>';
-
-    // Delete button
-    html += '<div class="btn-row" style="padding: 16px;">';
-    html += '<button class="btn btn-danger" id="btn-delete-session">Delete Session</button>';
-    html += '</div>';
-
+    var html = this._toolbarHtml('btn-misc-detail-back', 'Misc sessions', escapeHtml(dateStr));
+    html += '<div class="screen">';
+    html += this._sessionDetailBodyHtml(session);
     html += '</div>';
     container.innerHTML = html;
 
@@ -829,12 +742,13 @@ HistoryManager.prototype._revokeThumbnailUrls = function () {
 };
 
 /**
- * Load thumbnails for all session-thumbnail images in a container.
+ * Load thumbnails for all .thumb images in a container.
+ * Images without a stored thumbnail are hidden.
  */
 HistoryManager.prototype._loadThumbnails = function (container) {
     this._revokeThumbnailUrls();
     var self = this;
-    var imgs = container.querySelectorAll('img.session-thumbnail');
+    var imgs = container.querySelectorAll('img.thumb[data-session-id]');
     for (var i = 0; i < imgs.length; i++) {
         (function (img) {
             var sid = img.getAttribute('data-session-id');
@@ -844,9 +758,12 @@ HistoryManager.prototype._loadThumbnails = function (container) {
                     var url = URL.createObjectURL(record.thumbnailBlob);
                     self._thumbnailUrls.push(url);
                     img.src = url;
-                    img.classList.add('loaded');
+                } else {
+                    img.classList.add('hidden');
                 }
-            }).catch(function () {});
+            }).catch(function () {
+                img.classList.add('hidden');
+            });
         })(imgs[i]);
     }
 };
@@ -865,9 +782,9 @@ HistoryManager.prototype._loadFullImage = function (sessionId) {
         if (record && record.fullBlob) {
             var url = URL.createObjectURL(record.fullBlob);
             imgEl.src = url;
-            imgEl.style.display = 'block';
-            loadingEl.style.display = 'none';
-            if (actionsEl) actionsEl.style.display = '';
+            imgEl.classList.remove('hidden');
+            loadingEl.classList.add('hidden');
+            if (actionsEl) actionsEl.classList.remove('hidden');
 
             // Bind save button
             var saveBtn = document.getElementById('btn-session-save-image');
@@ -885,10 +802,7 @@ HistoryManager.prototype._loadFullImage = function (sessionId) {
                 });
             }
 
-            // Clean up object URL when image view changes
-            imgEl.addEventListener('load', function () {
-                // URL stays valid until page navigates away; revoke on next render
-            });
+            // Object URL stays valid until the next render replaces the view
         } else {
             loadingEl.textContent = 'No image available';
         }

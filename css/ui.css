@@ -466,6 +466,27 @@ img { max-width: 100%; }
 .chip.is-hold { color: var(--hold); border-color: var(--hold); background: var(--hold-dim); }
 .chip.is-stop { color: var(--stop); border-color: var(--stop); background: var(--stop-dim); }
 
+/* zero-guardian click-value picker (compact inline control) */
+.zg-clicks {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+.zg-clicks select {
+    min-height: 40px;
+    padding: 6px 30px 6px 10px;
+    background: var(--g2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-tile);
+    color: var(--ink);
+    font-size: 14px;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239BA6AE' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9.5 12 15.5 18 9.5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+}
+
 /* ── 8. INSTRUMENTS & DATA ──────────────────────────────── */
 
 .instrument { min-width: 0; }
@@ -928,6 +949,14 @@ img { max-width: 100%; }
     background: var(--g2);
     border: 1px solid var(--line);
     flex: none;
+}
+
+/* full-width media inside a plate (session detail image) */
+.plate-img {
+    display: block;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--line);
 }
 
 /* ── 13. WIZARD SHELL ───────────────────────────────────── */

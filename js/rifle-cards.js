@@ -9,8 +9,9 @@
  * Card contract:
  *   { id, slot, tool,                 // tool: null=core | tool key (ToolRegistry.isVisible gate)
  *     isVisible(ctx) -> bool (SYNC, uses preloaded ctx only),
- *     render(el, ctx) }               // may fetch async; self-collapses (el.style.display='none')
- *                                     // or renders its empty state (one sentence + one button)
+ *     render(el, ctx) }               // may fetch async; self-collapses (adds the
+ *                                     // 'hidden' class) or renders its empty state
+ *                                     // (one sentence + one button)
  * ctx = { db, rifle, loads, barrels, activeBarrel,
  *         managers: { profile, history, report, certificate } }
  *
@@ -24,7 +25,7 @@ var RifleCards = (function () {
     var SLOTS = ['ready', 'dial', 'ammo', 'truth', 'progress', 'records', 'prove'];
 
     // The seven questions, in the user's words — rendered as quiet
-    // engraved labels above each slot that has at least one card, so
+    // engraved kickers above each slot that has at least one card, so
     // the fixed order is legible without adding chrome.
     var SLOT_QUESTIONS = {
         ready: 'Am I ready?',
@@ -57,6 +58,45 @@ var RifleCards = (function () {
         _cards.push(card);
     }
 
+    /**
+     * A question label must never float over an empty slot: hide each
+     * kicker unless at least one following card (before the next kicker)
+     * is visible. Cards collapse asynchronously, so this re-runs via a
+     * MutationObserver on card class changes.
+     */
+    function _syncKickers(container) {
+        var kicker = null;
+        var anyVisible = false;
+        var nodes = container.children;
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            if (node.classList.contains('qcard-kicker')) {
+                if (kicker && kicker.classList.contains('hidden') === anyVisible) {
+                    kicker.classList.toggle('hidden', !anyVisible);
+                }
+                kicker = node;
+                anyVisible = false;
+            } else if (node.classList.contains('qcard') && !node.classList.contains('hidden')) {
+                anyVisible = true;
+            }
+        }
+        if (kicker && kicker.classList.contains('hidden') === anyVisible) {
+            kicker.classList.toggle('hidden', !anyVisible);
+        }
+    }
+
+    var _observed = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
+
+    function _watchKickers(container) {
+        if (typeof MutationObserver === 'undefined') return;
+        if (_observed) {
+            if (_observed.has(container)) return;
+            _observed.add(container);
+        }
+        var mo = new MutationObserver(function () { _syncKickers(container); });
+        mo.observe(container, { attributes: true, subtree: true, attributeFilter: ['class'] });
+    }
+
     function render(container, ctx) {
         if (!container) return;
         container.innerHTML = '';
@@ -72,21 +112,24 @@ var RifleCards = (function () {
             if (ordered[i].slot !== lastSlot) {
                 lastSlot = ordered[i].slot;
                 var label = document.createElement('div');
-                label.className = 'slot-label';
+                label.className = 'qcard-kicker';
                 label.textContent = SLOT_QUESTIONS[lastSlot] || '';
                 container.appendChild(label);
             }
             var el = document.createElement('div');
-            el.className = 'rifle-card rifle-card-' + ordered[i].slot;
+            el.className = 'qcard';
             el.setAttribute('data-card-id', ordered[i].id);
+            el.setAttribute('data-slot', ordered[i].slot);
             container.appendChild(el);
             try {
                 ordered[i].render(el, ctx);
             } catch (e) {
                 console.warn('[Cards] "' + ordered[i].id + '" render failed:', e);
-                el.style.display = 'none'; // a broken card must never break the page
+                el.classList.add('hidden'); // a broken card must never break the page
             }
         }
+        _syncKickers(container);
+        _watchKickers(container);
     }
 
     return {
@@ -106,29 +149,29 @@ RifleCards.register({
     tool: null,
     isVisible: function () { return true; }, // universal (empty state teaches)
     render: function (el, ctx) {
-        var html = '<div class="detail-section">';
-        html += '<div class="detail-section-header">';
-        html += '<h3 class="detail-section-title">Loads</h3>';
-        html += '<button class="btn btn-sm btn-secondary" id="btn-add-load">+ Add Load</button>';
-        html += '</div>';
+        var html = '<div class="plate">';
 
         if (ctx.loads.length === 0) {
-            html += '<p class="empty-state-sub">No loads yet — photograph the ammo box or add one.</p>';
+            html += '<div class="empty-teach">';
+            html += '<p>Photograph the ammo box or add a load by hand.</p>';
+            html += '<button class="action" id="btn-add-load">Add load</button>';
+            html += '</div>';
         } else {
             for (var i = 0; i < ctx.loads.length; i++) {
                 var ld = ctx.loads[i];
-                html += '<div class="profile-card load-card" data-load-id="' + ld.id + '">';
-                html += '<div class="profile-card-main">';
-                html += '<span class="profile-card-name">' + escapeHtml(ld.name) + '</span>';
                 var subParts = [];
                 if (ld.bulletName) subParts.push(escapeHtml(ld.bulletName));
                 if (ld.bulletWeight) subParts.push(formatNum(ld.bulletWeight, 1) + 'gr');
                 if (ld.muzzleVelocity) subParts.push(formatNum(ld.muzzleVelocity, 0) + ' fps');
-                html += '<span class="profile-card-sub">' + (subParts.join(' &middot; ') || '&mdash;') + '</span>';
+                html += '<button class="row-item" data-load-id="' + ld.id + '">';
+                html += '<div class="row-main">';
+                html += '<div class="row-title">' + escapeHtml(ld.name) + '</div>';
+                html += '<div class="row-sub">' + (subParts.join(' &middot; ') || '&mdash;') + '</div>';
                 html += '</div>';
-                html += '<span class="profile-card-arrow">&rsaquo;</span>';
-                html += '</div>';
+                html += '<div class="row-aside">' + Icon('chevron-right', 18) + '</div>';
+                html += '</button>';
             }
+            html += '<button class="action-ghost u-mt-10" id="btn-add-load">+ Add load</button>';
         }
         html += '</div>';
         el.innerHTML = html;
@@ -136,29 +179,31 @@ RifleCards.register({
         el.querySelector('#btn-add-load').addEventListener('click', function () {
             ctx.managers.profile.showLoadForm(ctx.rifle.id, null);
         });
-        var loadCards = el.querySelectorAll('.load-card');
-        for (var lc = 0; lc < loadCards.length; lc++) {
-            loadCards[lc].addEventListener('click', function () {
+        var loadRows = el.querySelectorAll('[data-load-id]');
+        for (var lc = 0; lc < loadRows.length; lc++) {
+            loadRows[lc].addEventListener('click', function () {
                 ctx.managers.profile.showLoadDetail(ctx.rifle.id, this.getAttribute('data-load-id'));
             });
         }
     }
 });
 
-// ── ready: zero status (the universal need — always present) ──
+// ── ready: zero status (the universal need — the hub's hero) ──
 RifleCards.register({
     id: 'zero-status',
     slot: 'ready',
     tool: null,
     isVisible: function (ctx) { return !!ctx.rifle; },
     render: function (el, ctx) {
-        el.innerHTML = '<div class="detail-card zero-status-card" id="zero-status-body"></div>';
+        el.innerHTML = '<div class="plate" id="zero-status-body"></div>';
         var body = el.querySelector('#zero-status-body');
 
         function emptyState() {
             body.innerHTML =
-                '<p class="empty-state-sub" style="padding:0;">No zero check yet — photograph a target and yorT gives you the verdict.</p>' +
-                '<button class="btn btn-primary" id="zero-status-check" style="margin-top:8px;">Check a target</button>';
+                '<div class="empty-teach">' +
+                '<p>No zero check yet &mdash; photograph a target and yorT gives you the verdict.</p>' +
+                '<button class="action-primary" id="zero-status-check">' + Icon('camera', 20) + ' Check a target</button>' +
+                '</div>';
             body.querySelector('#zero-status-check').addEventListener('click', function () {
                 if (window.AppNav) window.AppNav.go('session');
             });
@@ -183,17 +228,28 @@ RifleCards.register({
             if (!verdict) { emptyState(); return; }
 
             var when = latest.date ? new Date(latest.date).toLocaleDateString() : '';
-            if (verdict.confirmed) {
-                body.innerHTML = '<div class="zg-banner zg-confirmed">✓ ZERO CONFIRMED' +
-                    '<span class="zg-sub">Last checked ' + when + '</span></div>';
-            } else {
-                var parts = [];
-                if (verdict.elevClicks > 0) parts.push(verdict.elevClicks + ' click' + (verdict.elevClicks === 1 ? '' : 's') + ' ' + verdict.elevDir.toUpperCase());
-                if (verdict.windClicks > 0) parts.push(verdict.windClicks + ' click' + (verdict.windClicks === 1 ? '' : 's') + ' ' + verdict.windDir.toUpperCase());
-                body.innerHTML = '<div class="zg-banner zg-adjust">' +
-                    (parts.length ? 'Last check: adjust ' + parts.join(', ') : 'Last check: nearly there') +
-                    '<span class="zg-sub">' + when + ' — shoot a confirmation group</span></div>';
+            body.innerHTML = '';
+            var verdictEl = document.createElement('div');
+            body.appendChild(verdictEl);
+            // The verdict itself is ZeroGuardian's component — never restyled here
+            ZeroGuardian.render(verdictEl, latest.results);
+            if (when) {
+                var meta = document.createElement('div');
+                meta.className = 't-micro u-mt-10';
+                meta.textContent = verdict.confirmed
+                    ? 'Last checked ' + when
+                    : 'Last checked ' + when + ' — shoot a confirmation group';
+                body.appendChild(meta);
             }
+
+            // The hub's ONE brass action, contextual to the verdict
+            var cta = document.createElement('button');
+            cta.className = 'action-primary u-mt-14';
+            cta.innerHTML = Icon('camera', 20) + (verdict.confirmed ? ' Check a target' : ' Confirm zero');
+            cta.addEventListener('click', function () {
+                if (window.AppNav) window.AppNav.go('session');
+            });
+            body.appendChild(cta);
         }).catch(function () {
             emptyState();
         });
@@ -210,12 +266,14 @@ RifleCards.register({
         var rifle = ctx.rifle;
         var active = rifle.activeConfig === 'suppressed' ? 'suppressed' : 'bare';
 
-        var html = '<div class="detail-card">';
-        html += '<div class="config-row">';
-        html += '<button class="config-btn' + (active === 'bare' ? ' config-active' : '') + '" data-config="bare">🔊 Bare</button>';
-        html += '<button class="config-btn' + (active === 'suppressed' ? ' config-active' : '') + '" data-config="suppressed">🔇 Suppressed</button>';
+        var html = '<div class="plate">';
+        html += '<div class="seg">';
+        html += '<button class="seg-opt' + (active === 'bare' ? ' is-selected' : '') + '" data-config="bare">' +
+            Icon('sound', 18) + 'Bare</button>';
+        html += '<button class="seg-opt' + (active === 'suppressed' ? ' is-selected' : '') + '" data-config="suppressed">' +
+            Icon('sound-off', 18) + 'Suppressed</button>';
         html += '</div>';
-        html += '<div id="config-shift" class="chrono-hint" style="margin-top:8px;"></div>';
+        html += '<div id="config-shift" class="t-micro u-mt-10"></div>';
         html += '</div>';
         el.innerHTML = html;
 
@@ -243,7 +301,7 @@ RifleCards.register({
                 parts.push(formatNum(Math.abs(shift.velocityDelta), 0) + ' fps ' + (shift.velocityDelta > 0 ? 'faster' : 'slower'));
             }
             line.innerHTML = parts.length
-                ? '<strong>Can ON shifts POI ' + parts.join(', ') + '</strong> — accounted for.'
+                ? '<strong>Can ON shifts POI ' + parts.join(', ') + '</strong> &mdash; accounted for.'
                 : 'No meaningful shift measured between configurations.';
 
             // Persist measurements for the solver (best-effort)
@@ -259,7 +317,7 @@ RifleCards.register({
             if (changed) ctx.db.updateRifle(rifle).catch(function () {});
         }).catch(function () {});
 
-        var btns = el.querySelectorAll('.config-btn');
+        var btns = el.querySelectorAll('[data-config]');
         for (var b = 0; b < btns.length; b++) {
             btns[b].addEventListener('click', function () {
                 var next = this.getAttribute('data-config');
@@ -286,10 +344,10 @@ RifleCards.register({
 
         if (typeof factor !== 'number' || !isFinite(factor)) {
             // Empty state: one sentence + one button
-            html = '<div class="detail-card">' +
-                '<p class="empty-state-sub" style="padding:0;">This scope\'s tracking has never been verified — most scopes are 2–5% off, silently.</p>' +
-                '<button class="btn btn-secondary" id="scope-truth-test" style="margin-top:8px;">Verify scope tracking</button>' +
-                '</div>';
+            html = '<div class="plate"><div class="empty-teach">' +
+                '<p>This scope&rsquo;s tracking has never been verified &mdash; most scopes are 2&ndash;5% off, silently.</p>' +
+                '<button class="action" id="scope-truth-test">Verify scope tracking</button>' +
+                '</div></div>';
         } else {
             var errorPct = (factor - 1) * 100;
             var testedAt = rifle.scopeTrackingTestedAt ? new Date(rifle.scopeTrackingTestedAt) : null;
@@ -298,19 +356,24 @@ RifleCards.register({
 
             if (Math.abs(errorPct) <= 1 && !stale && !rifle.scopeCantWarn) {
                 // Silence is a feature: healthy + fresh renders one quiet line
-                html = '<div class="detail-card"><p class="chrono-hint" style="margin:0;">✓ Scope tracks true — verified ' + when + '</p></div>';
+                html = '<div class="plate">' +
+                    '<span class="chip is-go">' + Icon('check', 14) + 'Tracks true</span>' +
+                    '<span class="t-micro"> Verified ' + when + '</span>' +
+                    '</div>';
             } else {
-                html = '<div class="detail-card">';
+                html = '<div class="plate">';
                 if (Math.abs(errorPct) > 1) {
-                    html += '<p style="margin:0 0 6px;"><strong>Your clicks are ' +
+                    html += '<span class="chip is-hold">Corrected</span>';
+                    html += '<p class="u-mt-10">Your clicks are <strong>' +
                         formatNum(Math.abs(errorPct), 1) + '% ' + (errorPct < 0 ? 'small' : 'large') +
-                        '</strong> — corrected automatically in every solution.</p>';
+                        '</strong> &mdash; corrected automatically in every solution.</p>';
                 }
                 if (rifle.scopeCantWarn) {
-                    html += '<p class="chrono-hint" style="color:var(--calibration-color);">⚠ Lateral drift seen during the test — check scope plumb/cant.</p>';
+                    html += '<div class="alert-strip u-mt-10">' + Icon('alert', 18) +
+                        '<span>Lateral drift seen during the test &mdash; check scope plumb/cant.</span></div>';
                 }
-                html += '<p class="chrono-hint">Verified ' + when + (stale ? ' — over a year old, re-test recommended' : '') + '</p>';
-                html += '<button class="btn btn-secondary btn-sm" id="scope-truth-test">Re-test</button>';
+                html += '<p class="t-micro u-mt-10">Verified ' + when + (stale ? ' — over a year old, re-test recommended' : '') + '</p>';
+                html += '<button class="action-ghost u-mt-10" id="scope-truth-test">Re-test</button>';
                 html += '</div>';
             }
         }
@@ -336,61 +399,58 @@ RifleCards.register({
     render: function (el, ctx) {
         var activeBarrel = ctx.activeBarrel;
         var totalRounds = activeBarrel.totalRounds || 0;
-        el.innerHTML = '<div id="barrel-stats" style="display:flex;gap:8px;padding:0 16px 4px;"></div>';
 
         ctx.db.getCleaningLogsByBarrel(activeBarrel.id).then(function (cleaningLogs) {
-            var statsEl = el.querySelector('#barrel-stats');
-            if (!statsEl) return;
             var sinceCleaning = ctx.managers.history
                 ? ctx.managers.history._computeRoundsSinceCleaning(totalRounds, cleaningLogs)
                 : totalRounds;
 
-            statsEl.innerHTML =
-                '<div class="dashboard-stat" id="stat-total-rounds">' +
-                    '<span class="dashboard-stat-value" id="rounds-display">' + totalRounds + '</span>' +
-                    '<span class="dashboard-stat-label">Total Rounds</span>' +
-                    '<button class="btn btn-sm btn-secondary" id="btn-edit-rounds" style="margin-top:4px;padding:2px 10px;font-size:0.75rem;">Edit</button>' +
-                '</div>' +
-                '<div class="dashboard-stat">' +
-                    '<span class="dashboard-stat-value">' + sinceCleaning + '</span>' +
-                    '<span class="dashboard-stat-label">Since Cleaning</span>' +
+            el.innerHTML =
+                '<div class="plate">' +
+                    '<div class="stat-strip">' +
+                        '<div class="instrument">' +
+                            '<div class="instrument-label">Total rounds</div>' +
+                            '<div class="instrument-value" id="rounds-display">' + Number(totalRounds).toLocaleString() + '</div>' +
+                        '</div>' +
+                        '<div class="instrument">' +
+                            '<div class="instrument-label">Since cleaning</div>' +
+                            '<div class="instrument-value">' + Number(sinceCleaning).toLocaleString() + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<button class="action-ghost" id="btn-edit-rounds">' + Icon('pencil', 16) + 'Edit round count</button>' +
+                    '<div class="field-row hidden" id="rounds-editor">' +
+                        '<input type="number" class="field-input" id="rounds-input" min="0" step="1" inputmode="numeric" value="' + totalRounds + '">' +
+                        '<button class="action" id="btn-save-rounds">Save</button>' +
+                    '</div>' +
                 '</div>';
 
-            statsEl.querySelector('#btn-edit-rounds').addEventListener('click', function () {
-                var statEl = statsEl.querySelector('#stat-total-rounds');
-                if (!statEl) return;
-                statEl.innerHTML =
-                    '<input type="number" id="rounds-input" class="rounds-edit-input" min="0" step="1" inputmode="numeric" value="' + totalRounds + '">' +
-                    '<div style="display:flex;gap:6px;margin-top:6px;">' +
-                        '<button class="btn btn-sm btn-primary" id="btn-save-rounds" style="padding:2px 10px;font-size:0.75rem;">Save</button>' +
-                        '<button class="btn btn-sm btn-secondary" id="btn-cancel-rounds" style="padding:2px 10px;font-size:0.75rem;">Cancel</button>' +
-                    '</div>';
-                var inp = statEl.querySelector('#rounds-input');
+            var editBtn = el.querySelector('#btn-edit-rounds');
+            var editor = el.querySelector('#rounds-editor');
+            editBtn.addEventListener('click', function () {
+                editBtn.classList.add('hidden');
+                editor.classList.remove('hidden');
+                var inp = editor.querySelector('#rounds-input');
                 inp.focus();
                 inp.select();
+            });
 
-                statEl.querySelector('#btn-save-rounds').addEventListener('click', function () {
-                    var parsed = parseInt(inp.value, 10);
-                    if (!isNaN(parsed) && parsed >= 0) {
-                        activeBarrel.totalRounds = parsed;
-                        ctx.db.updateBarrel(activeBarrel).then(function () {
-                            ctx.managers.profile.showRifleDetail(ctx.rifle.id);
-                        });
-                    }
-                });
+            editor.querySelector('#btn-save-rounds').addEventListener('click', function () {
+                var parsed = parseInt(editor.querySelector('#rounds-input').value, 10);
+                if (!isNaN(parsed) && parsed >= 0) {
+                    activeBarrel.totalRounds = parsed;
+                    ctx.db.updateBarrel(activeBarrel).then(function () {
+                        ctx.managers.profile.showRifleDetail(ctx.rifle.id);
+                    });
+                }
+            });
 
-                statEl.querySelector('#btn-cancel-rounds').addEventListener('click', function () {
-                    ctx.managers.profile.showRifleDetail(ctx.rifle.id);
-                });
-
-                inp.addEventListener('keydown', function (e) {
-                    if (e.key === 'Enter') {
-                        statEl.querySelector('#btn-save-rounds').click();
-                    }
-                });
+            editor.querySelector('#rounds-input').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    editor.querySelector('#btn-save-rounds').click();
+                }
             });
         }).catch(function () {
-            el.style.display = 'none'; // no cleaning data reachable — collapse
+            el.classList.add('hidden'); // no cleaning data reachable — collapse
         });
     }
 });
@@ -404,16 +464,16 @@ RifleCards.register({
     render: function (el, ctx) {
         var rifle = ctx.rifle;
         var activeBarrel = ctx.activeBarrel;
-        var html = '<div class="detail-card">';
-        html += '<div class="detail-row"><span class="detail-label">Caliber</span><span class="detail-value">' + escapeHtml(rifle.caliber) + '</span></div>';
+        var html = '<div class="plate">';
+        html += '<div class="spec-row"><span class="spec-key">Caliber</span><span class="spec-val">' + escapeHtml(rifle.caliber) + '</span></div>';
         if (rifle.scopeHeight) {
-            html += '<div class="detail-row"><span class="detail-label">Scope Height</span><span class="detail-value">' + rifle.scopeHeight + '"</span></div>';
+            html += '<div class="spec-row"><span class="spec-key">Scope height</span><span class="spec-val">' + rifle.scopeHeight + '&Prime;</span></div>';
         }
         if (rifle.zeroRange) {
-            html += '<div class="detail-row"><span class="detail-label">Zero Range</span><span class="detail-value">' + rifle.zeroRange + ' yds</span></div>';
+            html += '<div class="spec-row"><span class="spec-key">Zero range</span><span class="spec-val">' + rifle.zeroRange + ' yd</span></div>';
         }
         if (activeBarrel && activeBarrel.twistRate) {
-            html += '<div class="detail-row"><span class="detail-label">Twist</span><span class="detail-value">' + escapeHtml(activeBarrel.twistRate) + ' ' + (activeBarrel.twistDirection || 'Right') + '</span></div>';
+            html += '<div class="spec-row"><span class="spec-key">Twist</span><span class="spec-val">' + escapeHtml(activeBarrel.twistRate) + ' ' + (activeBarrel.twistDirection || 'Right') + '</span></div>';
         }
         var buildRows = [
             ['Serial #', rifle.serialNumber],
@@ -425,12 +485,12 @@ RifleCards.register({
         ];
         for (var br = 0; br < buildRows.length; br++) {
             if (buildRows[br][1]) {
-                html += '<div class="detail-row"><span class="detail-label">' + buildRows[br][0] +
-                    '</span><span class="detail-value">' + escapeHtml(buildRows[br][1]) + '</span></div>';
+                html += '<div class="spec-row"><span class="spec-key">' + buildRows[br][0] +
+                    '</span><span class="spec-val">' + escapeHtml(buildRows[br][1]) + '</span></div>';
             }
         }
         if (rifle.notes) {
-            html += '<div class="detail-row detail-row-notes"><span class="detail-label">Notes</span><span class="detail-value">' + escapeHtml(rifle.notes) + '</span></div>';
+            html += '<div class="spec-row"><span class="spec-key">Notes</span><span class="spec-val">' + escapeHtml(rifle.notes) + '</span></div>';
         }
         html += '</div>';
         el.innerHTML = html;
@@ -472,22 +532,22 @@ RifleCards.register({
         ctx.db.getVelocityStringsByRifle(ctx.rifle.id).then(function (strings) {
             var alerts = typeof lotDrift === 'function' ? lotDrift(strings) : [];
             if (!alerts.length) {
-                el.style.display = 'none'; // silence is a feature
+                el.classList.add('hidden'); // silence is a feature
                 return;
             }
             var loadNames = {};
             (ctx.loads || []).forEach(function (l) { loadNames[l.id] = l.name; });
-            var html = '<div class="detail-card" style="border-color:var(--calibration-color);">';
-            alerts.forEach(function (a) {
-                html += '<p style="margin:0 0 6px;"><strong>' +
-                    escapeHtml(loadNames[a.loadId] || 'A load') + ' — lot ' + escapeHtml(a.newLot) +
+            var html = '';
+            alerts.forEach(function (a, idx) {
+                html += '<div class="alert-strip' + (idx > 0 ? ' u-mt-10' : '') + '">' + Icon('alert', 18) +
+                    '<span><strong>' +
+                    escapeHtml(loadNames[a.loadId] || 'A load') + ' &mdash; lot ' + escapeHtml(a.newLot) +
                     ' runs ' + Math.abs(a.deltaFps) + ' fps ' + (a.deltaFps > 0 ? 'faster' : 'slower') +
-                    '</strong> than lot ' + escapeHtml(a.prevLot) + ' — confirm your zero before it matters.</p>';
+                    '</strong> than lot ' + escapeHtml(a.prevLot) + ' &mdash; confirm your zero before it matters.</span></div>';
             });
-            html += '</div>';
             el.innerHTML = html;
         }).catch(function () {
-            el.style.display = 'none';
+            el.classList.add('hidden');
         });
     }
 });
@@ -499,46 +559,10 @@ RifleCards.register({
     tool: 'field',
     isVisible: function (ctx) { return !!ctx.rifle; },
     render: function (el, ctx) {
-        el.innerHTML = '<div class="detail-card" id="eff-range-body"></div>';
+        el.innerHTML = '<div class="plate" id="eff-range-body"></div>';
         var body = el.querySelector('#eff-range-body');
 
-        ctx.db.getFieldShotsByRifle(ctx.rifle.id).then(function (shots) {
-            if (!shots || !shots.length) {
-                body.innerHTML =
-                    '<p class="empty-state-sub" style="padding:0;">Log field shots and this card fills itself — your honest "should I shoot?" number.</p>' +
-                    '<button class="btn btn-secondary" id="eff-range-log" style="margin-top:8px;">Log field shots</button>';
-                body.querySelector('#eff-range-log').addEventListener('click', function () {
-                    if (window.ToolActions && window.ToolActions.fieldLog) {
-                        window.ToolActions.fieldLog(ctx.db);
-                    }
-                });
-                return;
-            }
-
-            var eff = FieldCore.computeEffectiveRange(shots);
-            var positions = Object.keys(eff);
-            var html = '';
-            if (positions.length) {
-                var parts = positions.map(function (p) {
-                    return p + ' ' + eff[p].yards + ' yd';
-                });
-                html += '<p style="margin:0 0 6px;"><strong>90% on a ' + FieldCore.VITALS_IN + '&Prime; vitals target: ' + parts.join(' · ') + '</strong></p>';
-                html += '<p class="chrono-hint">From ' + shots.length + ' logged strings. Updates itself as you log.</p>';
-            } else {
-                // Progress state — never silent while the shooter is feeding it
-                html += '<p class="empty-state-sub" style="padding:0;">' + shots.length + ' string' + (shots.length === 1 ? '' : 's') +
-                    ' logged — a few more at each distance and I\'ll compute your effective range. ' +
-                    'Each 100-yd bin needs 5+ shots at 90% before it counts.</p>' +
-                    '<button class="btn btn-secondary" id="eff-range-log" style="margin-top:8px;">Log field shots</button>';
-            }
-
-            // Wind grader insight (F5) — only when it has something real,
-            // spoken in the rifle's own turret unit
-            var insight = FieldCore.windInsight(FieldCore.analyzeWindCalls(shots), ctx.rifle.angleUnit || 'MOA');
-            if (insight) {
-                html += '<p class="chrono-hint" style="color:var(--calibration-color);">' + insight + '</p>';
-            }
-            body.innerHTML = html;
+        function bindLog() {
             var logBtn = body.querySelector('#eff-range-log');
             if (logBtn) {
                 logBtn.addEventListener('click', function () {
@@ -547,10 +571,57 @@ RifleCards.register({
                     }
                 });
             }
+        }
+
+        ctx.db.getFieldShotsByRifle(ctx.rifle.id).then(function (shots) {
+            if (!shots || !shots.length) {
+                body.innerHTML =
+                    '<div class="empty-teach">' +
+                    '<p>Log field shots and this card fills itself &mdash; your honest &ldquo;should I shoot?&rdquo; number.</p>' +
+                    '<button class="action" id="eff-range-log">Log field shots</button>' +
+                    '</div>';
+                bindLog();
+                return;
+            }
+
+            var eff = FieldCore.computeEffectiveRange(shots);
+            var positions = Object.keys(eff);
+            var html = '';
+            if (positions.length) {
+                // Verdict sentence first, numbers under
+                html += '<p class="t-head">90% hits on a ' + FieldCore.VITALS_IN + '&Prime; vitals target</p>';
+                html += '<div class="stat-strip">';
+                positions.forEach(function (p) {
+                    html += '<div class="instrument">' +
+                        '<div class="instrument-label">' + escapeHtml(p) + '</div>' +
+                        '<div class="instrument-value">' + Number(eff[p].yards).toLocaleString() +
+                        '<span class="instrument-unit">yd</span></div>' +
+                        '</div>';
+                });
+                html += '</div>';
+                html += '<p class="t-micro u-mt-10">From ' + shots.length + ' logged strings. Updates itself as you log.</p>';
+            } else {
+                // Progress state — never silent while the shooter is feeding it
+                html += '<div class="empty-teach">' +
+                    '<p>' + shots.length + ' string' + (shots.length === 1 ? '' : 's') +
+                    ' logged &mdash; a few more at each distance and I&rsquo;ll compute your effective range. ' +
+                    'Each 100-yd bin needs 5+ shots at 90% before it counts.</p>' +
+                    '<button class="action" id="eff-range-log">Log field shots</button>' +
+                    '</div>';
+            }
+
+            // Wind grader insight (F5) — only when it has something real,
+            // spoken in the rifle's own turret unit
+            var insight = FieldCore.windInsight(FieldCore.analyzeWindCalls(shots), ctx.rifle.angleUnit || 'MOA');
+            if (insight) {
+                html += '<p class="t-micro u-mt-10">' + insight + '</p>';
+            }
+            body.innerHTML = html;
+            bindLog();
         }).catch(function (err) {
             // No silent failures: say what happened instead of vanishing
             console.warn('[EffRange] failed to load field shots:', err);
-            body.innerHTML = '<p class="chrono-hint" style="margin:0;">Couldn\'t load field data — check your connection and reopen this rifle.</p>';
+            body.innerHTML = '<p class="t-micro">Couldn&rsquo;t load field data &mdash; check your connection and reopen this rifle.</p>';
         });
     }
 });
@@ -563,27 +634,21 @@ RifleCards.register({
     isVisible: function () { return true; },
     render: function (el, ctx) {
         var activeBarrel = ctx.activeBarrel;
-        var html = '<div class="detail-section">';
-        html += '<div class="detail-section-header">';
-        html += '<h3 class="detail-section-title">History &amp; Logs</h3>';
-        html += '</div>';
-        html += '<div class="profile-list" style="padding:0 16px;">';
-        html += '<div class="profile-card" id="btn-session-history">';
-        html += '<div class="profile-card-main"><span class="profile-card-name">Session History</span></div>';
-        html += '<span class="profile-card-arrow">&rsaquo;</span>';
-        html += '</div>';
+        var html = '';
+        html += '<button class="row-item" id="btn-session-history">';
+        html += '<div class="row-main"><div class="row-title">Session history</div></div>';
+        html += '<div class="row-aside">' + Icon('chevron-right', 18) + '</div>';
+        html += '</button>';
         if (activeBarrel) {
-            html += '<div class="profile-card" id="btn-cleaning-log" data-barrel-id="' + activeBarrel.id + '">';
-            html += '<div class="profile-card-main"><span class="profile-card-name">Cleaning Log</span></div>';
-            html += '<span class="profile-card-arrow">&rsaquo;</span>';
-            html += '</div>';
+            html += '<button class="row-item" id="btn-cleaning-log" data-barrel-id="' + activeBarrel.id + '">';
+            html += '<div class="row-main"><div class="row-title">Cleaning log</div></div>';
+            html += '<div class="row-aside">' + Icon('chevron-right', 18) + '</div>';
+            html += '</button>';
         }
-        html += '<div class="profile-card" id="btn-scope-adjustments">';
-        html += '<div class="profile-card-main"><span class="profile-card-name">Scope Adjustments</span></div>';
-        html += '<span class="profile-card-arrow">&rsaquo;</span>';
-        html += '</div>';
-        html += '</div>';
-        html += '</div>';
+        html += '<button class="row-item" id="btn-scope-adjustments">';
+        html += '<div class="row-main"><div class="row-title">Scope adjustments</div></div>';
+        html += '<div class="row-aside">' + Icon('chevron-right', 18) + '</div>';
+        html += '</button>';
         el.innerHTML = html;
 
         var history = ctx.managers.history;
@@ -617,13 +682,14 @@ RifleCards.register({
         return typeof hasFeature === 'function' && hasFeature('certificate');
     },
     render: function (el, ctx) {
-        var html = '<div class="profile-card report-promo" id="btn-performance-report">';
-        html += '<div class="profile-card-main">';
-        html += '<span class="profile-card-name">Performance Report</span>';
-        html += '<span class="profile-card-sub">Best group &middot; velocity stats &middot; certificate</span>';
+        var html = '<button class="row-item" id="btn-performance-report">';
+        html += Icon('award', 18);
+        html += '<div class="row-main">';
+        html += '<div class="row-title">Performance report</div>';
+        html += '<div class="row-sub">Best group, recommended load, certificate</div>';
         html += '</div>';
-        html += '<span class="profile-card-arrow">&rsaquo;</span>';
-        html += '</div>';
+        html += '<div class="row-aside">' + Icon('chevron-right', 18) + '</div>';
+        html += '</button>';
         el.innerHTML = html;
 
         var reportBtn = el.querySelector('#btn-performance-report');

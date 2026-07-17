@@ -83,21 +83,29 @@ var ZeroGuardian = (function () {
 
         var html;
         if (v.confirmed) {
-            html = '<div class="zg-banner zg-confirmed">✓ ZERO CONFIRMED' +
-                '<span class="zg-sub">Group center within ' + TOLERANCE_MOA + ' MOA of point of aim</span></div>';
+            html = '<div class="verdict">' +
+                '<span class="verdict-lamp is-go"></span>' +
+                '<div><div class="verdict-word is-go">ZERO CONFIRMED</div>' +
+                '<div class="verdict-sub">Group center within ' + TOLERANCE_MOA + ' MOA of point of aim</div>' +
+                '</div></div>';
         } else {
             var parts = [];
             if (v.elevClicks > 0) parts.push(v.elevClicks + ' click' + (v.elevClicks === 1 ? '' : 's') + ' ' + v.elevDir.toUpperCase());
             if (v.windClicks > 0) parts.push(v.windClicks + ' click' + (v.windClicks === 1 ? '' : 's') + ' ' + v.windDir.toUpperCase());
             // Off in MOA but rounds to 0 clicks on both axes
-            var text = parts.length ? 'Adjust: ' + parts.join(', ') : 'Almost there — less than 1 click off';
-            html = '<div class="zg-banner zg-adjust">' + text +
-                '<span class="zg-sub">Then shoot a confirmation group</span></div>';
+            var word = parts.length ? 'ADJUST' : 'ALMOST THERE';
+            var sub = parts.length ? parts.join(', ') + ' &mdash; then shoot a confirmation group'
+                : 'Less than 1 click off &mdash; shoot a confirmation group';
+            html = '<div class="verdict">' +
+                '<span class="verdict-lamp is-hold"></span>' +
+                '<div><div class="verdict-word is-hold">' + word + '</div>' +
+                '<div class="verdict-sub">' + sub + '</div>' +
+                '</div></div>';
         }
 
-        html += '<div class="zg-click-row"><label for="zg-click">Scope clicks</label>';
-        html += '<button class="help-btn" onclick="showHelp(\'clicks\')" title="What are scope clicks?">?</button>';
-        html += '<select id="zg-click">';
+        html += '<div class="zg-clicks"><label class="u-label" for="zg-click">Scope clicks</label>';
+        html += '<button class="hint-btn" onclick="showHelp(\'clicks\')" title="What are scope clicks?">?</button>';
+        html += '<select id="zg-click" aria-label="Scope click value">';
         html += '<option value="0.25"' + (getClickValue() === 0.25 ? ' selected' : '') + '>1/4 MOA</option>';
         html += '<option value="0.125"' + (getClickValue() === 0.125 ? ' selected' : '') + '>1/8 MOA</option>';
         html += '</select></div>';

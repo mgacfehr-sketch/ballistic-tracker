@@ -151,14 +151,14 @@ SessionFlow.prototype.reset = function () {
     this.croppedCanvas = null;
     if (this.els.btnCropImage) {
         this.els.btnCropImage.classList.remove('active');
-        this.els.btnCropImage.textContent = 'Crop Image';
+        this.els.btnCropImage.textContent = 'Crop';
     }
     var canvasContainer = document.getElementById('canvas-container');
     if (canvasContainer) canvasContainer.classList.remove('crop-mode');
 
     this.canvas.clearImage();
     this.canvas.setHint('');
-    if (this.els.canvasWatermark) this.els.canvasWatermark.style.display = '';
+    if (this.els.canvasWatermark) this.els.canvasWatermark.classList.remove('hidden');
 
     // Reset inputs
     if (this.els.inputDistance) this.els.inputDistance.value = '';
@@ -178,7 +178,7 @@ SessionFlow.prototype.reset = function () {
     // Reset weather button
     if (this.els.btnFetchWeather) {
         this.els.btnFetchWeather.disabled = false;
-        this.els.btnFetchWeather.textContent = 'Get Weather';
+        this.els.btnFetchWeather.innerHTML = Icon('cloud', 18) + ' Get weather';
     }
 
     // Reset button states
@@ -193,7 +193,7 @@ SessionFlow.prototype.reset = function () {
     if (this.els.btnCalculate) this.els.btnCalculate.disabled = true;
     if (this.els.btnSaveSession) {
         this.els.btnSaveSession.disabled = false;
-        this.els.btnSaveSession.textContent = 'Save Session';
+        this.els.btnSaveSession.innerHTML = Icon('check', 20) + ' Save session';
     }
 
     // Clear preset selection
@@ -311,7 +311,7 @@ SessionFlow.prototype._loadProfilePicker = function () {
     if (!picker) return;
 
     if (!this.db) {
-        picker.innerHTML = '<p class="empty-state-sub">Database not available</p>';
+        picker.innerHTML = '<p class="t-micro">Database not available</p>';
         return;
     }
 
@@ -319,10 +319,9 @@ SessionFlow.prototype._loadProfilePicker = function () {
     this.db.getAllRifles().then(function (rifles) {
         if (rifles.length === 0) {
             picker.innerHTML =
-                '<div class="empty-state" style="padding:16px 0;">' +
-                '<p class="empty-state-text">No rifles configured</p>' +
-                '<p class="empty-state-sub" style="margin-bottom:12px;">Create a rifle and load profile to track your data, or use Quick Mode below.</p>' +
-                '<button class="btn btn-primary btn-sm" id="btn-go-profiles">Go to Profiles</button>' +
+                '<div class="empty-teach">' +
+                '<p>Pick a rifle so this target lands on its record &mdash; or use Quick Mode below for a one-off measurement.</p>' +
+                '<button class="action" id="btn-go-profiles">Set up a rifle</button>' +
                 '</div>';
             var goBtn = document.getElementById('btn-go-profiles');
             if (goBtn) {
@@ -354,17 +353,18 @@ SessionFlow.prototype._renderProfilePicker = function (groups) {
 
     // Quick Start buttons (beta feature)
     if (typeof isBetaEnabled === 'function' && isBetaEnabled('quickStart') && groups.length > 0) {
-        html += '<div class="quick-start-section">';
-        html += '<div class="quick-start-label">Quick Start</div>';
+        html += '<div class="qcard-kicker">Quick start</div>';
+        html += '<div class="choice-stack u-mb-12">';
         for (var q = 0; q < groups.length; q++) {
             var qr = groups[q].rifle;
             var qloads = groups[q].loads;
             if (qloads.length === 0) continue;
             // Use first load as default
             var ql = qloads[0];
-            html += '<button class="quick-start-btn" data-rifle-id="' + escapeAttr(qr.id) + '" data-load-id="' + escapeAttr(ql.id) + '">';
-            html += '<span class="quick-start-btn-name">' + escapeHtml(qr.name) + '</span>';
-            html += '<span class="quick-start-btn-sub">' + escapeHtml(qr.caliber) + ' &middot; ' + escapeHtml(ql.name) + '</span>';
+            html += '<button class="choice-plate quick-start-btn" data-rifle-id="' + escapeAttr(qr.id) + '" data-load-id="' + escapeAttr(ql.id) + '">';
+            html += '<span>' + escapeHtml(qr.name);
+            html += '<span class="choice-desc">' + escapeHtml(qr.caliber) + ' &middot; ' + escapeHtml(ql.name) + '</span></span>';
+            html += Icon('chevron-right', 18);
             html += '</button>';
         }
         html += '</div>';
@@ -378,21 +378,23 @@ SessionFlow.prototype._renderProfilePicker = function (groups) {
             return (a.name || '').localeCompare(b.name || '');
         });
 
-        html += '<div class="picker-rifle-group">';
-        html += '<div class="picker-rifle-name">' + escapeHtml(rifle.name) + ' <span style="color:var(--text-muted);font-weight:400;">' + escapeHtml(rifle.caliber) + '</span></div>';
+        html += '<div class="qcard-kicker">' + escapeHtml(rifle.name) +
+            (rifle.caliber ? ' &middot; ' + escapeHtml(rifle.caliber) : '') + '</div>';
 
         if (loads.length === 0) {
-            html += '<p class="empty-state-sub" style="padding:4px 0;">No loads — add one on the rifle page (Rifles)</p>';
+            html += '<p class="t-micro">No loads &mdash; add one on the rifle page (Rifles)</p>';
         } else {
+            html += '<div class="choice-stack">';
             for (var l = 0; l < loads.length; l++) {
                 var ld = loads[l];
-                html += '<button class="picker-load-btn" data-rifle-id="' + escapeAttr(rifle.id) + '" data-load-id="' + escapeAttr(ld.id) + '">';
-                html += escapeHtml(ld.name);
-                html += '<span class="picker-load-sub">' + ld.bulletWeight + 'gr &middot; ' + ld.bulletDiameter + '&quot;</span>';
+                html += '<button class="choice-plate picker-load-btn" data-rifle-id="' + escapeAttr(rifle.id) + '" data-load-id="' + escapeAttr(ld.id) + '">';
+                html += '<span>' + escapeHtml(ld.name);
+                html += '<span class="choice-desc">' + ld.bulletWeight + 'gr &middot; ' + ld.bulletDiameter + '&quot;</span></span>';
+                html += Icon('chevron-right', 18);
                 html += '</button>';
             }
+            html += '</div>';
         }
-        html += '</div>';
     }
 
     picker.innerHTML = html;
@@ -629,7 +631,7 @@ SessionFlow.prototype._onImageSelected = function (e) {
     loadImageFromFile(file).then(function (img) {
         self.image = img;
         self.canvas.loadImage(img);
-        if (self.els.canvasWatermark) self.els.canvasWatermark.style.display = 'none';
+        if (self.els.canvasWatermark) self.els.canvasWatermark.classList.add('hidden');
         self._nextStep(); // move to calibrate step
 
         // Try auto-detection of yorT target; fall back to manual if it fails.
@@ -701,7 +703,7 @@ SessionFlow.prototype._tryAutoCalibration = function (img) {
             self.canvas.calibrationLine = null;
             self.canvas.render();
 
-            self.els.calibrationStatus.innerHTML = '✅ yorT target detected — auto-scaled (' + warp.pixelsPerInch.toFixed(0) + ' px/in)';
+            self.els.calibrationStatus.innerHTML = '<span class="chip is-go">' + Icon('check', 14) + 'Verified</span> yorT target detected &mdash; auto-scaled (' + warp.pixelsPerInch.toFixed(0) + ' px/in)';
             self._showEl(self.els.btnRedoCalibration);
             self._showEl(self.els.btnNextCalibration);
             self._showEl(self.els.btnManualCalibration);
@@ -951,116 +953,61 @@ SessionFlow.prototype._renderResults = function () {
 
     var html = '';
 
-    // Zero Guardian verdict banner (populated after innerHTML below)
-    html += '<div id="zero-guardian-banner"></div>';
+    // Zero Guardian verdict banner (populated after innerHTML below) —
+    // verdict first, numbers under: the banner leads the whole card
+    html += '<div id="zero-guardian-banner" class="u-mb-12"></div>';
 
-    // Group size
-    html += '<div class="result-section-title">Group Size</div>';
-    html += '<div class="result-row highlight">';
-    html += '<span class="result-label">Extreme Spread <button class="help-btn" onclick="showHelp(\'moa\')" title="What is MOA?">?</button></span>';
-    html += '<span class="result-value">' + formatFixed(r.groupSizeInches, 3) + '&quot; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span>';
+    // HERO — group size as the dominant instrument
+    html += '<div class="plate">';
+    html += '<div class="instrument">';
+    html += '<div class="instrument-label">Group size <button class="hint-btn" onclick="showHelp(\'moa\')" title="What is MOA?">?</button></div>';
+    html += '<div class="instrument-value t-display">' + formatFixed(r.groupSizeMOA, 2) + '<span class="instrument-unit">MOA</span></div>';
+    html += '<div class="t-micro">' + formatFixed(r.groupSizeInches, 3) + '&Prime; extreme spread &middot; ' + r.shotCount + ' shots @ ' + r.distanceYards + ' yds</div>';
     html += '</div>';
-    html += '<div class="result-row">';
-    html += '<span class="result-label">Mean Radius <button class="help-btn" onclick="showHelp(\'meanRadius\')" title="What is Mean Radius?">?</button></span>';
-    html += '<span class="result-value">' + formatFixed(r.meanRadiusInches, 3) + '&quot; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span>';
-    html += '</div>';
+    html += '<div class="stat-strip">';
+    html += '<div class="instrument"><div class="instrument-label">Mean radius <button class="hint-btn" onclick="showHelp(\'meanRadius\')" title="What is Mean Radius?">?</button></div>';
+    html += '<div class="instrument-value">' + formatFixed(r.meanRadiusMOA, 2) + '<span class="instrument-unit">MOA</span></div></div>';
+    html += '<div class="instrument"><div class="instrument-label">Vertical</div>';
+    html += '<div class="instrument-value">' + formatFixed(r.verticalSpreadMOA, 2) + '<span class="instrument-unit">MOA</span></div></div>';
+    html += '<div class="instrument"><div class="instrument-label">Horizontal</div>';
+    html += '<div class="instrument-value">' + formatFixed(r.horizontalSpreadMOA, 2) + '<span class="instrument-unit">MOA</span></div></div>';
+    html += '</div></div>';
 
-    html += '<div class="result-divider"></div>';
+    // Adjust to Zero — the dial the shooter came for
+    html += '<div class="plate u-mt-10">';
+    html += '<div class="instrument-label">Adjust to zero <button class="hint-btn" onclick="showHelp(\'atz\')" title="What is ATZ?">?</button></div>';
+    html += '<div class="stat-strip">';
+    html += '<div class="instrument"><div class="instrument-label">' + r.atzElevationDir + '</div>';
+    html += '<div class="instrument-value">' + formatFixed(r.atzElevationMOA, 2) + '<span class="instrument-unit">MOA</span></div></div>';
+    html += '<div class="instrument"><div class="instrument-label">' + r.atzWindageDir + '</div>';
+    html += '<div class="instrument-value">' + formatFixed(r.atzWindageMOA, 2) + '<span class="instrument-unit">MOA</span></div></div>';
+    html += '</div></div>';
 
-    // Spread
-    html += '<div class="result-section-title">Spread</div>';
-    html += '<div class="result-row">';
-    html += '<span class="result-label">Vertical</span>';
-    html += '<span class="result-value">' + formatFixed(r.verticalSpreadInches, 3) + '&quot; / ' + formatFixed(r.verticalSpreadMOA, 2) + ' MOA</span>';
-    html += '</div>';
-    html += '<div class="result-row">';
-    html += '<span class="result-label">Horizontal</span>';
-    html += '<span class="result-value">' + formatFixed(r.horizontalSpreadInches, 3) + '&quot; / ' + formatFixed(r.horizontalSpreadMOA, 2) + ' MOA</span>';
-    html += '</div>';
-
-    html += '<div class="result-divider"></div>';
-
-    // POA offset
-    html += '<div class="result-section-title">POA Offset</div>';
-    html += '<div class="result-row">';
-    html += '<span class="result-label">Elevation</span>';
+    // Every remaining number lives below the fold
+    html += '<details class="fold u-mt-10">';
+    html += '<summary>All stats</summary>';
+    html += '<div class="fold-body">';
+    html += '<div class="spec-row"><span class="spec-key">Extreme spread</span><span class="spec-val">' + formatFixed(r.groupSizeInches, 3) + '&Prime; / ' + formatFixed(r.groupSizeMOA, 2) + ' MOA</span></div>';
+    html += '<div class="spec-row"><span class="spec-key">Mean radius</span><span class="spec-val">' + formatFixed(r.meanRadiusInches, 3) + '&Prime; / ' + formatFixed(r.meanRadiusMOA, 2) + ' MOA</span></div>';
+    html += '<div class="spec-row"><span class="spec-key">Vertical spread</span><span class="spec-val">' + formatFixed(r.verticalSpreadInches, 3) + '&Prime; / ' + formatFixed(r.verticalSpreadMOA, 2) + ' MOA</span></div>';
+    html += '<div class="spec-row"><span class="spec-key">Horizontal spread</span><span class="spec-val">' + formatFixed(r.horizontalSpreadInches, 3) + '&Prime; / ' + formatFixed(r.horizontalSpreadMOA, 2) + ' MOA</span></div>';
     var elevSign = r.elevationOffsetInches >= 0 ? 'High' : 'Low';
-    html += '<span class="result-value">' + formatFixed(Math.abs(r.elevationOffsetInches), 3) + '&quot; ' + elevSign + ' / ' + formatFixed(r.elevationOffsetMOA, 2) + ' MOA</span>';
-    html += '</div>';
-    html += '<div class="result-row">';
-    html += '<span class="result-label">Windage</span>';
+    html += '<div class="spec-row"><span class="spec-key">Elevation offset</span><span class="spec-val">' + formatFixed(Math.abs(r.elevationOffsetInches), 3) + '&Prime; ' + elevSign + ' / ' + formatFixed(r.elevationOffsetMOA, 2) + ' MOA</span></div>';
     var windSign = r.windageOffsetInches >= 0 ? 'Right' : 'Left';
-    html += '<span class="result-value">' + formatFixed(Math.abs(r.windageOffsetInches), 3) + '&quot; ' + windSign + ' / ' + formatFixed(r.windageOffsetMOA, 2) + ' MOA</span>';
-    html += '</div>';
+    html += '<div class="spec-row"><span class="spec-key">Windage offset</span><span class="spec-val">' + formatFixed(Math.abs(r.windageOffsetInches), 3) + '&Prime; ' + windSign + ' / ' + formatFixed(r.windageOffsetMOA, 2) + ' MOA</span></div>';
 
-    html += '<div class="result-divider"></div>';
-
-    // ATZ
-    html += '<div class="result-section-title">Adjust to Zero <button class="help-btn" onclick="showHelp(\'atz\')" title="What is ATZ?">?</button></div>';
-    html += '<div class="atz-row">';
-    html += '<div class="atz-item">';
-    html += '<span class="atz-direction">' + r.atzElevationDir + '</span>';
-    html += '<span class="atz-value">' + formatFixed(r.atzElevationMOA, 2) + '</span>';
-    html += '<span class="atz-unit">MOA</span>';
-    html += '</div>';
-    html += '<div class="atz-item">';
-    html += '<span class="atz-direction">' + r.atzWindageDir + '</span>';
-    html += '<span class="atz-value">' + formatFixed(r.atzWindageMOA, 2) + '</span>';
-    html += '<span class="atz-unit">MOA</span>';
-    html += '</div>';
-    html += '</div>';
-
-    // Footer info
-    html += '<div class="result-divider"></div>';
-    html += '<div class="result-row">';
-    html += '<span class="result-label">Shots / Distance</span>';
-    html += '<span class="result-value">' + r.shotCount + ' shots @ ' + r.distanceYards + ' yds</span>';
-    html += '</div>';
-
-    // Advanced Stats (collapsible)
+    // Advanced statistics (only when computed)
     if (r.cepInches != null) {
-        html += '<details class="session-details">';
-        html += '<summary class="session-details-summary">Advanced Stats</summary>';
-        html += '<div class="session-details-body">';
-
-        html += '<div class="result-row">';
-        html += '<span class="result-label">CEP (50%) <button class="help-btn" onclick="showHelp(\'cep\')" title="What is CEP?">?</button></span>';
-        html += '<span class="result-value">' + formatFixed(r.cepInches, 3) + '&quot; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span>';
-        html += '</div>';
-
-        html += '<div class="result-row">';
-        html += '<span class="result-label">Radial SD <button class="help-btn" onclick="showHelp(\'radialSD\')" title="What is Radial SD?">?</button></span>';
-        html += '<span class="result-value">' + formatFixed(r.radialSDInches, 3) + '&quot; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span>';
-        html += '</div>';
-
-        html += '<div class="result-divider"></div>';
-
-        html += '<div class="result-row">';
-        html += '<span class="result-label">Vertical SD</span>';
-        html += '<span class="result-value">' + formatFixed(r.verticalSDInches, 3) + '&quot; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA</span>';
-        html += '</div>';
-
-        html += '<div class="result-row">';
-        html += '<span class="result-label">Horizontal SD</span>';
-        html += '<span class="result-value">' + formatFixed(r.horizontalSDInches, 3) + '&quot; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA</span>';
-        html += '</div>';
-
-        html += '<div class="result-divider"></div>';
-
+        html += '<div class="spec-row"><span class="spec-key">CEP (50%) <button class="hint-btn" onclick="showHelp(\'cep\')" title="What is CEP?">?</button></span><span class="spec-val">' + formatFixed(r.cepInches, 3) + '&Prime; / ' + formatFixed(r.cepMOA, 2) + ' MOA</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Radial SD <button class="hint-btn" onclick="showHelp(\'radialSD\')" title="What is Radial SD?">?</button></span><span class="spec-val">' + formatFixed(r.radialSDInches, 3) + '&Prime; / ' + formatFixed(r.radialSDMOA, 2) + ' MOA</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Vertical SD</span><span class="spec-val">' + formatFixed(r.verticalSDInches, 3) + '&Prime; / ' + formatFixed(r.verticalSDMOA, 2) + ' MOA</span></div>';
+        html += '<div class="spec-row"><span class="spec-key">Horizontal SD</span><span class="spec-val">' + formatFixed(r.horizontalSDInches, 3) + '&Prime; / ' + formatFixed(r.horizontalSDMOA, 2) + ' MOA</span></div>';
         var meanElevSign = r.meanElevationInches >= 0 ? 'High' : 'Low';
-        html += '<div class="result-row">';
-        html += '<span class="result-label">Mean Elevation</span>';
-        html += '<span class="result-value">' + formatFixed(Math.abs(r.meanElevationInches), 3) + '&quot; ' + meanElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA</span>';
-        html += '</div>';
-
+        html += '<div class="spec-row"><span class="spec-key">Mean elevation</span><span class="spec-val">' + formatFixed(Math.abs(r.meanElevationInches), 3) + '&Prime; ' + meanElevSign + ' / ' + formatFixed(r.meanElevationMOA, 2) + ' MOA</span></div>';
         var meanWindSign = r.meanWindageInches >= 0 ? 'Right' : 'Left';
-        html += '<div class="result-row">';
-        html += '<span class="result-label">Mean Windage</span>';
-        html += '<span class="result-value">' + formatFixed(Math.abs(r.meanWindageInches), 3) + '&quot; ' + meanWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA</span>';
-        html += '</div>';
-
-        html += '</div></details>';
+        html += '<div class="spec-row"><span class="spec-key">Mean windage</span><span class="spec-val">' + formatFixed(Math.abs(r.meanWindageInches), 3) + '&Prime; ' + meanWindSign + ' / ' + formatFixed(r.meanWindageMOA, 2) + ' MOA</span></div>';
     }
+    html += '</div></details>';
 
     card.innerHTML = html;
 
@@ -1068,9 +1015,10 @@ SessionFlow.prototype._renderResults = function () {
     if (typeof ToolRegistry !== 'undefined' && ToolRegistry.isVisible('bench') &&
         typeof LadderManager !== 'undefined' && this.impacts.length >= 4) {
         var ladderBtn = document.createElement('button');
-        ladderBtn.className = 'btn btn-secondary';
-        ladderBtn.style.margin = '8px 0';
-        ladderBtn.textContent = this.ladderResult ? 'Ladder attached ✓ (re-split)' : 'Split into ladder groups';
+        ladderBtn.className = 'action u-full u-mt-10';
+        ladderBtn.innerHTML = this.ladderResult
+            ? Icon('check', 18) + ' Ladder attached (re-split)'
+            : Icon('flask', 18) + ' Split into ladder groups';
         var flowRef = this;
         ladderBtn.addEventListener('click', function () {
             LadderManager.open(flowRef);
@@ -1148,12 +1096,12 @@ SessionFlow.prototype._saveSession = function () {
     var self = this;
     var btn = this.els.btnSaveSession;
     btn.disabled = true;
-    btn.textContent = 'Saving...';
+    btn.textContent = 'Saving…';
 
     this.db.addSession(sessionData).then(function (saved) {
         self.savedSessionId = saved.id;
         self.ladderResult = null; // consumed by this save
-        btn.textContent = 'Saved to History';
+        btn.innerHTML = Icon('check', 20) + ' Saved to history';
         if (typeof Recents !== 'undefined') Recents.touchSession(saved.id, self.selectedRifle);
         self._storeAnnotatedImage(saved.id);
         // Handload bookkeeping: a session on a recipe load = one firing
@@ -1167,7 +1115,7 @@ SessionFlow.prototype._saveSession = function () {
         // Never lose the session silently: it stays on screen, and the
         // user gets an immediate retry.
         btn.disabled = false;
-        btn.textContent = 'Save Session';
+        btn.innerHTML = Icon('check', 20) + ' Save session';
         if (confirm('Save failed: ' + err.message +
             '\n\nYour session is still on screen. Retry the save now?')) {
             self._saveSession();
@@ -1293,7 +1241,7 @@ SessionFlow.prototype._toggleCropMode = function () {
         this.croppedCanvas = this.canvas.captureViewport();
         if (btn) {
             btn.classList.remove('active');
-            btn.textContent = 'Crop Image';
+            btn.textContent = 'Crop';
         }
         if (container) container.classList.remove('crop-mode');
         this.canvas.setHint('');
@@ -1392,11 +1340,11 @@ SessionFlow.prototype._printBlankTarget = function () {
     var btn = this.els.btnPrintTarget;
     if (btn) {
         btn.disabled = true;
-        var origText = btn.textContent;
+        var origText = btn.innerHTML;
         btn.textContent = 'Opening print…';
         setTimeout(function () {
             btn.disabled = false;
-            btn.textContent = origText;
+            btn.innerHTML = origText;
         }, 4000);
     }
 
@@ -1451,8 +1399,8 @@ SessionFlow.prototype._shareBlankTarget = function () {
     var btn = this.els.btnShareTarget;
     if (btn) {
         btn.disabled = true;
-        var origText = btn.textContent;
-        var restore = function () { btn.disabled = false; btn.textContent = origText; };
+        var origText = btn.innerHTML;
+        var restore = function () { btn.disabled = false; btn.innerHTML = origText; };
         setTimeout(restore, 4000);
     }
 
@@ -1499,21 +1447,21 @@ SessionFlow.prototype._fetchWeather = function () {
     if (!btn) return;
 
     btn.disabled = true;
-    btn.textContent = 'Fetching conditions...';
+    btn.textContent = 'Fetching conditions…';
 
     NetService.getConditions().then(function (cond) {
         self._fillConditions(cond);
         if (self.els.dataOptionalDetails) {
             self.els.dataOptionalDetails.setAttribute('open', '');
         }
-        btn.textContent = 'Conditions Updated';
+        btn.innerHTML = Icon('check', 18) + ' Conditions updated';
         setTimeout(function () {
             btn.disabled = false;
-            btn.textContent = 'Get Weather';
+            btn.innerHTML = Icon('cloud', 18) + ' Get weather';
         }, 2000);
     }).catch(function (err) {
         btn.disabled = false;
-        btn.textContent = 'Get Weather';
+        btn.innerHTML = Icon('cloud', 18) + ' Get weather';
         alert(err.code === 'denied' ? 'Location access denied. Enable location to fetch weather.' :
             err.code === 'unsupported' ? 'Geolocation is not supported by your browser.' :
             'Failed to fetch weather data.');
@@ -1553,7 +1501,7 @@ SessionFlow.prototype._autoConditions = function () {
     NetService.getConditions().then(function (cond) {
         self._fillConditions(cond);
         var btn = self.els.btnFetchWeather;
-        if (btn) btn.textContent = 'Auto-filled · tap to refresh';
+        if (btn) btn.innerHTML = Icon('check', 18) + ' Auto-filled &middot; tap to refresh';
     }).catch(function () {
         // Silent: manual entry stays available
     });
