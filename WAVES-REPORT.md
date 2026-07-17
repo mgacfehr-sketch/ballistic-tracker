@@ -95,6 +95,49 @@ Per-feature declarations (Master Plan Part 5.2) are listed with each feature: **
 - Load detail (bench tool) gains the Recipe block (make/lot/fired counts/charge/seating) + the **Development Log**: every session (🎯 group w/ MOA, 🧪 ladder w/ its window sentence) and every confirmed string (📥 avg/SD, lot, 🔇 config) in date order; best eligible group starred; lot number shown on the load card.
 - Pure view over F7–F9 data — no new storage, no migration.
 
-## Notes so far
+## CONSOLIDATED FINAL REPORT
 
-- `docs/` (the three design docs) is untracked in git — intentional? Commit it if you want the specs versioned.
+### Done vs. needs-your-verification
+
+All ten features are **code-complete with pure cores unit-tested** (368 tests across six suites; 10/10 consistency review; every script loads in order; SW shell matches; CACHE_VERSION 78). Everything UI-facing **needs your browser pass** — nothing here has touched a real phone, camera, or the live database.
+
+### Migrations — run `WAVES-migrations.sql` top-to-bottom FIRST
+
+| Block | For | What it adds |
+|---|---|---|
+| M1 | F1 | 4 `scope_*` columns on rifles |
+| M2 | F2 | config columns on rifles/sessions/velocity_strings/cold_bore_shots/zero_records |
+| M3 | F4/F5 | `field_shots` table + RLS + index |
+| M4 | F7 | `lot_number` on loads + velocity_strings |
+| M5 | F8 | `recipe` jsonb on loads |
+| M6 | F9 | `session_type` + `ladder` on sessions |
+
+Every block is `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` — additive, re-runnable, existing rows untouched. **Until M1–M2 run, saving a rifle will fail** (the form now sends those columns); until M3, field logging fails; the rest degrade quietly.
+
+### Single-morning browser checklist (in this order)
+
+**Setup:** run WAVES-migrations.sql → hard-reload (SW v78) → drawer: activate everything (or re-run onboarding with "All of it").
+
+1. **F1 scope check:** Home → "Verify scope tracking" → wizard through to the photo step → 4 taps (two 6"-grid marks, bottom POI, top POI) → verdict overlay → rifle's truth card shows the correction → Solver come-ups change and show the footnote → Zero Guardian clicks change with the factor.
+2. **F2 configs:** rifle edit → check "sometimes runs a suppressor" → 🔊/🔇 card appears; toggle it; shoot/save a session in each state (+import strings) → shift sentence appears; suppressed solver MV shifts by the measured delta; zero-status card ignores the other config's sessions.
+3. **F3 DOPE:** Home → "Print a DOPE card" → 5 taps → PDF: header shows load/DA/date/zero; strip format prints at cut size; travel pack = 3 cards, one page; come-ups match the solver (both corrected).
+4. **F4/F5 field:** Home → "Log field shots" → hits chip → Save (2 taps with sticky defaults); wind call + actual once; row in Supabase with auto-attached weather.
+5. **F6:** after ~5 strings at 2-3 distances, the rifle's effective-range card speaks; wind insight appears after 5+ graded calls (fake a few).
+6. **F7 lots:** two lots on one load (edit lot between imports) with ≥30 fps difference → amber lot card; matching lots → silent.
+7. **F8 recipes:** bench active → load form recipe section; save → recipe block on load detail; component names suggest on the next load; save a session on that load → brass fired count +1.
+8. **F9 ladder:** session with 9+ impacts tapped in fire order → results → "Split into ladder groups" → 3/charge, labels "41.4,41.6,41.8" → chart + window sentence → attach → save → `session_type='ladder'` in Supabase.
+9. **F10:** that load's detail → Development Log shows the ladder, groups (best starred), and strings in order.
+
+### Judgment calls (all also noted per-feature above)
+
+Scope correction lives on the RIFLE (no scope entity yet) · scope-check measures via 4 manual taps on the photo (no pinch-zoom v1; aruco-warp integration deferred) · config shift speaks at ≥1 session per state · POI shift reported but never auto-dialed · DOPE format picker is text-described, not thumbnails · lot attaches at string-confirmation time · one brass firing per session · ladder groups assigned by TAP ORDER (shoot charge-by-charge; round-robin unsupported v1) · **velocity flat-spot overlay deferred** — auto-matching strings to charges is guesswork next to a load-development conclusion · Wave 2 shipped as one commit (three features, one interlocked file).
+
+### Surprises
+
+- `computeTrajectory()` was already a clean pure function — DOPE cards reuse it with zero solver refactoring. The foundation's seams (ToolActions `run:` handlers, custom wizard steps, card registry) absorbed all ten features without a single new nav element — the architecture docs' bet paid off.
+- Quarter-MOA click snapping legitimately swallows small scope corrections at short range (caught by a test, kept as correct print behavior).
+- The one process slip of the night: F3's first commit went out with a red test because a check chain used `;` instead of `&&` — caught immediately, fixed forward, and every later commit used an explicit green-gate.
+
+### Still needs a live phone pass
+
+Camera flows (scope-check taps, ladder in glare), chip tap-targets with gloves, DOPE PDF print scale (measure a printed strip with a ruler), sunlight-mode contrast on the new amber cards, and the `docs/` folder remains untracked in git — commit it if you want the specs versioned.
