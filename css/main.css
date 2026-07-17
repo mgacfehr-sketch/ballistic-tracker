@@ -585,15 +585,24 @@ input[type="checkbox"] {
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-2);
-    padding: max(var(--sp-2), env(safe-area-inset-top)) var(--sp-3) var(--sp-2);
+    min-height: 52px;
+    padding: max(var(--sp-1), env(safe-area-inset-top)) var(--sp-4) var(--sp-1);
     border-bottom: 1px solid var(--line);
     background: var(--bg);
+}
+
+.header-brand {
+    font-size: var(--fs-xl);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .header-utility {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
 }
 
 .connection-dot {
@@ -602,36 +611,49 @@ input[type="checkbox"] {
     border-radius: var(--r-pill);
     background: var(--ink-3);
     flex: none;
+    margin-right: var(--sp-2);
 }
 .connection-dot.online { background: var(--ok); }
 .connection-dot.offline { background: var(--warn); }
-
-.nav-grid {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-1);
-    flex: 1;
-    justify-content: flex-end;
-}
-
-.nav-tab {
-    min-height: var(--touch);
-    padding: 0 var(--sp-4);
-    border-radius: var(--r-sm);
-    font-size: var(--fs-base);
-    font-weight: 600;
-    color: var(--ink-2);
-    border-bottom: 3px solid transparent;
-}
-.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-.nav-tab:active { background: var(--surface-2); }
 
 .nav-logout {
     min-height: var(--touch);
     padding: 0 var(--sp-3);
     font-size: var(--fs-sm);
+    font-weight: 600;
     color: var(--ink-3);
+    border-radius: var(--r-sm);
 }
+.nav-logout:active { background: var(--surface-2); color: var(--ink); }
+
+/* Bottom navigation — three destinations, one-handed reach */
+.nav-bar {
+    flex: none;
+    display: flex;
+    align-items: stretch;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.nav-bar .nav-tab {
+    flex: 1;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--ink-3);
+    border-top: 3px solid transparent;
+    border-radius: 0;
+}
+.nav-bar .nav-tab.active { color: var(--accent); border-top-color: var(--accent); }
+.nav-bar .nav-tab:active { background: var(--surface); }
+
+/* Admin / beta buttons in the header keep .nav-tab for the shared
+   view-switch binding but look like utility icons */
+.header-utility .nav-tab.active { color: var(--accent); }
 
 .app-view {
     display: none;

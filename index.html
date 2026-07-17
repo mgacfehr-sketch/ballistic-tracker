@@ -42,16 +42,12 @@
 
     <div id="app" class="hidden">
         <header id="app-header">
+            <div class="header-brand" aria-hidden="true"><span class="brand-yor">yor</span><span class="brand-t">T</span></div>
             <div class="header-utility">
                 <span id="connection-status" class="connection-dot" title="Connection"></span>
                 <button id="btn-sunlight-mode" class="utility-btn" title="Sunlight Mode" aria-label="Sunlight Mode">&#9788;</button>
+                <button id="btn-logout" class="nav-logout">Log out</button>
             </div>
-            <nav id="app-nav" class="nav-grid">
-                <button class="nav-tab active" data-view="home">Home</button>
-                <button class="nav-tab" data-view="profiles">Rifles</button>
-                <button class="nav-tab" data-view="ai">Ask yorT</button>
-                <button id="btn-logout" class="nav-logout">Log Out</button>
-            </nav>
         </header>
 
         <!-- Session View (canvas + step panel) -->
@@ -284,6 +280,15 @@
 
         <!-- Admin View (admin-only, injected via JS) -->
         <div id="view-admin" class="app-view"></div>
+
+        <!-- Bottom navigation — three destinations, thumb reach.
+             Flow views (session, solver, chrono, admin) are full-screen
+             pushes launched from Home/rifle hub; they never add a tab. -->
+        <nav id="app-nav" class="nav-bar">
+            <button class="nav-tab active" data-view="home">Home</button>
+            <button class="nav-tab" data-view="profiles">Rifles</button>
+            <button class="nav-tab" data-view="ai">Ask yorT</button>
+        </nav>
 
     </div>
 

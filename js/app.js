@@ -44,39 +44,31 @@
                 initBetaFeatures(user.id);
             }
 
-            // Inject admin tab if this is the admin user — insert before Log Out
-            if (user.id === ADMIN_USER_ID) {
-                var nav = document.getElementById('app-nav');
-                if (nav && !nav.querySelector('[data-view="admin"]')) {
-                    var adminTab = document.createElement('button');
-                    adminTab.className = 'nav-tab';
-                    adminTab.setAttribute('data-view', 'admin');
-                    adminTab.textContent = 'Admin';
-                    var logoutBtn = document.getElementById('btn-logout');
-                    if (logoutBtn && logoutBtn.parentNode === nav) {
-                        nav.insertBefore(adminTab, logoutBtn);
-                    } else {
-                        nav.appendChild(adminTab);
-                    }
-                }
+            // Admin and beta Wind Call live as header utility buttons, not
+            // nav tabs — no feature ever adds a tab. They keep the
+            // .nav-tab class so the shared view-switch binding drives them.
+            var utility = document.querySelector('#app-header .header-utility');
+
+            if (user.id === ADMIN_USER_ID && utility &&
+                !utility.querySelector('[data-view="admin"]')) {
+                var adminBtn = document.createElement('button');
+                adminBtn.className = 'nav-tab utility-btn';
+                adminBtn.setAttribute('data-view', 'admin');
+                adminBtn.setAttribute('title', 'Admin');
+                adminBtn.setAttribute('aria-label', 'Admin');
+                adminBtn.textContent = '⚙';
+                utility.insertBefore(adminBtn, utility.firstChild);
             }
 
-            // Inject Wind Call tab if beta enabled — insert before Admin / Log Out
-            if (typeof isBetaEnabled === 'function' && isBetaEnabled('windCall')) {
-                var nav2 = document.getElementById('app-nav');
-                if (nav2 && !nav2.querySelector('[data-view="wind"]')) {
-                    var windTab = document.createElement('button');
-                    windTab.className = 'nav-tab';
-                    windTab.setAttribute('data-view', 'wind');
-                    windTab.textContent = 'Wind';
-                    var anchor = nav2.querySelector('[data-view="admin"]') ||
-                                 document.getElementById('btn-logout');
-                    if (anchor && anchor.parentNode === nav2) {
-                        nav2.insertBefore(windTab, anchor);
-                    } else {
-                        nav2.appendChild(windTab);
-                    }
-                }
+            if (typeof isBetaEnabled === 'function' && isBetaEnabled('windCall') &&
+                utility && !utility.querySelector('[data-view="wind"]')) {
+                var windBtn = document.createElement('button');
+                windBtn.className = 'nav-tab utility-btn';
+                windBtn.setAttribute('data-view', 'wind');
+                windBtn.setAttribute('title', 'Wind Call');
+                windBtn.setAttribute('aria-label', 'Wind Call');
+                windBtn.textContent = '🌬';
+                utility.insertBefore(windBtn, utility.firstChild);
             }
 
             var db = new BallisticDB(client, user.id);
