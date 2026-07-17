@@ -3,9 +3,10 @@
  *
  * Gathers all sessions, velocity strings, and loads for one rifle,
  * aggregates them via aggregateRifle() (velocity-stats.js), and renders:
- * recommended load, best group (with target thumbnail), per-load rollup,
- * and the string list with assignment status. This screen is the data
- * source review for the Certificate of Performance.
+ * recommended-load hero plate (stat strip of instruments), best group
+ * (with target thumbnail), per-load datatable rollup, and the string
+ * list with assignment status. This screen is the data source review
+ * for the Certificate of Performance.
  *
  * Renders into the ProfileManager's container (#view-profiles), like
  * history.js. Gated by hasFeature('certificate').
@@ -23,7 +24,7 @@ function RifleReportManager(db, profileManager) {
 RifleReportManager.prototype.show = function (rifleId) {
     var self = this;
     var container = this.profileManager.container;
-    container.innerHTML = '<div class="profile-screen"><p class="chrono-intro">Building report…</p></div>';
+    container.innerHTML = '<div class="screen"><p class="u-quiet">Building report&hellip;</p></div>';
 
     Promise.all([
         this.db.getRifle(rifleId),
@@ -40,8 +41,9 @@ RifleReportManager.prototype.show = function (rifleId) {
         });
         self._render(rifle, agg, results[2] || [], results[3] || []);
     }).catch(function (err) {
-        container.innerHTML = '<div class="profile-screen"><p class="chrono-error">Could not build the report: ' +
-            escapeHtml(err.message) + '</p></div>';
+        container.innerHTML = '<div class="screen"><div class="alert-strip is-stop">' +
+            Icon('alert', 18) + '<span>Could not build the report: ' +
+            escapeHtml(err.message) + '</span></div></div>';
     });
 };
 
@@ -50,112 +52,121 @@ RifleReportManager.prototype._render = function (rifle, agg, strings, loads) {
     var loadNames = {};
     for (var i = 0; i < loads.length; i++) loadNames[loads[i].id] = loads[i].name;
 
-    var html = '<div class="profile-screen">';
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-report-back">&lsaquo; ' + escapeHtml(rifle.name) + '</button>';
-    html += '<h2 class="profile-title">Performance Report</h2>';
-    html += '<div class="toolbar-spacer"></div>';
+    var html = '<div class="view-toolbar">';
+    html += '<button class="toolbar-back" id="btn-report-back">' + Icon('chevron-left', 20) +
+        '<span>' + escapeHtml(rifle.name) + '</span></button>';
+    html += '<h2 class="toolbar-title">Performance report</h2>';
     html += '</div>';
 
-    html += '<div style="padding:0 16px 12px;">';
-    html += '<button class="btn btn-primary" id="btn-generate-cert" style="width:100%;">Generate Certificate</button>';
-    html += '</div>';
+    html += '<div class="screen">';
 
     // Pending-strings warning with resolve link
     var pending = agg.pendingStrings.unassigned + agg.pendingStrings.suggested + agg.pendingStrings.ambiguous;
     if (pending > 0) {
-        html += '<div class="chrono-warnings report-pending">' + pending + ' velocity string' +
-            (pending === 1 ? '' : 's') + ' not confirmed to a load yet — stats below only use confirmed strings. ';
-        html += '<button class="btn btn-secondary btn-sm" id="btn-report-resolve">Resolve now</button></div>';
+        html += '<div class="alert-strip u-mb-12">' + Icon('alert', 18);
+        html += '<span>' + pending + ' velocity string' + (pending === 1 ? '' : 's') +
+            ' not confirmed to a load yet &mdash; stats below only use confirmed strings. ' +
+            '<button class="action-ghost" id="btn-report-resolve">Resolve now</button></span>';
+        html += '</div>';
     }
 
-    // Recommended load
-    html += '<div class="detail-section"><div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Recommended Load</h3></div>';
+    // HERO — recommended load
+    html += '<div class="zone-hero"><div class="plate">';
+    html += '<div class="instrument-label">Recommended load</div>';
     if (agg.recommendedLoadId) {
         var rec = agg.loads.filter(function (r) { return r.loadId === agg.recommendedLoadId; })[0];
-        html += '<div class="detail-card report-recommended">';
-        html += '<h3>★ ' + escapeHtml(rec.load.name) + '</h3>';
-        html += '<div class="chrono-stats-row">';
-        html += '<span>best group <strong>' + formatNum(rec.bestGroupMOA, 2) + ' MOA</strong></span>';
+        html += '<h3 class="t-title">' + escapeHtml(rec.load.name) + '</h3>';
+        html += '<div class="u-mt-10"><span class="chip is-go">' + Icon('star', 14) + 'Recommended</span></div>';
+        html += '<div class="stat-strip">';
+        html += '<div class="instrument"><div class="instrument-label">Best group</div>' +
+            '<div class="instrument-value">' + formatNum(rec.bestGroupMOA, 2) +
+            '<span class="instrument-unit">MOA</span></div></div>';
         if (rec.stats.n) {
-            html += '<span>avg <strong>' + formatNum(rec.stats.avg, 1) + '</strong> fps</span>';
-            html += '<span>SD ' + formatNum(rec.stats.sd, 1) + '</span>';
-            html += '<span>ES ' + formatNum(rec.stats.es, 1) + '</span>';
-            html += '<span>' + rec.stats.n + ' chrono shots</span>';
+            html += '<div class="instrument"><div class="instrument-label">Avg</div>' +
+                '<div class="instrument-value">' + formatNum(rec.stats.avg, 1) +
+                '<span class="instrument-unit">fps</span></div></div>';
+            html += '<div class="instrument"><div class="instrument-label">SD</div>' +
+                '<div class="instrument-value">' + formatNum(rec.stats.sd, 1) + '</div></div>';
+            html += '<div class="instrument"><div class="instrument-label">ES</div>' +
+                '<div class="instrument-value">' + formatNum(rec.stats.es, 1) + '</div></div>';
         }
-        html += '</div></div>';
+        html += '</div>';
+        if (rec.stats.n) html += '<div class="t-micro u-mt-10">' + rec.stats.n + ' chrono shots</div>';
     } else {
-        html += '<div class="detail-card"><p class="chrono-intro">No recommendation yet — a load needs at least one saved target session with 3+ marked shots. Velocity data alone is not enough to recommend a load.</p></div>';
+        html += '<div class="empty-teach"><p>No recommendation yet &mdash; a load needs at least one saved target session with 3+ marked shots. Velocity data alone is not enough to recommend a load.</p></div>';
     }
-    html += '</div>';
+    html += '</div></div>';
+
+    // The one loud thing on this screen
+    html += '<button class="action-primary" id="btn-generate-cert">' + Icon('award', 20) + 'Generate certificate</button>';
 
     // Best group
-    html += '<div class="detail-section"><div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Best Group</h3></div>';
+    html += '<div class="qcard-kicker">Best group</div>';
+    html += '<div class="plate">';
     if (agg.bestGroup) {
-        html += '<div class="detail-card report-best-group">';
-        html += '<img class="report-thumb" id="report-best-thumb" alt="Best group target">';
-        html += '<div class="report-best-facts">';
-        html += '<h3>' + formatNum(agg.bestGroup.moa, 2) + ' MOA';
-        if (agg.bestGroup.inches !== null) html += ' <span class="report-inches">(' + formatNum(agg.bestGroup.inches, 2) + '")</span>';
-        html += '</h3>';
-        html += '<p>' + agg.bestGroup.shots + ' shots at ' + (agg.bestGroup.distanceYards || '?') + ' yd';
+        html += '<img class="thumb" id="report-best-thumb" alt="Best group target">';
+        html += '<div class="instrument u-mt-10">';
+        html += '<div class="instrument-value">' + formatNum(agg.bestGroup.moa, 2) +
+            '<span class="instrument-unit">MOA</span></div>';
+        html += '</div>';
+        var facts = [];
+        if (agg.bestGroup.inches !== null) facts.push(formatNum(agg.bestGroup.inches, 2) + '&Prime;');
+        facts.push(agg.bestGroup.shots + ' shots at ' + (agg.bestGroup.distanceYards || '?') + ' yd');
         if (agg.bestGroup.loadId && loadNames[agg.bestGroup.loadId]) {
-            html += ' · ' + escapeHtml(loadNames[agg.bestGroup.loadId]);
+            facts.push(escapeHtml(loadNames[agg.bestGroup.loadId]));
         }
         if (agg.bestGroup.date) {
             var d = new Date(agg.bestGroup.date);
-            if (!isNaN(d.getTime())) html += ' · ' + d.toLocaleDateString();
+            if (!isNaN(d.getTime())) facts.push(d.toLocaleDateString());
         }
-        html += '</p></div></div>';
+        html += '<div class="t-micro u-mt-10">' + facts.join(' &middot; ') + '</div>';
     } else {
-        html += '<div class="detail-card"><p class="chrono-intro">No eligible groups yet (needs a saved session with 3+ marked shots).</p></div>';
+        html += '<div class="empty-teach"><p>No eligible groups yet &mdash; needs a saved session with 3+ marked shots.</p></div>';
     }
     html += '</div>';
 
     // Per-load rollup
-    html += '<div class="detail-section"><div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Loads</h3></div>';
+    html += '<div class="qcard-kicker">Loads</div>';
     if (agg.loads.length) {
-        html += '<div class="detail-card"><table class="chrono-table"><thead><tr>' +
+        html += '<div class="datatable-wrap"><table class="datatable"><thead><tr>' +
             '<th>Load</th><th>Best grp</th><th>Avg</th><th>SD</th><th>ES</th><th>Shots</th></tr></thead><tbody>';
         for (var r = 0; r < agg.loads.length; r++) {
             var row = agg.loads[r];
-            html += '<tr' + (row.loadId === agg.recommendedLoadId ? ' class="report-rec-row"' : '') + '>';
-            html += '<td>' + (row.loadId === agg.recommendedLoadId ? '★ ' : '') + escapeHtml(row.load.name) + '</td>';
-            html += '<td>' + (row.bestGroupMOA !== null ? formatNum(row.bestGroupMOA, 2) : '—') + '</td>';
+            var isRec = row.loadId === agg.recommendedLoadId;
+            html += '<tr' + (isRec ? ' class="is-marked"' : '') + '>';
+            html += '<td>' + (isRec ? Icon('star', 12) + ' ' : '') + escapeHtml(row.load.name) + '</td>';
+            html += '<td>' + (row.bestGroupMOA !== null ? formatNum(row.bestGroupMOA, 2) : '&mdash;') + '</td>';
             html += '<td>' + formatNum(row.stats.avg, 1) + '</td>';
             html += '<td>' + formatNum(row.stats.sd, 1) + '</td>';
             html += '<td>' + formatNum(row.stats.es, 1) + '</td>';
-            html += '<td>' + (row.stats.n || '—') + '</td>';
+            html += '<td>' + (row.stats.n || '&mdash;') + '</td>';
             html += '</tr>';
         }
         html += '</tbody></table></div>';
     } else {
-        html += '<div class="detail-card"><p class="chrono-intro">No loads on this rifle yet.</p></div>';
+        html += '<div class="plate"><div class="empty-teach"><p>No loads on this rifle yet.</p></div></div>';
     }
-    html += '</div>';
 
     // Strings
-    html += '<div class="detail-section"><div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Velocity Strings (' + strings.length + ')</h3></div>';
+    html += '<div class="qcard-kicker">Velocity strings (' + strings.length + ')</div>';
     if (strings.length) {
-        html += '<div class="detail-card"><ul class="chrono-string-list">';
         for (var v = 0; v < strings.length; v++) {
             var s = strings[v];
-            var label = s.assignmentStatus === 'confirmed'
-                ? '→ ' + escapeHtml(loadNames[s.loadId] || 'unknown load')
-                : '<span class="chrono-badge">' + escapeHtml(s.assignmentStatus) + '</span>';
-            html += '<li>' + escapeHtml(self._stringLabel(s)) + ' ' + label + '</li>';
+            var sub = s.assignmentStatus === 'confirmed'
+                ? escapeHtml(loadNames[s.loadId] || 'unknown load')
+                : '<span class="chip">' + escapeHtml(s.assignmentStatus) + '</span>';
+            html += '<div class="row-item">';
+            html += '<div class="row-main">';
+            html += '<div class="row-title">' + escapeHtml(self._stringLabel(s)) + '</div>';
+            html += '<div class="row-sub">' + sub + '</div>';
+            html += '</div>';
+            html += '</div>';
         }
-        html += '</ul></div>';
     } else {
-        html += '<div class="detail-card"><p class="chrono-intro">No chrono strings imported yet — Home → "Import chrono data".</p></div>';
+        html += '<div class="plate"><div class="empty-teach"><p>No chrono strings imported yet &mdash; use Import chrono data on Home.</p></div></div>';
     }
-    html += '</div>';
 
-    html += '</div>'; // .profile-screen
+    html += '</div>'; // .screen
     this.profileManager.container.innerHTML = html;
 
     document.getElementById('btn-report-back').addEventListener('click', function () {

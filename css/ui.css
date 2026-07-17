@@ -214,7 +214,7 @@ img { max-width: 100%; }
     background: var(--go);
     margin-right: 6px;
 }
-.conn-dot.is-offline { background: var(--ink-3); }
+.conn-dot.offline { background: var(--ink-3); }
 
 /* views */
 .app-view {
@@ -465,6 +465,16 @@ img { max-width: 100%; }
 .chip.is-go { color: var(--go); border-color: var(--go); background: var(--go-dim); }
 .chip.is-hold { color: var(--hold); border-color: var(--hold); background: var(--hold-dim); }
 .chip.is-stop { color: var(--stop); border-color: var(--stop); background: var(--stop-dim); }
+
+/* card header row: title left, quiet action right */
+.plate-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.plate-head .t-head { flex: 1; min-width: 0; }
 
 /* zero-guardian click-value picker (compact inline control) */
 .zg-clicks {
@@ -1535,20 +1545,6 @@ body.high-contrast .overlay { background: rgba(40, 44, 47, 0.5); }
 
 .validation-hint { font-size: 13px; color: var(--stop); min-height: 18px; margin: 6px 0 0; }
 .chrono-hint { font-size: 13px; color: var(--ink-3); margin: 8px 0; }
-.help-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
-    border: 1px solid var(--line-strong);
-    background: none;
-    color: var(--ink-3);
-    font-size: 12px;
-    font-weight: 600;
-    flex: none;
-}
 
 /* frozen solver table + form */
 .solver-form { padding: 0 var(--gutter) 20px; }
@@ -1598,27 +1594,4 @@ body.high-contrast .overlay { background: rgba(40, 44, 47, 0.5); }
     color: var(--ink);
     border-top: 1px solid var(--hold);
     border-bottom: 1px solid var(--hold);
-}
-
-/* legacy wizard overlay (until wizard.js and its consumers are rewritten) */
-.wizard-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 70;
-    background: rgba(6, 8, 9, 0.72);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-}
-.wizard-card {
-    width: 100%;
-    max-width: 480px;
-    max-height: 86dvh;
-    overflow-y: auto;
-    background: var(--g3);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r-overlay);
-    box-shadow: var(--shadow-overlay);
-    padding: 20px 16px;
 }

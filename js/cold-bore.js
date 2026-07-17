@@ -7,7 +7,9 @@
  *   2) Manual entries in the cold_bore_shots table (legacy / hand-logged).
  *
  * Groups by load when multiple loads exist on the rifle.
- * Shows averages, history, and a target-diagram plot.
+ * Renders as a card (.plate) inside the rifle hub: verdict sentence
+ * first, instrument strip under it, scatter plot, then folds for the
+ * per-load breakdown, shot log, and tutorial.
  */
 
 function ColdBoreManager(db) {
@@ -16,31 +18,20 @@ function ColdBoreManager(db) {
 }
 
 /**
- * Render Cold Bore section inside rifle detail.
+ * Render Cold Bore card inside rifle detail (container is a .qcard).
  */
 ColdBoreManager.prototype.renderSection = function (container, rifleId, rifle) {
     var self = this;
     this._rifle = rifle || null; // for suppressor-config tagging on manual entries
-    var html = '';
 
-    html += '<div class="detail-section">';
-    html += '<div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Cold Bore</h3>';
-    html += '<button class="btn btn-sm btn-secondary" id="btn-add-cold-bore">+ Log Shot</button>';
-    html += '</div>';
-    html += '<div id="cold-bore-content"><p class="empty-state-sub">Loading...</p></div>';
+    var html = '';
+    html += '<div class="plate">';
+    html += '<div id="cold-bore-content"><p class="t-micro">Loading&hellip;</p></div>';
     html += '</div>';
 
     container.insertAdjacentHTML('beforeend', html);
 
     self._loadData(rifleId);
-
-    var addBtn = document.getElementById('btn-add-cold-bore');
-    if (addBtn) {
-        addBtn.addEventListener('click', function () {
-            self._showAddForm(rifleId);
-        });
-    }
 };
 
 /**
@@ -111,7 +102,18 @@ ColdBoreManager.prototype._loadData = function (rifleId) {
         }
 
         if (entries.length === 0) {
-            contentEl.innerHTML = self._renderTutorial();
+            // Teaching empty state: one sentence; manual logging stays
+            // reachable for shooters transcribing a paper cold-bore log.
+            contentEl.innerHTML = '<div class="empty-teach">' +
+                '<p>Mark shot #1 in your next session and yorT tracks your cold bore automatically.</p>' +
+                '</div>' +
+                '<div class="action-row"><button class="action-ghost" id="btn-add-cold-bore">' + Icon('plus', 16) + ' Log a shot by hand</button></div>';
+            var emptyAdd = document.getElementById('btn-add-cold-bore');
+            if (emptyAdd) {
+                emptyAdd.addEventListener('click', function () {
+                    self._showAddForm(rifleId);
+                });
+            }
             return;
         }
 
@@ -129,11 +131,17 @@ ColdBoreManager.prototype._loadData = function (rifleId) {
             self._drawPlot('cb-plot-' + g, groups[g].entries);
         }
 
-        // Bind delete handlers
+        // Bind header + delete handlers
+        var addBtn = document.getElementById('btn-add-cold-bore');
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                self._showAddForm(rifleId);
+            });
+        }
         self._bindDeleteButtons(rifleId);
     }).catch(function (err) {
         console.error('[ColdBore] Failed to load:', err);
-        contentEl.innerHTML = '<p class="empty-state-sub">Failed to load cold bore data.</p>';
+        contentEl.innerHTML = '<p class="t-body u-quiet">Could not load cold bore data.</p>';
     });
 };
 
@@ -186,68 +194,66 @@ ColdBoreManager.prototype._renderEntries = function (entries, groups) {
     var html = '';
     var overallAvg = this._averageEntries(entries);
 
-    // Overall stats
-    var elevDir = overallAvg.vertMOA >= 0 ? 'High' : 'Low';
-    var windDir = overallAvg.horizMOA >= 0 ? 'Right' : 'Left';
+    var elevDir = overallAvg.vertMOA >= 0 ? 'high' : 'low';
+    var windDir = overallAvg.horizMOA >= 0 ? 'right' : 'left';
+    var vAbs = Math.abs(overallAvg.vertMOA).toFixed(2);
+    var hAbs = Math.abs(overallAvg.horizMOA).toFixed(2);
 
-    html += '<div class="cb-stats">';
-    html += '<div class="cb-stat">';
-    html += '<span class="cb-stat-value">' + Math.abs(overallAvg.vertMOA).toFixed(2) + '</span>';
-    html += '<span class="cb-stat-label">Avg Vertical (MOA) ' + elevDir + '</span>';
-    html += '</div>';
-    html += '<div class="cb-stat">';
-    html += '<span class="cb-stat-value">' + Math.abs(overallAvg.horizMOA).toFixed(2) + '</span>';
-    html += '<span class="cb-stat-label">Avg Horizontal (MOA) ' + windDir + '</span>';
-    html += '</div>';
-    html += '<div class="cb-stat">';
-    html += '<span class="cb-stat-value">' + overallAvg.totalMOA.toFixed(2) + '</span>';
-    html += '<span class="cb-stat-label">Avg Total (MOA)</span>';
-    html += '</div>';
-    html += '<div class="cb-stat">';
-    html += '<span class="cb-stat-value">' + entries.length + '</span>';
-    html += '<span class="cb-stat-label">cold bore shot' + (entries.length !== 1 ? 's' : '') + '</span>';
-    html += '</div>';
+    // Verdict sentence first (the HOLD), log action beside it.
+    html += '<div class="plate-head">';
+    html += '<p class="t-head">Cold bore lands ' + vAbs + ' MOA ' + elevDir + ', ' +
+        hAbs + ' ' + windDir + ' &mdash; hold opposite for shot one.</p>';
+    html += '<button class="action-ghost" id="btn-add-cold-bore">' + Icon('plus', 16) + 'Log shot</button>';
     html += '</div>';
 
-    // Hold recommendation hint
-    html += '<p class="cb-tutorial-text" style="margin-top:8px;">';
-    html += 'Cold bore tends to land <strong>' + Math.abs(overallAvg.vertMOA).toFixed(2) + ' MOA ' + elevDir + '</strong>, ';
-    html += '<strong>' + Math.abs(overallAvg.horizMOA).toFixed(2) + ' MOA ' + windDir + '</strong>. ';
-    html += 'Hold opposite for your first cold shot.';
-    html += '</p>';
-
-    // Overall plot
-    html += '<div class="cb-plot-container">';
-    html += '<canvas id="cb-plot-all" width="280" height="280"></canvas>';
+    // Instrument strip: numbers under the sentence.
+    html += '<div class="stat-strip">';
+    html += '<div class="instrument">';
+    html += '<div class="instrument-label">Vertical &middot; ' + elevDir + '</div>';
+    html += '<div class="instrument-value">' + vAbs + '<span class="instrument-unit">MOA</span></div>';
     html += '</div>';
+    html += '<div class="instrument">';
+    html += '<div class="instrument-label">Horizontal &middot; ' + windDir + '</div>';
+    html += '<div class="instrument-value">' + hAbs + '<span class="instrument-unit">MOA</span></div>';
+    html += '</div>';
+    html += '<div class="instrument">';
+    html += '<div class="instrument-label">Total</div>';
+    html += '<div class="instrument-value">' + overallAvg.totalMOA.toFixed(2) + '<span class="instrument-unit">MOA</span></div>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<p class="t-micro u-mt-10">' + entries.length + ' cold bore shot' +
+        (entries.length !== 1 ? 's' : '') + ' recorded</p>';
+
+    // Scatter plot: center = POA, each dot = a cold bore offset.
+    html += '<canvas id="cb-plot-all" class="u-center u-mt-10" width="280" height="280"></canvas>';
 
     // Per-load breakdown (only when there are 2+ loads)
     if (groups.length > 1) {
-        html += '<details class="session-details" style="margin-top:8px;">';
-        html += '<summary class="session-details-summary">Breakdown by load (' + groups.length + ')</summary>';
-        html += '<div class="session-details-body">';
+        html += '<details class="fold u-mt-10">';
+        html += '<summary>Breakdown by load (' + groups.length + ')</summary>';
+        html += '<div class="fold-body">';
         for (var g = 0; g < groups.length; g++) {
             var grp = groups[g];
-            var gElevDir = grp.avg.vertMOA >= 0 ? 'High' : 'Low';
-            var gWindDir = grp.avg.horizMOA >= 0 ? 'Right' : 'Left';
-            html += '<div style="margin-bottom:12px;border-top:1px solid var(--border);padding-top:8px;">';
-            html += '<div style="font-weight:600;margin-bottom:4px;">' + escapeHtml(grp.loadName) + ' (' + grp.entries.length + ')</div>';
-            html += '<div class="result-row"><span class="result-label">Avg Vertical</span><span class="result-value">' + Math.abs(grp.avg.vertMOA).toFixed(2) + ' MOA ' + gElevDir + '</span></div>';
-            html += '<div class="result-row"><span class="result-label">Avg Horizontal</span><span class="result-value">' + Math.abs(grp.avg.horizMOA).toFixed(2) + ' MOA ' + gWindDir + '</span></div>';
-            html += '<div class="result-row"><span class="result-label">Avg Total</span><span class="result-value">' + grp.avg.totalMOA.toFixed(2) + ' MOA</span></div>';
-            html += '<div class="cb-plot-container" style="margin-top:4px;">';
-            html += '<canvas id="cb-plot-' + g + '" width="220" height="220"></canvas>';
-            html += '</div>';
-            html += '</div>';
+            var gElevDir = grp.avg.vertMOA >= 0 ? 'high' : 'low';
+            var gWindDir = grp.avg.horizMOA >= 0 ? 'right' : 'left';
+            html += '<div class="u-label u-mt-10">' + escapeHtml(grp.loadName) + ' (' + grp.entries.length + ')</div>';
+            html += '<div class="spec-row"><span class="spec-key">Avg vertical</span><span class="spec-val">' +
+                Math.abs(grp.avg.vertMOA).toFixed(2) + ' MOA ' + gElevDir + '</span></div>';
+            html += '<div class="spec-row"><span class="spec-key">Avg horizontal</span><span class="spec-val">' +
+                Math.abs(grp.avg.horizMOA).toFixed(2) + ' MOA ' + gWindDir + '</span></div>';
+            html += '<div class="spec-row"><span class="spec-key">Avg total</span><span class="spec-val">' +
+                grp.avg.totalMOA.toFixed(2) + ' MOA</span></div>';
+            html += '<canvas id="cb-plot-' + g + '" class="u-center u-mt-10" width="220" height="220"></canvas>';
         }
         html += '</div></details>';
     }
 
-    // History table
-    html += '<details class="session-details" style="margin-top:8px;">';
-    html += '<summary class="session-details-summary">Shot Log (' + entries.length + ')</summary>';
-    html += '<div class="session-details-body">';
-    html += '<div class="admin-table-wrap"><table class="admin-table">';
+    // Shot log
+    html += '<details class="fold">';
+    html += '<summary>Shot log (' + entries.length + ')</summary>';
+    html += '<div class="fold-body">';
+    html += '<div class="datatable-wrap"><table class="datatable">';
     html += '<thead><tr><th>Date</th><th>Dist</th><th>Load</th><th>Vert</th><th>Horiz</th><th>Total</th><th></th></tr></thead>';
     html += '<tbody>';
     for (var i = 0; i < entries.length; i++) {
@@ -263,9 +269,10 @@ ColdBoreManager.prototype._renderEntries = function (entries, groups) {
         html += '<td>' + Math.abs(e.horizMOA).toFixed(2) + ' ' + hDir + '</td>';
         html += '<td>' + e.totalMOA.toFixed(2) + '</td>';
         if (e.source === 'manual') {
-            html += '<td><button class="btn-icon btn-sm cb-delete-btn" data-cb-id="' + e.manualId + '">&times;</button></td>';
+            html += '<td><button class="action-ghost" data-cb-id="' + e.manualId +
+                '" aria-label="Delete entry">' + Icon('trash', 16) + '</button></td>';
         } else {
-            html += '<td><span class="cb-tag">auto</span></td>';
+            html += '<td><span class="chip">auto</span></td>';
         }
         html += '</tr>';
     }
@@ -273,31 +280,24 @@ ColdBoreManager.prototype._renderEntries = function (entries, groups) {
     html += '</div></details>';
 
     // Tutorial
-    html += '<details class="session-details" style="margin-top:8px;">';
-    html += '<summary class="session-details-summary">What is Cold Bore Tracking?</summary>';
-    html += '<div class="session-details-body">' + this._tutorialText() + '</div>';
+    html += '<details class="fold">';
+    html += '<summary>What is cold bore tracking?</summary>';
+    html += '<div class="fold-body">' + this._tutorialText() + '</div>';
     html += '</details>';
 
     return html;
 };
 
-ColdBoreManager.prototype._renderTutorial = function () {
-    return '<div class="cb-tutorial">' +
-        '<div class="cb-tutorial-title">Cold Bore Tracking</div>' +
-        this._tutorialText() +
-        '</div>';
-};
-
 ColdBoreManager.prototype._tutorialText = function () {
-    return '<p class="cb-tutorial-text">' +
+    return '<p class="t-body u-quiet">' +
         '<strong>Why it matters:</strong> Your first shot on a clean, cold barrel often impacts at a different point than subsequent shots from a warm, fouled barrel. ' +
-        'Knowing your cold bore offset lets you compensate on your critical first shot — which is often the only shot that matters in the field.' +
+        'Knowing your cold bore offset lets you compensate on your critical first shot &mdash; which is often the only shot that matters in the field.' +
         '</p>' +
-        '<p class="cb-tutorial-text">' +
+        '<p class="t-body u-quiet u-mt-10">' +
         '<strong>How yorT collects this:</strong> Whenever you mark your impacts in fire order, shot #1 is treated as the cold-bore shot. Its offset from POA is saved with the session automatically.' +
         '</p>' +
-        '<p class="cb-tutorial-text">' +
-        '<strong>Tip:</strong> Tap your hole in fire order (shot #1 first). 10+ data points reveal a reliable trend.' +
+        '<p class="t-body u-quiet u-mt-10">' +
+        '<strong>Tip:</strong> Tap your holes in fire order (shot #1 first). 10+ data points reveal a reliable trend.' +
         '</p>';
 };
 
@@ -305,7 +305,7 @@ ColdBoreManager.prototype._bindDeleteButtons = function (rifleId) {
     var self = this;
     var contentEl = document.getElementById('cold-bore-content');
     if (!contentEl) return;
-    var delBtns = contentEl.querySelectorAll('.cb-delete-btn');
+    var delBtns = contentEl.querySelectorAll('[data-cb-id]');
     for (var d = 0; d < delBtns.length; d++) {
         delBtns[d].addEventListener('click', function () {
             var id = this.getAttribute('data-cb-id');
@@ -323,46 +323,54 @@ ColdBoreManager.prototype._showAddForm = function (rifleId) {
     var contentEl = document.getElementById('cold-bore-content');
     if (!contentEl) return;
 
-    var html = '<div class="dope-add-form">';
+    var html = '';
+    html += '<h4 class="t-head u-mb-12">Log a cold bore shot</h4>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Distance (yds)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="cb-distance">Distance <span class="field-unit">yd</span></label>';
     html += '<input type="number" id="cb-distance" min="50" max="2000" step="25" inputmode="numeric" placeholder="100">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Barrel Condition</label>';
-    html += '<select id="cb-condition">';
-    html += '<option value="clean_cold">Clean & Cold</option>';
-    html += '<option value="cold_fouled">Cold (fouled)</option>';
-    html += '</select>';
+
+    html += '<div class="field">';
+    html += '<div class="field-label">Barrel condition</div>';
+    html += '<div class="seg" id="cb-condition">';
+    html += '<button type="button" class="seg-opt is-selected" data-value="clean_cold">Clean &amp; cold</button>';
+    html += '<button type="button" class="seg-opt" data-value="cold_fouled">Cold, fouled</button>';
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Vert Offset (MOA)</label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="cb-elev">Vert offset <span class="field-unit">MOA</span></label>';
     html += '<input type="number" id="cb-elev" step="0.25" inputmode="decimal" placeholder="+1.5 high, -0.5 low">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Horiz Offset (MOA)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="cb-wind">Horiz offset <span class="field-unit">MOA</span></label>';
     html += '<input type="number" id="cb-wind" step="0.25" inputmode="decimal" placeholder="+0.5 right, -0.5 left">';
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label>Notes (optional)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="cb-notes">Notes <span class="field-unit">optional</span></label>';
     html += '<input type="text" id="cb-notes" placeholder="e.g., barrel cleaned yesterday">';
     html += '</div>';
-    html += '<p id="cb-error" class="form-error"></p>';
+    html += '<p id="cb-error" class="field-error"></p>';
 
-    html += '<div class="btn-row">';
-    html += '<button class="btn btn-secondary" id="cb-cancel-btn">Cancel</button>';
-    html += '<button class="btn btn-primary" id="cb-save-btn">Save</button>';
-    html += '</div>';
+    html += '<div class="action-row u-mt-10">';
+    html += '<button class="action-ghost" id="cb-cancel-btn">Cancel</button>';
+    html += '<button class="action" id="cb-save-btn">Save</button>';
     html += '</div>';
 
     contentEl.innerHTML = html;
+
+    // Segmented control: one selected option at a time.
+    var segOpts = contentEl.querySelectorAll('#cb-condition .seg-opt');
+    for (var s = 0; s < segOpts.length; s++) {
+        segOpts[s].addEventListener('click', function () {
+            for (var t = 0; t < segOpts.length; t++) segOpts[t].classList.remove('is-selected');
+            this.classList.add('is-selected');
+        });
+    }
 
     document.getElementById('cb-cancel-btn').addEventListener('click', function () {
         self._loadData(rifleId);
@@ -379,10 +387,11 @@ ColdBoreManager.prototype._showAddForm = function (rifleId) {
             if (errEl) errEl.textContent = 'Enter at least one non-zero offset.';
             return;
         }
+        var selectedCond = contentEl.querySelector('#cb-condition .seg-opt.is-selected');
         var shot = {
             rifleId: rifleId,
             distanceYards: parseFloat(document.getElementById('cb-distance').value) || 100,
-            condition: document.getElementById('cb-condition').value,
+            condition: selectedCond ? selectedCond.getAttribute('data-value') : 'clean_cold',
             config: self._rifle && self._rifle.hasConfigs
                 ? (self._rifle.activeConfig || 'bare') : null,
             elevationOffsetMOA: elev,
@@ -402,6 +411,9 @@ ColdBoreManager.prototype._showAddForm = function (rifleId) {
 /**
  * Draw a scatter plot of cold bore shots on a target-like canvas.
  * Center = POA, each dot = cold bore offset.
+ * Colors are spec-token literals (canvas cannot read CSS variables here):
+ * impacts --impact, POA --poa, rings/grid --line, labels --ink-2,
+ * average marker --hold (the number you act on). Background transparent.
  * @param {string} canvasId
  * @param {array} entries — unified entries with vertMOA / horizMOA
  */
@@ -416,9 +428,6 @@ ColdBoreManager.prototype._drawPlot = function (canvasId, entries) {
 
     ctx.clearRect(0, 0, w, h);
 
-    ctx.fillStyle = '#1e1e1e';
-    ctx.fillRect(0, 0, w, h);
-
     // Find max MOA to fit all points
     var maxAbs = 1;
     for (var i = 0; i < entries.length; i++) {
@@ -432,19 +441,19 @@ ColdBoreManager.prototype._drawPlot = function (canvasId, entries) {
     var scale = (Math.min(cx, cy) - 20) / maxMOA;
 
     // Rings
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = '#2A3036';
     ctx.lineWidth = 1;
     for (var ring = 1; ring <= maxMOA; ring++) {
         ctx.beginPath();
         ctx.arc(cx, cy, ring * scale, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = '#555';
+        ctx.fillStyle = '#9BA6AE';
         ctx.font = '10px sans-serif';
         ctx.fillText(ring + ' MOA', cx + ring * scale + 4, cy - 4);
     }
 
     // Crosshairs
-    ctx.strokeStyle = '#444';
+    ctx.strokeStyle = '#2A3036';
     ctx.beginPath();
     ctx.moveTo(cx, 10);
     ctx.lineTo(cx, h - 10);
@@ -453,30 +462,30 @@ ColdBoreManager.prototype._drawPlot = function (canvasId, entries) {
     ctx.stroke();
 
     // POA marker
-    ctx.fillStyle = '#2196f3';
+    ctx.fillStyle = '#4D9FD6';
     ctx.beginPath();
     ctx.arc(cx, cy, 4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = '#9BA6AE';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('POA', cx + 8, cy - 8);
 
-    // Plot each shot — orange/yellow for cold bore
+    // Plot each shot — impact green
     for (var k = 0; k < entries.length; k++) {
         var e = entries[k];
         var px = cx + e.horizMOA * scale;
         var py = cy - e.vertMOA * scale;
         ctx.beginPath();
         ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 193, 7, 0.7)';
+        ctx.fillStyle = 'rgba(70, 178, 104, 0.7)';
         ctx.fill();
-        ctx.strokeStyle = '#ffc107';
+        ctx.strokeStyle = '#46B268';
         ctx.lineWidth = 1;
         ctx.stroke();
     }
 
-    // Average marker (only with multiple shots)
+    // Average marker (only with multiple shots) — brass, the hold point
     if (entries.length > 1) {
         var avgV = 0, avgH = 0;
         for (var m = 0; m < entries.length; m++) {
@@ -489,12 +498,12 @@ ColdBoreManager.prototype._drawPlot = function (canvasId, entries) {
         var ay = cy - avgV * scale;
         ctx.beginPath();
         ctx.arc(ax, ay, 7, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(76, 175, 80, 0.85)';
+        ctx.fillStyle = 'rgba(217, 161, 59, 0.85)';
         ctx.fill();
-        ctx.strokeStyle = '#4caf50';
+        ctx.strokeStyle = '#D9A13B';
         ctx.lineWidth = 2;
         ctx.stroke();
-        ctx.fillStyle = '#4caf50';
+        ctx.fillStyle = '#D9A13B';
         ctx.font = 'bold 10px sans-serif';
         ctx.fillText('AVG', ax + 10, ay + 4);
     }

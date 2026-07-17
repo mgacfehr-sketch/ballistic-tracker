@@ -2,11 +2,12 @@
  * chrono.js — ChronoManager: Garmin ShotView import UI.
  *
  * Flow: pick a ShotView export (.csv single session / .xlsx multi-session)
- * → parse via garmin-import.js → preview cards with include checkboxes
+ * → parse via garmin-import.js → preview plates with include checkboxes
  * → optionally pick a rifle (strings become 'suggested'; confirmed later
  * in the assignment step) → save each included string to velocity_strings
  * with stats from velocity-stats.js and the barrel round count at that time.
  *
+ * Markup follows docs/REDESIGN-SPEC.md (Part IV vocabulary, css/ui.css).
  * Gated by hasFeature('chronoImport'). All storage goes through db.js.
  */
 
@@ -25,7 +26,7 @@ ChronoManager.prototype.init = function () {
     this.container = document.getElementById('view-chrono');
     var tab = document.getElementById('nav-chrono');
     if (tab && typeof hasFeature === 'function' && hasFeature('chronoImport')) {
-        tab.style.display = '';
+        tab.classList.remove('hidden');
     }
 };
 
@@ -40,34 +41,50 @@ ChronoManager.prototype.show = function () {
     }
 
     var html = '';
-    html += '<div class="chrono-screen">';
-    html += '<h2>Chrono Import</h2>';
-    html += '<p class="chrono-intro">Pick the rifle, then import a Garmin ShotView export (single-session CSV or multi-session .xlsx).</p>';
-
-    // Rifle-first: the import context is visible BEFORE any file is
-    // parsed, and survives across multiple imports
-    html += '<div id="chrono-import-section">';
-    html += '<div class="detail-card chrono-assign">';
-    html += '<div class="form-group"><label for="chrono-rifle">Rifle for this import</label>';
-    html += '<select id="chrono-rifle"><option value="">— Pick a rifle —</option></select></div>';
-    html += '<div class="form-group"><label for="chrono-base-rounds">Barrel round count BEFORE this import</label>';
-    html += '<input type="number" id="chrono-base-rounds" min="0" step="1" placeholder="unknown" class="chrono-rounds-input" style="max-width:160px;">';
-    html += '<p class="chrono-hint">Each string is tagged with its AFTER-count: this base + shots fired so far.</p></div>';
-    html += '<label class="chrono-add-rounds"><input type="checkbox" id="chrono-add-rounds" disabled> ' +
-        'Update the barrel round count to match (base + imported shots)</label>';
+    html += '<div class="view-toolbar" id="chrono-toolbar-import">';
+    html += '<h2 class="toolbar-title">Chrono import</h2>';
     html += '</div>';
-    html += '<label class="btn btn-primary chrono-file-label" for="chrono-file">Choose ShotView File</label>';
-    html += '<input type="file" id="chrono-file" accept=".csv,.xlsx" class="chrono-file-input">';
+
+    html += '<div class="view-toolbar hidden" id="chrono-toolbar-review">';
+    html += '<button type="button" class="toolbar-back" id="chrono-back-btn">' +
+        Icon('chevron-left', 20) + 'Import</button>';
+    html += '<h2 class="toolbar-title">Assign strings to ammo</h2>';
+    html += '</div>';
+
+    html += '<div class="screen">';
+
+    // Rifle-first hero plate: the import context is visible BEFORE any
+    // file is parsed, and survives across multiple imports
+    html += '<div id="chrono-import-section">';
+    html += '<div class="plate">';
+    html += '<h3 class="t-head">Import chrono data</h3>';
+    html += '<p class="t-body u-quiet">A ShotView file, straight from Garmin &mdash; CSV or XLSX.</p>';
+    html += '<div class="field-row u-mt-14">';
+    html += '<div class="field"><label class="field-label" for="chrono-rifle">Rifle for this import</label>';
+    html += '<select id="chrono-rifle"><option value="">Pick a rifle</option></select></div>';
+    html += '<div class="field"><label class="field-label" for="chrono-base-rounds">Rounds before import</label>';
+    html += '<input type="number" id="chrono-base-rounds" min="0" step="1" placeholder="unknown">';
+    html += '<p class="field-hint">Each string is tagged with its after-count: this base + shots fired so far.</p>';
+    html += '</div></div>';
+    html += '<label class="t-body u-quiet" for="chrono-add-rounds">' +
+        '<input type="checkbox" id="chrono-add-rounds" disabled> ' +
+        'Update the barrel round count to match (base + imported shots)</label>';
+    html += '</div>'; // .plate
+    html += '<label class="action-primary u-mt-14" id="chrono-file-label" for="chrono-file">' +
+        Icon('import', 20) + 'Choose ShotView file</label>';
+    html += '<input type="file" id="chrono-file" accept=".csv,.xlsx" class="hidden">';
     html += '</div>'; // #chrono-import-section
 
-    html += '<div id="chrono-review-launcher" class="detail-card chrono-assign hidden">';
-    html += '<div class="form-group"><label for="chrono-review-rifle">Review &amp; assign saved strings</label>';
+    html += '<div id="chrono-review-launcher" class="hidden">';
+    html += '<div class="qcard-kicker">Review saved strings</div>';
+    html += '<div class="field"><label class="field-label" for="chrono-review-rifle">Rifle</label>';
     html += '<select id="chrono-review-rifle"></select></div>';
-    html += '<button id="chrono-review-btn" class="btn btn-secondary">Review Strings</button>';
+    html += '<button type="button" id="chrono-review-btn" class="action">Review strings</button>';
     html += '</div>';
-    html += '<div id="chrono-error" class="chrono-error hidden"></div>';
-    html += '<div id="chrono-results"></div>';
-    html += '</div>';
+
+    html += '<div id="chrono-error" class="alert-strip is-stop u-mt-10 hidden"></div>';
+    html += '<div id="chrono-results" class="u-mt-10"></div>';
+    html += '</div>'; // .screen
     this.container.innerHTML = html;
 
     var self = this;
@@ -77,6 +94,11 @@ ChronoManager.prototype.show = function () {
             self._handleFile(input.files[0]);
         }
         input.value = ''; // allow re-picking the same file
+    });
+
+    // Review takes over the screen; the toolbar back returns here
+    document.getElementById('chrono-back-btn').addEventListener('click', function () {
+        self.show();
     });
 
     // Import-context bindings live here now (panel is static)
@@ -100,7 +122,7 @@ ChronoManager.prototype.show = function () {
             opts += '<option value="' + self._escapeHtml(self.rifles[i].id) + '">' +
                 self._escapeHtml(self.rifles[i].name) + '</option>';
         }
-        importSel.innerHTML = '<option value="">— Pick a rifle —</option>' + opts;
+        importSel.innerHTML = '<option value="">Pick a rifle</option>' + opts;
         sel.innerHTML = opts;
         launcher.classList.remove('hidden');
         document.getElementById('chrono-review-btn').addEventListener('click', function () {
@@ -118,7 +140,7 @@ ChronoManager.prototype._handleFile = function (file) {
     var self = this;
     this._showError(null);
     document.getElementById('chrono-results').innerHTML =
-        '<p class="chrono-intro">Reading ' + this._escapeHtml(file.name) + '…</p>';
+        '<p class="t-body u-quiet">Reading ' + this._escapeHtml(file.name) + '&hellip;</p>';
 
     var name = (file.name || '').toLowerCase();
 
@@ -160,7 +182,18 @@ ChronoManager.prototype._setSessions = function (sessions) {
 };
 
 /**
- * Render assignment controls + one preview card per parsed session.
+ * One labelled instrument (label above number, unit beside) for a
+ * stat strip.
+ */
+ChronoManager.prototype._instrumentHtml = function (label, value, unit) {
+    return '<div class="instrument"><div class="instrument-label">' + label +
+        '</div><div class="instrument-value">' + value +
+        (unit ? '<span class="instrument-unit">' + unit + '</span>' : '') +
+        '</div></div>';
+};
+
+/**
+ * Render one preview plate per parsed session.
  */
 ChronoManager.prototype._renderPreview = function () {
     var out = '';
@@ -172,55 +205,59 @@ ChronoManager.prototype._renderPreview = function () {
         totalShots += s.shots.length;
         warnings = warnings.concat(s.warnings || []);
 
-        var fpsList = s.shots.map(function (x) { return x.fps; });
-        var min = Math.min.apply(null, fpsList);
-        var max = Math.max.apply(null, fpsList);
+        // Garmin's own numbers when the export carries them, otherwise
+        // the same math the import will save (velocity-stats.js)
+        var stats = velocityStats(s.shots);
+        var avg = s.reported && s.reported.avg !== null ? s.reported.avg : stats.avg;
+        var sd = s.reported && s.reported.sd !== null ? s.reported.sd : stats.sd;
+        var es = s.reported && s.reported.es !== null ? s.reported.es : stats.es;
 
-        out += '<div class="detail-card chrono-session" data-index="' + i + '">';
-        out += '<label class="chrono-include"><input type="checkbox" class="chrono-include-cb" data-index="' + i + '" checked> Include</label>';
-        out += '<h3>' + this._escapeHtml(this._sessionTitle(s, i)) + '</h3>';
-        out += '<div class="chrono-badge chrono-dup-badge hidden" id="chrono-dup-' + i + '">already imported</div>';
-        out += '<div class="chrono-stats-row">';
-        out += '<span><strong>' + s.shots.length + '</strong> shots</span>';
-        out += '<span>' + formatNum(min, 1) + '–' + formatNum(max, 1) + ' fps</span>';
-        if (s.reported && s.reported.avg !== null) {
-            out += '<span>avg <strong>' + formatNum(s.reported.avg, 1) + '</strong></span>';
-        }
-        if (s.reported && s.reported.sd !== null) {
-            out += '<span>SD ' + formatNum(s.reported.sd, 1) + '</span>';
-        }
-        if (s.reported && s.reported.es !== null) {
-            out += '<span>ES ' + formatNum(s.reported.es, 1) + '</span>';
-        }
+        out += '<div class="plate u-mb-12" data-index="' + i + '">';
+        out += '<label class="t-head"><input type="checkbox" class="chrono-include-cb" data-index="' +
+            i + '" checked> ' + this._escapeHtml(this._sessionTitle(s, i)) + '</label>';
+        out += '<div id="chrono-dup-' + i + '" class="hidden"></div>';
+
+        out += '<div class="stat-strip">';
+        out += this._instrumentHtml('Shots', String(s.shots.length), null);
+        out += this._instrumentHtml('Avg', formatNum(avg, 0), 'fps');
+        out += this._instrumentHtml('SD', formatNum(sd, 1), 'fps');
+        out += this._instrumentHtml('ES', formatNum(es, 1), 'fps');
         out += '</div>';
 
-        out += '<div class="form-group chrono-roundcount"><label for="chrono-rounds-' + i + '">Barrel round count AFTER this string</label>';
-        out += '<input type="number" id="chrono-rounds-' + i + '" class="chrono-rounds-input" data-index="' + i + '" min="0" step="1" placeholder="—"></div>';
+        out += '<div class="field u-mt-10"><label class="field-label" for="chrono-rounds-' + i +
+            '">Barrel round count after this string</label>';
+        out += '<input type="number" id="chrono-rounds-' + i + '" class="chrono-rounds-input" data-index="' +
+            i + '" min="0" step="1" placeholder="unknown"></div>';
 
-        out += '<details class="chrono-shots"><summary>Shots</summary><table class="chrono-table"><thead><tr><th>#</th><th>Speed (fps)</th><th>Time</th></tr></thead><tbody>';
+        out += '<details class="fold"><summary>Shots</summary><div class="fold-body">';
+        out += '<div class="datatable-wrap"><table class="datatable"><thead><tr>' +
+            '<th>#</th><th>Speed (fps)</th><th>Time</th></tr></thead><tbody>';
         for (var j = 0; j < s.shots.length; j++) {
             var shot = s.shots[j];
             out += '<tr><td>' + shot.shot + '</td><td>' + formatNum(shot.fps, 1) + '</td><td>' +
                 this._escapeHtml(shot.time || '—') + '</td></tr>';
         }
-        out += '</tbody></table></details>';
-        out += '</div>';
+        out += '</tbody></table></div></div></details>';
+        out += '</div>'; // .plate
     }
 
-    if (warnings.length) {
-        out += '<div class="chrono-warnings"><strong>Warnings</strong><ul>';
-        for (var w = 0; w < warnings.length; w++) {
-            out += '<li>' + this._escapeHtml(warnings[w]) + '</li>';
-        }
-        out += '</ul></div>';
+    for (var w = 0; w < warnings.length; w++) {
+        out += '<div class="alert-strip u-mb-12">' + Icon('alert', 18) +
+            '<span>' + this._escapeHtml(warnings[w]) + '</span></div>';
     }
 
-    out += '<p class="chrono-intro">' + this.sessions.length + ' session' +
+    out += '<p class="t-micro">' + this.sessions.length + ' session' +
         (this.sessions.length === 1 ? '' : 's') + ', ' + totalShots + ' shots parsed.</p>';
-    out += '<button id="chrono-import-btn" class="btn btn-primary">Import Selected</button>';
-    out += '<div id="chrono-status" class="chrono-intro"></div>';
+    out += '<button type="button" id="chrono-import-btn" class="action-primary u-mt-10">Import selected</button>';
+    out += '<div id="chrono-status" class="t-micro u-mt-10"></div>';
 
     document.getElementById('chrono-results').innerHTML = out;
+
+    // With results on screen, "Import selected" is the one loud thing —
+    // the file picker steps back to a quiet action
+    var fileLabel = document.getElementById('chrono-file-label');
+    if (fileLabel) fileLabel.className = 'action u-full u-mt-14';
+
     this._bindPreviewEvents();
 
     // Mark strings that already exist (against the current rifle pick,
@@ -242,7 +279,7 @@ ChronoManager.prototype._renderPreview = function () {
  *
  * 2. NAME+TIMESTAMP (backstop): a same-rifle (or unassigned-pool)
  *    sheet_name + epoch-date match is a hard duplicate — unticked AND
- *    disabled ("already imported").
+ *    disabled ("Already imported").
  *
  * Either way, excluded strings never advance the round-count odometer.
  */
@@ -292,18 +329,16 @@ ChronoManager.prototype._refreshDuplicates = function (rifleId) {
             }
             if (badge) {
                 if (isExact) {
-                    badge.textContent = 'already imported';
-                    badge.classList.remove('chrono-fp-warn');
-                    badge.classList.remove('hidden');
+                    badge.className = 'chip is-stop u-mt-10';
+                    badge.textContent = 'Already imported';
                 } else if (isFpDup) {
                     var where = fpOwner === null ? 'in your unassigned strings'
                         : 'on rifle "' + (rifleNames[fpOwner] || 'unknown') + '"';
-                    badge.textContent = '⚠ these exact shots are already imported ' + where +
-                        ' — tick Include only to import anyway';
-                    badge.classList.add('chrono-fp-warn');
-                    badge.classList.remove('hidden');
+                    badge.className = 'alert-strip u-mt-10';
+                    badge.innerHTML = Icon('alert', 18) + '<span>These exact shots are already imported ' +
+                        self._escapeHtml(where) + ' &mdash; tick this string only to import anyway.</span>';
                 } else {
-                    badge.classList.add('hidden');
+                    badge.className = 'hidden';
                 }
             }
         }
@@ -322,7 +357,7 @@ ChronoManager.prototype._bindPreviewEvents = function () {
     }
 
     // Manual per-string edits win over recomputed defaults
-    var counts = document.querySelectorAll('.chrono-roundcount .chrono-rounds-input');
+    var counts = document.querySelectorAll('#chrono-results .chrono-rounds-input');
     for (var c = 0; c < counts.length; c++) {
         counts[c].addEventListener('input', function () {
             this.setAttribute('data-edited', 'true');
@@ -478,7 +513,7 @@ ChronoManager.prototype._importSelected = function () {
     }
 
     if (!records.length) {
-        status.textContent = 'Nothing selected — tick "Include" on at least one session.';
+        status.textContent = 'Nothing selected — tick at least one session.';
         return;
     }
 
@@ -537,12 +572,13 @@ ChronoManager.prototype._importSelected = function () {
                 ' (' + totalShots + ' shots)' + skipNote + '.';
         }).then(function () {
             self.sessions = [];
-            document.getElementById('chrono-import-btn').style.display = 'none';
+            document.getElementById('chrono-import-btn').classList.add('hidden');
             // No auto-jump: hand the user an explicit next step instead
             // of yanking the screen away while they read the status
             var goBtn = document.createElement('button');
-            goBtn.className = 'btn btn-primary';
-            goBtn.textContent = 'Assign to loads →';
+            goBtn.type = 'button';
+            goBtn.className = 'action u-mt-10';
+            goBtn.innerHTML = 'Assign to loads ' + Icon('arrow-right', 18);
             goBtn.addEventListener('click', function () {
                 self.showAssignmentReview(rifleId);
             });
@@ -571,19 +607,23 @@ ChronoManager.prototype.showAssignmentReview = function (rifleId) {
     if (!rifleId) return;
     this._showError(null);
 
-    // Review takes over the screen — hide the import controls
-    // (Back to Import re-renders the whole view)
+    // Review takes over the screen — hide the import controls and swap
+    // toolbars (the toolbar back re-renders the whole view)
     var importSection = document.getElementById('chrono-import-section');
     if (importSection) importSection.classList.add('hidden');
     var launcher = document.getElementById('chrono-review-launcher');
     if (launcher) launcher.classList.add('hidden');
+    var importToolbar = document.getElementById('chrono-toolbar-import');
+    if (importToolbar) importToolbar.classList.add('hidden');
+    var reviewToolbar = document.getElementById('chrono-toolbar-review');
+    if (reviewToolbar) reviewToolbar.classList.remove('hidden');
 
     // Preserve the confirmed-section expand state across re-renders
     // (deleting/editing several strings in a row shouldn't snap it shut)
     var confirmedDetails = document.getElementById('chrono-confirmed-details');
     if (confirmedDetails) this._confirmedOpen = confirmedDetails.hasAttribute('open');
     document.getElementById('chrono-results').innerHTML =
-        '<p class="chrono-intro">Loading strings…</p>';
+        '<p class="t-body u-quiet">Loading strings&hellip;</p>';
 
     // Carry the user's split choices across data refreshes (assigning
     // or deleting one string must not re-merge the others)
@@ -642,12 +682,12 @@ ChronoManager.prototype._renderAssignmentReview = function () {
     var loadNames = {};
     for (var ln = 0; ln < r.loads.length; ln++) loadNames[r.loads[ln].id] = r.loads[ln].name;
 
-    var out = '<button id="chrono-back-btn" class="btn btn-secondary">← Back to Import</button>';
-    out += '<h3 class="chrono-review-title">Assign Strings to Ammo</h3>';
+    var out = '';
 
     if (!r.pending.length) {
-        out += '<p class="chrono-intro">No strings waiting for assignment.</p>';
-        out += '<button id="chrono-goto-report" class="btn btn-primary">View Performance Report →</button>';
+        out += '<div class="empty-teach"><p>No strings waiting for assignment.</p>';
+        out += '<button type="button" id="chrono-goto-report" class="action">' +
+            Icon('award', 18) + 'View performance report</button></div>';
     }
 
     // Show each load's confirmed velocity in the pickers — this is the
@@ -661,7 +701,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
             loadAvg[s.loadId].n += w;
         }
     });
-    var loadOptions = '<option value="">— Pick a load —</option>';
+    var loadOptions = '<option value="">Pick a load</option>';
     for (var lo = 0; lo < r.loads.length; lo++) {
         var la = loadAvg[r.loads[lo].id];
         loadOptions += '<option value="' + this._escapeHtml(r.loads[lo].id) + '">' +
@@ -677,7 +717,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         if (r.clusters[pc].members.some(function (m) { return !r.splitIds[m.id]; })) anyGroup = true;
     }
     if (anyGroup) {
-        out += '<p class="chrono-intro">These are <strong>proposals</strong> based on velocity — nothing is combined until you confirm. Untick a string to split it out and give it its own load.</p>';
+        out += '<p class="t-body u-quiet u-mb-12">These are <strong>proposals</strong> based on velocity — nothing is combined until you confirm. Untick a string to split it out and give it its own load.</p>';
     }
 
     for (var c = 0; c < r.clusters.length; c++) {
@@ -689,73 +729,83 @@ ChronoManager.prototype._renderAssignmentReview = function () {
             return a + (m.shots && m.shots.length ? m.shots.length : 0);
         }, 0);
 
-        out += '<div class="detail-card chrono-cluster">';
-        out += '<h4>Proposed group ' + (c + 1) + ' — avg ~' + formatNum(cluster.meanFps, 0) + ' fps · ' +
-            members.length + ' string' + (members.length === 1 ? '' : 's') +
-            ' · ' + groupShots + ' shots</h4>';
-        out += '<ul class="chrono-string-list chrono-proposal-list">';
+        out += '<div class="plate u-mb-12">';
+        out += '<h4 class="t-head">These ' + groupShots + ' shots look like one load</h4>';
+        out += '<p class="t-micro">Proposed group ' + (c + 1) + ' · avg ~' + formatNum(cluster.meanFps, 0) +
+            ' fps · ' + members.length + ' string' + (members.length === 1 ? '' : 's') + '</p>';
+        out += '<div class="u-mt-10">';
         for (var m = 0; m < members.length; m++) {
             var s = members[m];
-            out += '<li><label class="chrono-member-row">';
-            out += '<input type="checkbox" class="chrono-member-cb" data-id="' +
-                this._escapeHtml(s.id) + '" checked> ';
-            out += this._escapeHtml(this._stringLabel(s));
-            out += '</label> ' + this._roundsEditHtml(s) + ' ' + this._deleteBtnHtml(s);
-            out += '</li>';
+            var escId = this._escapeHtml(s.id);
+            out += '<div class="row-item">';
+            out += '<input type="checkbox" class="chrono-member-cb" id="chrono-member-' + escId +
+                '" data-id="' + escId + '" checked>';
+            out += '<label class="row-main" for="chrono-member-' + escId + '">' +
+                this._escapeHtml(this._stringLabel(s)) + '</label>';
+            out += '<div class="row-aside">' + this._roundsEditHtml(s) + this._deleteBtnHtml(s) + '</div>';
+            out += '</div>';
         }
-        out += '</ul>';
-        out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' +
-            loadOptions + '</select>';
-        out += '<input type="text" class="chrono-newload-name hidden" maxlength="80" placeholder="New load name">';
-        out += '<button class="btn btn-primary chrono-cluster-confirm" data-cluster="' + c +
-            '" data-select="chrono-cluster-load-' + c + '">Assign group (' + members.length + ')</button></div>';
         out += '</div>';
+        out += '<div class="field u-mt-10"><label class="field-label" for="chrono-cluster-load-' + c +
+            '">Load</label>';
+        out += '<select class="chrono-load-select" id="chrono-cluster-load-' + c + '">' + loadOptions + '</select>';
+        out += '<input type="text" class="chrono-newload-name u-mt-10 hidden" maxlength="80" placeholder="New load name">';
+        out += '<button type="button" class="action u-full u-mt-10 chrono-cluster-confirm" data-cluster="' + c +
+            '" data-select="chrono-cluster-load-' + c + '">Assign group (' + members.length + ')</button>';
+        out += '</div>';
+        out += '</div>'; // .plate
     }
 
     // Split-out strings — each gets its OWN load pick + assign button
     var splitStrings = r.pending.filter(function (s) { return r.splitIds[s.id]; });
     if (splitStrings.length) {
-        out += '<h4 class="chrono-split-heading">Assign separately</h4>';
+        out += '<div class="qcard-kicker">Assign separately</div>';
         for (var sp = 0; sp < splitStrings.length; sp++) {
             var ss = splitStrings[sp];
-            out += '<div class="detail-card chrono-cluster chrono-split-card">';
-            out += '<div class="chrono-split-row">' + this._escapeHtml(this._stringLabel(ss)) +
-                ' ' + this._roundsEditHtml(ss) + ' ' + this._deleteBtnHtml(ss);
-            if (r.ambiguousIds[ss.id]) {
-                out += ' <span class="chrono-badge">needs your call — sits between velocity groups</span>';
-            } else {
-                out += ' <button type="button" class="chrono-rejoin" data-id="' + this._escapeHtml(ss.id) +
-                    '">↩ Back to group</button>';
+            out += '<div class="plate u-mb-12">';
+            out += '<div class="t-body">' + this._escapeHtml(this._stringLabel(ss)) + '</div>';
+            out += '<div class="u-mt-10">' + this._roundsEditHtml(ss) + ' ' + this._deleteBtnHtml(ss);
+            if (!r.ambiguousIds[ss.id]) {
+                out += ' <button type="button" class="action-ghost chrono-rejoin" data-id="' +
+                    this._escapeHtml(ss.id) + '">' + Icon('undo', 16) + 'Back to group</button>';
             }
             out += '</div>';
-            out += '<div class="chrono-confirm-row"><select class="chrono-load-select" id="chrono-split-load-' +
-                this._escapeHtml(ss.id) + '">' + loadOptions + '</select>';
-            out += '<input type="text" class="chrono-newload-name hidden" maxlength="80" placeholder="New load name">';
-            out += '<button class="btn btn-primary chrono-split-confirm" data-id="' + this._escapeHtml(ss.id) +
-                '" data-select="chrono-split-load-' + this._escapeHtml(ss.id) + '">Assign (1)</button></div>';
+            if (r.ambiguousIds[ss.id]) {
+                out += '<div class="alert-strip u-mt-10">' + Icon('alert', 18) +
+                    '<span>Needs your call — this string sits between velocity groups.</span></div>';
+            }
+            out += '<div class="field u-mt-10"><label class="field-label" for="chrono-split-load-' +
+                this._escapeHtml(ss.id) + '">Load</label>';
+            out += '<select class="chrono-load-select" id="chrono-split-load-' + this._escapeHtml(ss.id) + '">' +
+                loadOptions + '</select>';
+            out += '<input type="text" class="chrono-newload-name u-mt-10 hidden" maxlength="80" placeholder="New load name">';
+            out += '<button type="button" class="action u-full u-mt-10 chrono-split-confirm" data-id="' +
+                this._escapeHtml(ss.id) + '" data-select="chrono-split-load-' + this._escapeHtml(ss.id) +
+                '">Assign (1)</button>';
             out += '</div>';
+            out += '</div>'; // .plate
         }
     }
 
     if (confirmed.length) {
-        out += '<details class="chrono-shots" id="chrono-confirmed-details"' +
-            (this._confirmedOpen ? ' open' : '') + '><summary>' + confirmed.length + ' already-confirmed string' +
-            (confirmed.length === 1 ? '' : 's') + '</summary><ul class="chrono-string-list">';
+        out += '<details class="fold" id="chrono-confirmed-details"' +
+            (this._confirmedOpen ? ' open' : '') + '><summary>' + confirmed.length +
+            ' already-confirmed string' + (confirmed.length === 1 ? '' : 's') +
+            '</summary><div class="fold-body">';
         for (var cf = 0; cf < confirmed.length; cf++) {
-            out += '<li>' + this._escapeHtml(this._stringLabel(confirmed[cf])) + ' → ' +
-                this._escapeHtml(loadNames[confirmed[cf].loadId] || 'unknown load') +
-                ' ' + this._roundsEditHtml(confirmed[cf]) +
-                ' ' + this._deleteBtnHtml(confirmed[cf]) + '</li>';
+            out += '<div class="row-item">';
+            out += '<div class="row-main"><div>' + this._escapeHtml(this._stringLabel(confirmed[cf])) +
+                '</div><div class="row-sub">' +
+                this._escapeHtml(loadNames[confirmed[cf].loadId] || 'unknown load') + '</div></div>';
+            out += '<div class="row-aside">' + this._roundsEditHtml(confirmed[cf]) +
+                this._deleteBtnHtml(confirmed[cf]) + '</div>';
+            out += '</div>';
         }
-        out += '</ul></details>';
+        out += '</div></details>';
     }
 
-    out += '<div id="chrono-status" class="chrono-intro"></div>';
+    out += '<div id="chrono-status" class="t-micro u-mt-10"></div>';
     document.getElementById('chrono-results').innerHTML = out;
-
-    document.getElementById('chrono-back-btn').addEventListener('click', function () {
-        self.show();
-    });
 
     // "+ New load…" reveals its inline name field
     var loadSelects = document.querySelectorAll('.chrono-load-select');
@@ -787,14 +837,16 @@ ChronoManager.prototype._renderAssignmentReview = function () {
         editBtns[eb].addEventListener('click', function () {
             var id = this.getAttribute('data-id');
             var s = stringById[id];
+            var wrap = document.createElement('span');
+            wrap.className = 'stepper';
             var field = document.createElement('input');
             field.type = 'number';
             field.min = '0';
             field.step = '1';
-            field.className = 'chrono-rounds-inline';
             field.value = s && typeof s.roundCountAt === 'number' ? s.roundCountAt : '';
             field.placeholder = 'rounds';
-            this.replaceWith(field);
+            wrap.appendChild(field);
+            this.replaceWith(wrap);
             field.focus();
 
             var done = false;
@@ -949,20 +1001,22 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
 };
 
 /**
- * Small 🗑 delete button for one saved string (confirm-guarded).
+ * Ghost delete button for one saved string (confirm-guarded).
  */
 ChronoManager.prototype._deleteBtnHtml = function (s) {
-    return '<button type="button" class="chrono-delete-string" data-id="' + this._escapeHtml(s.id) + '" ' +
-        'title="Delete this string permanently">🗑 Delete</button>';
+    return '<button type="button" class="action-ghost chrono-delete-string" data-id="' +
+        this._escapeHtml(s.id) + '" title="Delete this string permanently">' +
+        Icon('trash', 16) + 'Delete</button>';
 };
 
 /**
- * Small "rounds: N ✎" edit button for one saved string.
+ * Ghost "Rounds: N" edit button for one saved string.
  */
 ChronoManager.prototype._roundsEditHtml = function (s) {
     var shown = typeof s.roundCountAt === 'number' ? s.roundCountAt : '—';
-    return '<button type="button" class="chrono-edit-rounds" data-id="' + this._escapeHtml(s.id) + '" ' +
-        'title="Edit barrel round count after this string">rounds: ' + shown + ' ✎</button>';
+    return '<button type="button" class="action-ghost chrono-edit-rounds" data-id="' +
+        this._escapeHtml(s.id) + '" title="Edit barrel round count after this string">Rounds: ' +
+        shown + ' ' + Icon('pencil', 16) + '</button>';
 };
 
 /**
@@ -980,7 +1034,7 @@ ChronoManager.prototype._stringLabel = function (s) {
 };
 
 /**
- * Human title for a session card: date if known, else sheet/file name.
+ * Human title for a session plate: date if known, else sheet/file name.
  */
 ChronoManager.prototype._sessionTitle = function (session, index) {
     if (session.date) {
@@ -997,10 +1051,10 @@ ChronoManager.prototype._showError = function (message) {
     var el = document.getElementById('chrono-error');
     if (!el) return;
     if (message) {
-        el.textContent = message;
+        el.innerHTML = Icon('alert', 18) + '<span>' + this._escapeHtml(message) + '</span>';
         el.classList.remove('hidden');
     } else {
-        el.textContent = '';
+        el.innerHTML = '';
         el.classList.add('hidden');
     }
 };

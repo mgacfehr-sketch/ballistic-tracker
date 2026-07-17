@@ -44,7 +44,7 @@ CertificateManager.QR_BOX = {
 CertificateManager.prototype.showPreflight = function (rifleId) {
     var self = this;
     var container = this.profileManager.container;
-    container.innerHTML = '<div class="profile-screen"><p class="chrono-intro">Checking certificate data…</p></div>';
+    container.innerHTML = '<div class="screen"><p class="u-quiet">Checking certificate data&hellip;</p></div>';
 
     Promise.all([
         this.db.getRifle(rifleId),
@@ -72,8 +72,9 @@ CertificateManager.prototype.showPreflight = function (rifleId) {
         };
         self._renderPreflight();
     }).catch(function (err) {
-        container.innerHTML = '<div class="profile-screen"><p class="chrono-error">Could not load certificate data: ' +
-            escapeHtml(err.message) + '</p></div>';
+        container.innerHTML = '<div class="screen"><div class="alert-strip is-stop">' +
+            Icon('alert', 18) + '<span>Could not load certificate data: ' +
+            escapeHtml(err.message) + '</span></div></div>';
     });
 };
 
@@ -89,12 +90,12 @@ CertificateManager.prototype._renderPreflight = function () {
     var c = this._ctx;
     var agg = c.agg;
 
-    var html = '<div class="profile-screen">';
-    html += '<div class="profile-toolbar">';
-    html += '<button class="btn-back" id="btn-cert-back">&lsaquo; Report</button>';
-    html += '<h2 class="profile-title">Certificate</h2>';
-    html += '<div class="toolbar-spacer"></div>';
+    var html = '<div class="view-toolbar">';
+    html += '<button class="toolbar-back" id="btn-cert-back">' + Icon('chevron-left', 20) + '<span>Report</span></button>';
+    html += '<h2 class="toolbar-title">Certificate</h2>';
     html += '</div>';
+
+    html += '<div class="screen">';
 
     // Blockers — never generate over unresolved data
     var pending = agg.pendingStrings.unassigned + agg.pendingStrings.suggested + agg.pendingStrings.ambiguous;
@@ -113,11 +114,13 @@ CertificateManager.prototype._renderPreflight = function () {
     }
 
     if (blockers.length) {
-        html += '<div class="chrono-error cert-blockers"><strong>Not enough verified data for a certificate:</strong><ul>';
-        for (var b = 0; b < blockers.length; b++) html += '<li>' + escapeHtml(blockers[b]) + '</li>';
-        html += '</ul>';
-        if (pending > 0) html += '<button class="btn btn-secondary" id="btn-cert-resolve">Resolve strings now</button>';
-        html += '</div></div>';
+        html += '<p class="t-head u-mb-12">Not enough verified data for a certificate.</p>';
+        for (var b = 0; b < blockers.length; b++) {
+            html += '<div class="alert-strip is-stop u-mb-12">' + Icon('alert', 18) +
+                '<span>' + escapeHtml(blockers[b]) + '</span></div>';
+        }
+        if (pending > 0) html += '<button class="action u-mt-10" id="btn-cert-resolve">Resolve strings now</button>';
+        html += '</div>';
         this.profileManager.container.innerHTML = html;
         document.getElementById('btn-cert-back').addEventListener('click', function () {
             self.profileManager.reportManager.show(c.rifle.id);
@@ -129,12 +132,15 @@ CertificateManager.prototype._renderPreflight = function () {
         return;
     }
 
-    // Confirmation panel: what exactly will print
-    html += '<div class="detail-card">';
-    html += '<h3>' + escapeHtml(c.rifle.name) + (c.rifle.serialNumber ? ' · SN ' + escapeHtml(c.rifle.serialNumber) : '') + '</h3>';
-    html += '<p class="chrono-intro">Confirm the data that will appear. Defaults are the computed best group and recommended load.</p>';
+    // Confirmation plate: what exactly will print
+    html += '<div class="plate">';
+    html += '<div class="spec-row"><span class="spec-key">Rifle</span><span class="spec-val">' + escapeHtml(c.rifle.name) + '</span></div>';
+    if (c.rifle.serialNumber) {
+        html += '<div class="spec-row"><span class="spec-key">Serial</span><span class="spec-val">' + escapeHtml(c.rifle.serialNumber) + '</span></div>';
+    }
+    html += '<p class="u-quiet u-mt-10 u-mb-12">Confirm the data that will appear. Defaults are the computed best group and recommended load.</p>';
 
-    html += '<div class="form-group"><label for="cert-session">Group to certify</label><select id="cert-session">';
+    html += '<div class="field"><label class="field-label" for="cert-session">Group to certify</label><select id="cert-session">';
     eligible.sort(function (a, b) { return a.results.groupSizeMOA - b.results.groupSizeMOA; });
     for (var e = 0; e < eligible.length; e++) {
         var s = eligible[e];
@@ -146,7 +152,7 @@ CertificateManager.prototype._renderPreflight = function () {
     }
     html += '</select></div>';
 
-    html += '<div class="form-group"><label for="cert-load">Load to certify</label><select id="cert-load">';
+    html += '<div class="field"><label class="field-label" for="cert-load">Load to certify</label><select id="cert-load">';
     var loadsWithStrings = agg.loads.filter(function (r) { return r.stringCount > 0; });
     for (var l = 0; l < loadsWithStrings.length; l++) {
         var r = loadsWithStrings[l];
@@ -154,15 +160,15 @@ CertificateManager.prototype._renderPreflight = function () {
             (r.loadId === agg.recommendedLoadId ? ' selected' : '') + '>' +
             escapeHtml(r.load.name) + ' — avg ' + formatNum(r.stats.avg, 1) + ', SD ' +
             formatNum(r.stats.sd, 1) + ', ES ' + formatNum(r.stats.es, 1) + ' (' + r.stats.n + ' shots)' +
-            (r.loadId === agg.recommendedLoadId ? ' ★ recommended' : '') + '</option>';
+            (r.loadId === agg.recommendedLoadId ? ' (recommended)' : '') + '</option>';
     }
     html += '</select></div>';
 
-    html += '<button class="btn btn-primary" id="btn-cert-generate">Generate Certificate</button>';
+    html += '<button class="action-primary" id="btn-cert-generate">' + Icon('award', 20) + 'Generate certificate</button>';
     html += '</div>';
 
-    html += '<div id="cert-preview-wrap" class="cert-preview-wrap"></div>';
-    html += '<div id="cert-status" class="chrono-intro"></div>';
+    html += '<div id="cert-preview-wrap" class="u-mt-14"></div>';
+    html += '<div id="cert-status" class="t-micro u-mt-10"></div>';
     html += '</div>';
 
     this.profileManager.container.innerHTML = html;
@@ -431,11 +437,16 @@ CertificateManager.prototype._showPreview = function () {
     if (!wrap) return;
 
     this._revokePreview();
-    var html = '<img id="cert-preview-img" class="cert-preview-img" alt="Certificate preview">';
-    html += '<div class="btn-row">';
-    html += '<button class="btn btn-primary" id="btn-cert-export">Export PDF</button>';
-    html += '</div>';
+    var html = '<img id="cert-preview-img" class="plate-img" alt="Certificate preview">';
+    html += '<button class="action-primary u-mt-10" id="btn-cert-export">Export PDF</button>';
     wrap.innerHTML = html;
+
+    // One loud thing per screen: Export is now primary, so quiet Generate down.
+    var genBtn = document.getElementById('btn-cert-generate');
+    if (genBtn) {
+        genBtn.classList.remove('action-primary');
+        genBtn.classList.add('action', 'u-full');
+    }
 
     this._canvas.toBlob(function (blob) {
         self._previewUrl = URL.createObjectURL(blob);

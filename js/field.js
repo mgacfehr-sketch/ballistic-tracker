@@ -159,26 +159,36 @@ var FieldLog = (function () {
     var DISTANCES = [100, 200, 300, 400, 500, 600, 800, 1000];
     var TARGET_SIZES = [8, 10, 12];
     var WIND_VALUES = [
-        { v: 'full-left', label: '← full' },
-        { v: 'half-left', label: '← half' },
-        { v: 'none', label: 'calm' },
-        { v: 'half-right', label: 'half →' },
-        { v: 'full-right', label: 'full →' }
+        { v: 'full-left', side: 'left', label: 'full' },
+        { v: 'half-left', side: 'left', label: 'half' },
+        { v: 'none', side: null, label: 'calm' },
+        { v: 'half-right', side: 'right', label: 'half' },
+        { v: 'full-right', side: 'right', label: 'full' }
     ];
     // Post-shot correction chips in the rifle's own turret unit.
     // Values are in that unit; converted to canonical mils at save time.
     var WIND_ACTUAL_CHIPS = {
         MIL: [
             { v: '-0.5', label: '0.5 mil less' }, { v: '-0.2', label: '0.2 mil less' },
-            { v: '0', label: 'my call ✓' },
+            { v: '0', label: 'my call' },
             { v: '0.2', label: '0.2 mil more' }, { v: '0.5', label: '0.5 mil more' }
         ],
         MOA: [
             { v: '-1.5', label: '1.5 MOA less' }, { v: '-0.5', label: '0.5 MOA less' },
-            { v: '0', label: 'my call ✓' },
+            { v: '0', label: 'my call' },
             { v: '0.5', label: '0.5 MOA more' }, { v: '1.5', label: '1.5 MOA more' }
         ]
     };
+
+    /* Browser-only label builders (Icon is a window global). */
+    function windValueLabel(v) {
+        if (v.side === 'left') return Icon('arrow-left', 14) + ' ' + v.label;
+        if (v.side === 'right') return v.label + ' ' + Icon('arrow-right', 14);
+        return v.label;
+    }
+    function windActualLabel(v) {
+        return v.v === '0' ? v.label + ' ' + Icon('check', 14) : v.label;
+    }
 
     /** The selected rifle's turret unit — 'MIL' or 'MOA' (default). */
     function unitFor(rifles, rifleId) {
@@ -194,11 +204,11 @@ var FieldLog = (function () {
     }
 
     function chipRow(id, values, selected, labelFn) {
-        var html = '<div class="field-chips" id="' + id + '">';
+        var html = '<div class="chip-row u-mt-10" id="' + id + '">';
         values.forEach(function (v) {
             var val = typeof v === 'object' ? v.v : v;
             var label = labelFn ? labelFn(v) : String(val);
-            html += '<button class="field-chip' + (String(val) === String(selected) ? ' field-chip-on' : '') +
+            html += '<button class="chip-opt' + (String(val) === String(selected) ? ' is-selected' : '') +
                 '" data-value="' + val + '">' + label + '</button>';
         });
         html += '</div>';
@@ -233,55 +243,55 @@ var FieldLog = (function () {
         if (TARGET_SIZES.indexOf(state.targetSize) === -1) state.targetCustom = true;
 
         var overlay = document.createElement('div');
-        overlay.className = 'wizard-overlay';
+        overlay.className = 'overlay';
 
         function draw() {
-            var html = '<div class="wizard-card field-card">';
-            html += '<button class="wizard-close" aria-label="Close">×</button>';
-            html += '<h3 class="wizard-prompt">Log field shots</h3>';
-            html += '<p class="chrono-hint" style="margin:0 0 10px;">Log your hits on steel or targets — yorT computes your real effective range.</p>';
+            var html = '<div class="overlay-card">';
+            html += '<button class="overlay-close" aria-label="Close">' + Icon('x', 20) + '</button>';
+            html += '<h3 class="overlay-title">Log field shots</h3>';
+            html += '<p class="overlay-text">Log your hits on steel or targets — yorT computes your real effective range.</p>';
 
-            html += '<select id="field-rifle" class="wizard-input" style="margin-bottom:10px;">';
+            html += '<div class="field"><select id="field-rifle" class="field-input">';
             rifles.forEach(function (r) {
                 html += '<option value="' + r.id + '"' + (r.id === state.rifleId ? ' selected' : '') + '>' +
                     escapeHtml(r.name) + '</option>';
             });
-            html += '</select>';
+            html += '</select></div>';
 
-            html += '<div class="field-label">Distance (yd)</div>';
+            html += '<div class="u-label">Distance (yd)</div>';
             html += chipRow('field-distance', DISTANCES, state.distance);
-            html += '<div class="field-label">Shots</div>';
+            html += '<div class="u-label u-mt-14">Shots</div>';
             html += chipRow('field-shots', [5, 10, 15, 20], state.shots);
-            html += '<div class="field-label">Hits</div>';
+            html += '<div class="u-label u-mt-14">Hits</div>';
             var hitVals = [];
             for (var h = 0; h <= state.shots; h += (state.shots > 10 ? 2 : 1)) hitVals.push(h);
             if (hitVals[hitVals.length - 1] !== state.shots) hitVals.push(state.shots);
             html += chipRow('field-hits', hitVals, state.hits);
-            html += '<div class="field-label">Target size</div>';
+            html += '<div class="u-label u-mt-14">Target size</div>';
             var targetChips = TARGET_SIZES.map(function (t) { return { v: String(t), label: t + '&Prime;' }; });
-            targetChips.push({ v: 'custom', label: '✎ inches' });
+            targetChips.push({ v: 'custom', label: Icon('pencil', 14) + ' inches' });
             html += chipRow('field-target', targetChips,
                 state.targetCustom ? 'custom' : String(state.targetSize),
                 function (v) { return v.label; });
-            if (state.targetCustom) {
-                html += '<input type="number" id="field-target-custom" class="wizard-input" min="1" max="60" step="0.5" inputmode="decimal" placeholder="Target size (in)" value="' +
-                    (state.targetSize || '') + '" style="margin-bottom:6px;">';
-            }
-            html += '<div class="field-label">Position</div>';
+            html += '<div class="field u-mt-10' + (state.targetCustom ? '' : ' hidden') + '">' +
+                '<input type="number" id="field-target-custom" min="1" max="60" step="0.5" inputmode="decimal" placeholder="Target size (in)" value="' +
+                (state.targetCustom && state.targetSize ? state.targetSize : '') + '"></div>';
+            html += '<div class="u-label u-mt-14">Position</div>';
             html += chipRow('field-position', POSITIONS, state.position);
 
             // Optional wind call (F5) — a gift, not homework
             var unit = unitFor(rifles, state.rifleId);
-            html += '<details class="home-drawer" style="margin-top:6px;"' + (state.windCall ? ' open' : '') + '><summary>Wind call (optional)</summary>';
-            html += '<div class="field-label">My call</div>';
+            html += '<details class="fold u-mt-14"' + (state.windCall ? ' open' : '') + '><summary>Wind call (optional)</summary>';
+            html += '<div class="fold-body">';
+            html += '<div class="u-label">My call</div>';
             html += chipRow('field-wind-mph', [5, 10, 15, 20], state.windCall && state.windCall.mph);
-            html += chipRow('field-wind-value', WIND_VALUES, state.windCall && state.windCall.value, function (v) { return v.label; });
-            html += '<div class="field-label">What actually worked (' + (unit === 'MIL' ? 'mil' : 'MOA') + ')</div>';
-            html += chipRow('field-wind-actual', WIND_ACTUAL_CHIPS[unit], state.windActual, function (v) { return v.label; });
-            html += '</details>';
+            html += chipRow('field-wind-value', WIND_VALUES, state.windCall && state.windCall.value, windValueLabel);
+            html += '<div class="u-label u-mt-14">What actually worked (' + (unit === 'MIL' ? 'mil' : 'MOA') + ')</div>';
+            html += chipRow('field-wind-actual', WIND_ACTUAL_CHIPS[unit], state.windActual, windActualLabel);
+            html += '</div></details>';
 
-            html += '<p class="wizard-error" id="field-error"></p>';
-            html += '<div class="wizard-nav"><button class="btn btn-primary wizard-next" id="field-save">Save</button></div>';
+            html += '<p class="field-error" id="field-error"></p>';
+            html += '<button class="action-primary u-mt-10" id="field-save">Save</button>';
             html += '</div>';
             overlay.innerHTML = html;
             bind();
@@ -290,7 +300,7 @@ var FieldLog = (function () {
         function bindChips(id, apply) {
             var row = overlay.querySelector('#' + id);
             if (!row) return;
-            var chips = row.querySelectorAll('.field-chip');
+            var chips = row.querySelectorAll('.chip-opt');
             for (var i = 0; i < chips.length; i++) {
                 chips[i].addEventListener('click', function () {
                     apply(this.getAttribute('data-value'));
@@ -300,7 +310,7 @@ var FieldLog = (function () {
         }
 
         function bind() {
-            overlay.querySelector('.wizard-close').addEventListener('click', function () {
+            overlay.querySelector('.overlay-close').addEventListener('click', function () {
                 document.body.removeChild(overlay);
             });
             overlay.querySelector('#field-rifle').addEventListener('change', function () {

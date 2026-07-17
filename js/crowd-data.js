@@ -189,23 +189,28 @@ function CrowdDataManager(db) {
     this.onBack = null;
 }
 
-/** Render into a container (the admin content area). onBack returns to the dashboard. */
+/** Render into a container (the admin view). onBack returns to the dashboard. */
 CrowdDataManager.prototype.show = function (container, onBack) {
     var self = this;
     self.container = container;
     self.onBack = onBack || null;
     if (!container) return;
 
-    container.className = '';
-    container.innerHTML = '<div class="admin-loading">Loading crowd data…</div>';
+    container.innerHTML =
+        '<div class="view-toolbar"><h2 class="toolbar-title">Crowd data</h2></div>' +
+        '<div class="screen"><p class="t-body u-quiet">Loading crowd data&hellip;</p></div>';
 
     self.db.crowdGetData().then(function (rows) {
         self.rows = rows || [];
         self._renderShell();
     }).catch(function (err) {
         container.innerHTML =
-            '<div class="admin-error">Failed to load crowd data: ' + self._esc(err.message) + '</div>' +
-            '<button class="btn btn-secondary" id="crowd-back-err">Back to Dashboard</button>';
+            '<div class="screen">' +
+            '<div class="alert-strip is-stop">' + Icon('alert', 18) +
+            '<span>Failed to load crowd data: ' + self._esc(err.message) + '</span></div>' +
+            '<button type="button" class="action u-mt-14" id="crowd-back-err">' +
+            Icon('chevron-left', 18) + 'Dashboard</button>' +
+            '</div>';
         var backBtn = document.getElementById('crowd-back-err');
         if (backBtn && self.onBack) backBtn.addEventListener('click', self.onBack);
     });
@@ -228,53 +233,63 @@ CrowdDataManager.prototype._renderShell = function () {
     var self = this;
     var html = '';
 
-    html += '<section class="admin-section crowd-section">';
-    html += '<div class="crowd-toolbar">';
-    html += '<button class="btn btn-secondary btn-sm" id="crowd-back">&larr; Dashboard</button>';
-    html += '<h3 class="admin-section-title crowd-title">Crowd Data Warehouse</h3>';
-    html += '<button class="btn btn-secondary btn-sm" id="crowd-refresh">Refresh</button>';
+    html += '<div class="view-toolbar">';
+    html += '<button type="button" class="toolbar-back" id="crowd-back">' + Icon('chevron-left', 20) + 'Dashboard</button>';
+    html += '<h2 class="toolbar-title">Crowd data</h2>';
+    html += '<button type="button" class="toolbar-act" id="crowd-refresh" aria-label="Refresh">' + Icon('refresh', 20) + '</button>';
     html += '</div>';
-    html += '<p class="admin-desc">Anonymized velocity strings across all users, joined with rifle/barrel/load specs and same-trip group data. Filter, then export for external analysis.</p>';
+
+    html += '<div class="screen">';
+    html += '<p class="t-body u-quiet u-mb-12">Anonymized velocity strings across all users, joined with rifle, barrel and load specs and same-trip group data. Filter, then export for external analysis.</p>';
 
     // Export buttons
-    html += '<div class="crowd-export-row">';
-    html += '<button class="btn btn-primary btn-sm" id="crowd-csv-filtered">CSV (filtered)</button>';
-    html += '<button class="btn btn-primary btn-sm" id="crowd-xlsx-filtered">XLSX (filtered)</button>';
-    html += '<button class="btn btn-secondary btn-sm" id="crowd-csv-all">CSV (all)</button>';
-    html += '<button class="btn btn-secondary btn-sm" id="crowd-xlsx-all">XLSX (all)</button>';
+    html += '<div class="action-row u-mb-12">';
+    html += '<button type="button" class="action" id="crowd-csv-filtered">' + Icon('download', 16) + 'CSV filtered</button>';
+    html += '<button type="button" class="action" id="crowd-xlsx-filtered">' + Icon('download', 16) + 'XLSX filtered</button>';
+    html += '<button type="button" class="action" id="crowd-csv-all">' + Icon('download', 16) + 'CSV all</button>';
+    html += '<button type="button" class="action" id="crowd-xlsx-all">' + Icon('download', 16) + 'XLSX all</button>';
     html += '</div>';
 
-    // Filters
-    html += '<div class="crowd-filters" id="crowd-filters">';
+    // Filters: dropdowns two-up, then the search field with Clear beside it
+    html += '<div id="crowd-filters">';
+    var filterCols = [];
     for (var i = 0; i < CROWD_COLUMNS.length; i++) {
-        var col = CROWD_COLUMNS[i];
-        if (!col.filter) continue;
-        html += '<label class="crowd-filter">';
-        html += '<span class="crowd-filter-label">' + self._esc(col.label) + '</span>';
-        html += '<select data-filter-key="' + col.key + '">' + self._filterOptions(col.key) + '</select>';
-        html += '</label>';
+        if (CROWD_COLUMNS[i].filter) filterCols.push(CROWD_COLUMNS[i]);
     }
-    html += '<label class="crowd-filter crowd-filter-search">';
-    html += '<span class="crowd-filter-label">Search</span>';
-    html += '<input type="text" id="crowd-search" placeholder="Any column…">';
-    html += '</label>';
-    html += '<button class="btn btn-secondary btn-sm" id="crowd-clear-filters">Clear</button>';
+    for (var f = 0; f < filterCols.length; f += 2) {
+        html += '<div class="field-row">';
+        for (var p = f; p < f + 2 && p < filterCols.length; p++) {
+            var col = filterCols[p];
+            html += '<div class="field">';
+            html += '<label class="field-label">' + self._esc(col.label) + '</label>';
+            html += '<select data-filter-key="' + col.key + '">' + self._filterOptions(col.key) + '</select>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="crowd-search">Search</label>';
+    html += '<input type="text" id="crowd-search" placeholder="Any column" value="' + self._escAttr(self.search) + '">';
+    html += '</div>';
+    html += '<button type="button" class="action-ghost" id="crowd-clear-filters">Clear</button>';
+    html += '</div>';
     html += '</div>';
 
-    html += '<p class="crowd-count" id="crowd-count"></p>';
+    html += '<p class="t-micro u-mb-12" id="crowd-count"></p>';
 
     // Table
-    html += '<div class="admin-table-wrap crowd-table-wrap">';
-    html += '<table class="admin-table crowd-table">';
+    html += '<div class="admin-table-wrap">';
+    html += '<table class="admin-table">';
     html += '<thead><tr>';
     for (var h = 0; h < CROWD_COLUMNS.length; h++) {
-        html += '<th class="crowd-th" data-sort-key="' + CROWD_COLUMNS[h].key + '">' +
-            self._esc(CROWD_COLUMNS[h].label) + '<span class="crowd-sort-ind"></span></th>';
+        html += '<th data-sort-key="' + CROWD_COLUMNS[h].key + '">' +
+            self._esc(CROWD_COLUMNS[h].label) + '<span data-sort-ind></span></th>';
     }
     html += '</tr></thead>';
     html += '<tbody id="crowd-tbody"></tbody>';
     html += '</table></div>';
-    html += '</section>';
+    html += '</div>';
 
     self.container.innerHTML = html;
     self._bindShell();
@@ -336,7 +351,7 @@ CrowdDataManager.prototype._bindShell = function () {
         self._renderBody();
     });
 
-    var ths = self.container.querySelectorAll('.crowd-th');
+    var ths = self.container.querySelectorAll('th[data-sort-key]');
     for (var t = 0; t < ths.length; t++) {
         ths[t].addEventListener('click', function () {
             var key = this.getAttribute('data-sort-key');
@@ -383,14 +398,14 @@ CrowdDataManager.prototype._renderBody = function () {
     }
 
     // Sort indicators
-    var ths = self.container.querySelectorAll('.crowd-th');
+    var ths = self.container.querySelectorAll('th[data-sort-key]');
     for (var t = 0; t < ths.length; t++) {
-        var ind = ths[t].querySelector('.crowd-sort-ind');
+        var ind = ths[t].querySelector('[data-sort-ind]');
         if (!ind) continue;
         if (ths[t].getAttribute('data-sort-key') === self.sortKey) {
-            ind.textContent = self.sortDir === 'asc' ? ' ▲' : ' ▼';
+            ind.innerHTML = self.sortDir === 'asc' ? Icon('chevron-up', 12) : Icon('chevron-down', 12);
         } else {
-            ind.textContent = '';
+            ind.innerHTML = '';
         }
     }
 
@@ -408,7 +423,7 @@ CrowdDataManager.prototype._renderBody = function () {
         body += '</tr>';
     }
     if (rows.length === 0) {
-        body = '<tr><td colspan="' + CROWD_COLUMNS.length + '" class="crowd-empty">No rows match the current filters.</td></tr>';
+        body = '<tr><td colspan="' + CROWD_COLUMNS.length + '">No rows match the current filters.</td></tr>';
     }
 
     var tbody = document.getElementById('crowd-tbody');

@@ -2,9 +2,10 @@
  * scope-check.js — scope-tracking verification (tall-target test).
  *
  * Question: "Is my equipment telling the truth?" · Budget C (wizard).
- * Verdict: "Your clicks are X% small — fixed, every solution now
- * corrected automatically." · Empty state: "This scope's tracking has
- * never been verified." + [Verify scope tracking].
+ * Verdict-first overlay: TRACKS TRUE, or CORRECTED with "Your clicks
+ * are X% small — every solution now corrected automatically."
+ * Empty state elsewhere: "This scope's tracking has never been
+ * verified." + [Verify scope tracking].
  *
  * Flow (WizardShell): rifle → click value → clicks dialed → one photo
  * with four taps (two scale marks 6" apart on the yorT target grid,
@@ -30,12 +31,12 @@ var ScopeCheck = (function () {
             type: 'custom',
             mount: function (el, state, api) {
                 el.innerHTML =
-                    '<p class="chrono-hint">Whole target in frame, square to the paper.</p>' +
-                    '<label class="btn btn-primary chrono-file-label" for="sc-photo">Take Photo</label>' +
-                    '<input type="file" id="sc-photo" accept="image/*" capture="environment" class="chrono-file-input">' +
-                    '<p class="chrono-hint" id="sc-instruction"></p>' +
-                    '<canvas id="sc-canvas" class="sc-canvas" style="display:none;"></canvas>' +
-                    '<div class="btn-row"><button type="button" class="btn btn-secondary" id="sc-undo" style="display:none;">Undo tap</button></div>';
+                    '<p class="t-body u-quiet u-mb-12">Whole target in frame, square to the paper.</p>' +
+                    '<label class="action-primary" for="sc-photo">' + Icon('camera', 18) + 'Take photo</label>' +
+                    '<input type="file" id="sc-photo" accept="image/*" capture="environment" class="hidden">' +
+                    '<p class="t-body u-mt-10" id="sc-instruction"></p>' +
+                    '<canvas id="sc-canvas" class="hidden u-mt-10"></canvas>' +
+                    '<button type="button" class="action hidden u-mt-10" id="sc-undo">' + Icon('undo', 18) + 'Undo tap</button>';
 
                 var taps = [];
                 var scale = 1; // canvas px per image px
@@ -50,14 +51,14 @@ var ScopeCheck = (function () {
                     for (var i = 0; i < taps.length; i++) {
                         ctx2.beginPath();
                         ctx2.arc(taps[i].x * scale, taps[i].y * scale, 7, 0, Math.PI * 2);
-                        ctx2.strokeStyle = i < 2 ? '#ff9800' : '#4caf50';
+                        ctx2.strokeStyle = i < 2 ? '#D9A13B' : '#46B268'; /* calibration brass / impact green */
                         ctx2.lineWidth = 3;
                         ctx2.stroke();
                     }
                     instruction.textContent = taps.length < 4
                         ? (taps.length + 1) + '/4 — ' + MEASURE_TAPS[taps.length]
                         : 'Measuring…';
-                    undoBtn.style.display = taps.length ? '' : 'none';
+                    undoBtn.classList.toggle('hidden', !taps.length);
                 }
 
                 el.querySelector('#sc-photo').addEventListener('change', function () {
@@ -68,7 +69,7 @@ var ScopeCheck = (function () {
                         scale = Math.min(1, maxW / img.width);
                         canvas.width = Math.round(img.width * scale);
                         canvas.height = Math.round(img.height * scale);
-                        canvas.style.display = '';
+                        canvas.classList.remove('hidden');
                         taps = [];
                         redraw();
                     }).catch(function (err) {
@@ -199,25 +200,39 @@ var ScopeCheck = (function () {
     /** Verdict first, numbers under. */
     function showVerdict(analysis, rifle, onDone) {
         var overlay = document.createElement('div');
-        overlay.className = 'wizard-overlay';
+        overlay.className = 'overlay';
         var pct = Math.abs(analysis.errorPct);
-        var sentence;
+        var html = '<div class="overlay-card">';
         if (pct <= 1) {
-            sentence = '✓ Your scope tracks true.';
+            html += '<div class="verdict">' +
+                '<span class="verdict-lamp is-go"></span>' +
+                '<div><div class="verdict-word is-go">TRACKS TRUE</div>' +
+                '<div class="verdict-sub">Within 1% of true &mdash; no correction needed.</div></div>' +
+                '</div>';
         } else {
-            sentence = 'Your clicks are ' + formatNum(pct, 1) + '% ' +
+            html += '<div class="verdict">' +
+                '<span class="verdict-lamp is-hold"></span>' +
+                '<div><div class="verdict-word is-hold">CORRECTED</div>' +
+                '<div class="verdict-sub">Your clicks are ' + formatNum(pct, 1) + '% ' +
                 (analysis.errorPct < 0 ? 'small' : 'large') +
-                ' — fixed. Every solution is now corrected automatically.';
+                ' &mdash; every solution now corrected automatically.</div></div>' +
+                '</div>';
         }
-        var html = '<div class="wizard-card">';
-        html += '<h3 class="wizard-prompt">' + sentence + '</h3>';
         if (analysis.cantWarn) {
-            html += '<p class="chrono-warnings" style="margin:0 0 10px;">⚠ Your impacts drifted sideways while dialing up — check that the scope is mounted plumb (cant).</p>';
+            html += '<div class="alert-strip u-mt-14">' + Icon('alert', 18) +
+                '<span>Your impacts drifted sideways while dialing up &mdash; check that the scope is mounted plumb (cant).</span></div>';
         }
-        html += '<p class="chrono-hint">Expected ' + formatNum(analysis.expectedInches, 2) +
-            '" of travel, measured ' + formatNum(analysis.actualInches, 2) +
-            '" (factor ' + formatNum(analysis.factor, 3) + '). Stored on ' + escapeHtml(rifle.name) + '.</p>';
-        html += '<div class="wizard-nav"><button class="btn btn-primary wizard-next" id="sc-done">Done</button></div>';
+        html += '<div class="u-mt-14">' +
+            '<div class="spec-row"><span class="spec-key">Expected travel</span><span class="spec-val">' +
+            formatNum(analysis.expectedInches, 2) + '&Prime;</span></div>' +
+            '<div class="spec-row"><span class="spec-key">Measured travel</span><span class="spec-val">' +
+            formatNum(analysis.actualInches, 2) + '&Prime;</span></div>' +
+            '<div class="spec-row"><span class="spec-key">Correction factor</span><span class="spec-val">' +
+            formatNum(analysis.factor, 3) + '</span></div>' +
+            '<div class="spec-row"><span class="spec-key">Stored on</span><span class="spec-val">' +
+            escapeHtml(rifle.name) + '</span></div>' +
+            '</div>';
+        html += '<button class="action-primary u-mt-14" id="sc-done">Done</button>';
         html += '</div>';
         overlay.innerHTML = html;
         document.body.appendChild(overlay);

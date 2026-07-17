@@ -104,14 +104,16 @@ var Onboarding = (function () {
     }
 
     /**
-     * HTML for the scan button + hidden camera input ('' when gated off).
+     * HTML for the scan control: a quiet full-width action label over a
+     * hidden camera input, with a micro status line ('' when gated off).
      */
     function scanButtonHtml() {
         if (!enabled()) return '';
-        return '<div class="form-group onboarding-scan-row">' +
-            '<label class="btn btn-secondary" for="onboarding-scan-input">📷 Scan Ammo Box</label>' +
-            '<input type="file" id="onboarding-scan-input" accept="image/*" capture="environment" class="chrono-file-input">' +
-            '<span id="onboarding-scan-status" class="onboarding-scan-status"></span>' +
+        return '<div class="field">' +
+            '<label class="action u-full" for="onboarding-scan-input">' +
+            Icon('camera', 18) + 'Scan the ammo box</label>' +
+            '<input type="file" id="onboarding-scan-input" accept="image/*" capture="environment" class="hidden">' +
+            '<p class="t-micro u-mt-10" id="onboarding-scan-status"></p>' +
             '</div>';
     }
 

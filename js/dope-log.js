@@ -3,8 +3,9 @@
  *
  * Logs verified hits at known distances with known dials.
  * Back-calculates true BC by comparing actual drop vs predicted.
- * Builds verified DOPE chart per rifle/load.
- * Admin-only beta feature.
+ * Renders as a card (.plate) inside the rifle hub: header row with
+ * a quiet log action, per-load groups with BC spec rows and a hits
+ * table. Admin-only beta feature.
  */
 
 function DopeLogManager(db) {
@@ -13,19 +14,19 @@ function DopeLogManager(db) {
 }
 
 /**
- * Render Verified DOPE section inside rifle detail.
- * Called from profiles.js _renderRifleDetail.
+ * Render Verified DOPE card inside rifle detail (container is a .qcard).
+ * Called from the rifle hub card system.
  */
 DopeLogManager.prototype.renderSection = function (container, rifleId, loads) {
     var self = this;
     var html = '';
 
-    html += '<div class="detail-section">';
-    html += '<div class="detail-section-header">';
-    html += '<h3 class="detail-section-title">Verified DOPE</h3>';
-    html += '<button class="btn btn-sm btn-secondary" id="btn-add-dope">+ Log Hit</button>';
+    html += '<div class="plate">';
+    html += '<div class="plate-head">';
+    html += '<h4 class="t-head">Verified DOPE</h4>';
+    html += '<button class="action-ghost" id="btn-add-dope">' + Icon('plus', 16) + 'Log hit</button>';
     html += '</div>';
-    html += '<div id="dope-log-content"><p class="empty-state-sub">Loading...</p></div>';
+    html += '<div id="dope-log-content"><p class="t-micro">Loading&hellip;</p></div>';
     html += '</div>';
 
     container.insertAdjacentHTML('beforeend', html);
@@ -48,7 +49,9 @@ DopeLogManager.prototype._loadEntries = function (rifleId, loads) {
 
     self.db.getDopeEntries(rifleId).then(function (entries) {
         if (!entries || entries.length === 0) {
-            contentEl.innerHTML = '<p class="empty-state-sub">No verified data points yet. Log your confirmed hits to build a verified DOPE chart and true your BC.</p>';
+            contentEl.innerHTML = '<div class="empty-teach">' +
+                '<p>Log a confirmed hit at distance and yorT builds your verified DOPE chart and trues your BC.</p>' +
+                '</div>';
             return;
         }
 
@@ -69,15 +72,14 @@ DopeLogManager.prototype._loadEntries = function (rifleId, loads) {
             loadEntries.sort(function (a, b) { return (a.distanceYards || 0) - (b.distanceYards || 0); });
 
             // Find load name
-            var loadName = 'Unknown Load';
+            var loadName = 'Unknown load';
             for (var l = 0; l < loads.length; l++) {
                 if (loads[l].id === loadId) { loadName = loads[l].name; break; }
             }
 
-            html += '<div class="dope-load-group">';
-            html += '<div class="dope-load-name">' + escapeHtml(loadName) + '</div>';
+            html += '<div class="u-label u-mt-14">' + escapeHtml(loadName) + '</div>';
 
-            // BC truing
+            // BC truing — box vs trued, delta chip when meaningful
             var load = null;
             for (var ll = 0; ll < loads.length; ll++) {
                 if (loads[ll].id === loadId) { load = loads[ll]; break; }
@@ -85,38 +87,43 @@ DopeLogManager.prototype._loadEntries = function (rifleId, loads) {
             if (load && load.bulletBC) {
                 var truedBC = self._calculateTrueBC(loadEntries, load, null);
                 if (truedBC) {
-                    html += '<div class="dope-bc-true">';
-                    html += '<span>Box BC: ' + load.bulletBC.toFixed(3) + ' ' + (load.dragModel || 'G1') + '</span>';
-                    html += '<span>Trued BC: <strong>' + truedBC.bc.toFixed(3) + '</strong></span>';
-                    var diff = ((truedBC.bc - load.bulletBC) / load.bulletBC * 100).toFixed(1);
-                    html += '<span class="' + (diff >= 0 ? 'dope-bc-up' : 'dope-bc-down') + '">' + (diff >= 0 ? '+' : '') + diff + '%</span>';
-                    html += '</div>';
+                    var diff = (truedBC.bc - load.bulletBC) / load.bulletBC * 100;
+                    var chip = '';
+                    if (Math.abs(diff) >= 1) {
+                        // Small drift = box BC holds (go); large = trust the trued number (hold)
+                        chip = ' <span class="chip ' + (Math.abs(diff) < 5 ? 'is-go' : 'is-hold') + '">' +
+                            (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%</span>';
+                    }
+                    html += '<div class="spec-row"><span class="spec-key">Box BC</span><span class="spec-val">' +
+                        load.bulletBC.toFixed(3) + ' ' + escapeHtml(load.dragModel || 'G1') + '</span></div>';
+                    html += '<div class="spec-row"><span class="spec-key">Trued BC</span><span class="spec-val">' +
+                        truedBC.bc.toFixed(3) + chip + '</span></div>';
                 }
             }
 
             // Entries table
-            html += '<div class="admin-table-wrap"><table class="admin-table">';
-            html += '<thead><tr><th>Dist</th><th>Elev Dial</th><th>Wind</th><th>Result</th><th></th></tr></thead>';
+            html += '<div class="datatable-wrap u-mt-10"><table class="datatable">';
+            html += '<thead><tr><th>Dist</th><th>Dial</th><th>Wind</th><th>Result</th><th></th></tr></thead>';
             html += '<tbody>';
             for (var j = 0; j < loadEntries.length; j++) {
                 var entry = loadEntries[j];
-                var resultClass = entry.result === 'hit' ? 'dope-hit' : (entry.result === 'miss' ? 'dope-miss' : 'dope-near');
+                var resultState = entry.result === 'hit' ? 'is-go' : (entry.result === 'miss' ? 'is-stop' : 'is-hold');
                 html += '<tr>';
                 html += '<td>' + entry.distanceYards + 'y</td>';
                 html += '<td>' + (entry.elevationMOA || 0).toFixed(1) + ' MOA</td>';
                 html += '<td>' + (entry.windHoldMOA || 0).toFixed(1) + '</td>';
-                html += '<td><span class="' + resultClass + '">' + escapeHtml(entry.result || '?') + '</span></td>';
-                html += '<td><button class="btn-icon btn-sm dope-delete-btn" data-dope-id="' + entry.id + '" title="Delete">&times;</button></td>';
+                html += '<td><span class="chip ' + resultState + '">' + escapeHtml(entry.result || '?') + '</span></td>';
+                html += '<td><button class="action-ghost" data-dope-id="' + entry.id +
+                    '" aria-label="Delete entry">' + Icon('trash', 16) + '</button></td>';
                 html += '</tr>';
             }
             html += '</tbody></table></div>';
-            html += '</div>';
         }
 
         contentEl.innerHTML = html;
 
         // Bind delete buttons
-        var delBtns = contentEl.querySelectorAll('.dope-delete-btn');
+        var delBtns = contentEl.querySelectorAll('[data-dope-id]');
         for (var d = 0; d < delBtns.length; d++) {
             delBtns[d].addEventListener('click', function () {
                 var id = this.getAttribute('data-dope-id');
@@ -128,7 +135,7 @@ DopeLogManager.prototype._loadEntries = function (rifleId, loads) {
             });
         }
     }).catch(function () {
-        contentEl.innerHTML = '<p class="empty-state-sub">Failed to load DOPE entries.</p>';
+        contentEl.innerHTML = '<p class="t-body u-quiet">Could not load DOPE entries.</p>';
     });
 };
 
@@ -137,11 +144,11 @@ DopeLogManager.prototype._showAddForm = function (rifleId, loads) {
     var contentEl = document.getElementById('dope-log-content');
     if (!contentEl) return;
 
-    var html = '<div class="dope-add-form">';
+    var html = '';
 
     // Load selector
-    html += '<div class="form-group">';
-    html += '<label>Load</label>';
+    html += '<div class="field u-mt-10">';
+    html += '<label class="field-label" for="dope-load-select">Load</label>';
     html += '<select id="dope-load-select">';
     for (var i = 0; i < loads.length; i++) {
         html += '<option value="' + loads[i].id + '">' + escapeHtml(loads[i].name) + '</option>';
@@ -149,24 +156,24 @@ DopeLogManager.prototype._showAddForm = function (rifleId, loads) {
     html += '</select>';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Distance (yds)</label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="dope-distance">Distance <span class="field-unit">yd</span></label>';
     html += '<input type="number" id="dope-distance" min="50" max="2000" step="25" inputmode="numeric" placeholder="500">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Elev Dial (MOA)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="dope-elevation">Elev dial <span class="field-unit">MOA</span></label>';
     html += '<input type="number" id="dope-elevation" min="0" max="200" step="0.25" inputmode="decimal" placeholder="12.5">';
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Wind Hold (MOA)</label>';
+    html += '<div class="field-row">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="dope-wind">Wind hold <span class="field-unit">MOA</span></label>';
     html += '<input type="number" id="dope-wind" min="-20" max="20" step="0.25" inputmode="decimal" placeholder="0">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label>Result</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="dope-result">Result</label>';
     html += '<select id="dope-result">';
     html += '<option value="hit">Hit</option>';
     html += '<option value="high">High</option>';
@@ -178,15 +185,15 @@ DopeLogManager.prototype._showAddForm = function (rifleId, loads) {
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label>Notes (optional)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="dope-notes">Notes <span class="field-unit">optional</span></label>';
     html += '<input type="text" id="dope-notes" placeholder="e.g., 10 mph crosswind, 5000ft DA">';
     html += '</div>';
+    html += '<p id="dope-error" class="field-error"></p>';
 
-    html += '<div class="btn-row">';
-    html += '<button class="btn btn-secondary" id="dope-cancel-btn">Cancel</button>';
-    html += '<button class="btn btn-primary" id="dope-save-btn">Save</button>';
-    html += '</div>';
+    html += '<div class="action-row u-mt-10">';
+    html += '<button class="action-ghost" id="dope-cancel-btn">Cancel</button>';
+    html += '<button class="action" id="dope-save-btn">Save</button>';
     html += '</div>';
 
     contentEl.innerHTML = html;
@@ -208,7 +215,8 @@ DopeLogManager.prototype._showAddForm = function (rifleId, loads) {
         };
 
         if (entry.distanceYards < 50) {
-            alert('Enter a valid distance.');
+            var errEl = document.getElementById('dope-error');
+            if (errEl) errEl.textContent = 'Enter a valid distance (50 yards or more).';
             return;
         }
 

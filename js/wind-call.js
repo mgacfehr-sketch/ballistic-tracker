@@ -3,8 +3,12 @@
  *
  * Uses compass API for shooter heading, clock-face wind direction visual,
  * and calculates: wind drift, Coriolis, spin drift, and total hold.
- * Admin-only beta feature.
+ * Results render as an instrument plate (stat strip in the rifle's own
+ * turret unit, total hold as the hero numeral). Admin-only beta feature.
  */
+
+/* 1 milliradian = 3.43775 MOA (turret-unit conversion) */
+var WIND_MIL_TO_MOA = 3.43775;
 
 function WindCallManager(db) {
     this.db = db;
@@ -48,12 +52,14 @@ WindCallManager.prototype._renderUI = function (groups) {
     var self = this;
     var html = '';
 
-    html += '<div class="wind-call-page">';
+    html += '<div class="view-toolbar"><h2 class="toolbar-title">Wind call</h2></div>';
+    html += '<div class="screen">';
 
-    // Rifle/Load selector
-    html += '<div class="wind-call-selector">';
-    html += '<select id="wind-rifle-select" class="wind-select">';
-    html += '<option value="">Select Rifle & Load</option>';
+    // Rifle/load selector
+    html += '<div class="field">';
+    html += '<label class="field-label" for="wind-rifle-select">Rifle &amp; load</label>';
+    html += '<select id="wind-rifle-select">';
+    html += '<option value="">Select rifle &amp; load</option>';
     for (var g = 0; g < groups.length; g++) {
         var rifle = groups[g].rifle;
         var loads = groups[g].loads;
@@ -70,35 +76,31 @@ WindCallManager.prototype._renderUI = function (groups) {
     html += '</div>';
 
     // Compass heading
-    html += '<div class="wind-call-compass-status" id="wind-compass-status">';
+    html += '<div id="wind-compass-status">';
     if (this.heading !== null) {
-        html += 'Heading: ' + Math.round(this.heading) + '&deg; (' + self._headingToCardinal(this.heading) + ')';
+        html += '<p class="t-micro">Heading ' + Math.round(this.heading) + '&deg; (' + self._headingToCardinal(this.heading) + ')</p>';
     } else {
-        html += '<button class="btn btn-secondary btn-sm" id="wind-enable-compass">Enable Compass</button>';
+        html += '<button type="button" class="action" id="wind-enable-compass">' + Icon('compass', 18) + 'Enable compass</button>';
     }
     html += '</div>';
 
-    // Clock face
-    html += '<div class="wind-clock-container">';
-    html += '<canvas id="wind-clock-canvas" width="260" height="260"></canvas>';
-    html += '</div>';
+    // Clock face (canvas draws its own palette-matched colors)
+    html += '<canvas id="wind-clock-canvas" class="u-center u-mt-14" width="260" height="260"></canvas>';
 
     // Wind speed & distance inputs
-    html += '<div class="wind-call-inputs">';
-    html += '<div class="form-row">';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="wind-speed-input">Wind Speed (mph)</label>';
+    html += '<div class="field-row u-mt-14">';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="wind-speed-input">Wind speed <span class="field-unit">mph</span></label>';
     html += '<input type="number" id="wind-speed-input" min="0" max="60" step="1" inputmode="numeric" value="' + this.windSpeed + '">';
     html += '</div>';
-    html += '<div class="form-group form-group-half">';
-    html += '<label for="wind-distance-input">Distance (yds)</label>';
+    html += '<div class="field">';
+    html += '<label class="field-label" for="wind-distance-input">Distance <span class="field-unit">yds</span></label>';
     html += '<input type="number" id="wind-distance-input" min="50" max="2000" step="50" inputmode="numeric" value="' + this.distance + '">';
-    html += '</div>';
     html += '</div>';
     html += '</div>';
 
     // Results
-    html += '<div class="wind-call-results" id="wind-call-results"></div>';
+    html += '<div id="wind-call-results"></div>';
 
     html += '</div>';
 
@@ -203,14 +205,14 @@ WindCallManager.prototype._listenCompass = function () {
             self.heading = heading;
             var statusEl = document.getElementById('wind-compass-status');
             if (statusEl) {
-                statusEl.innerHTML = 'Heading: ' + Math.round(heading) + '&deg; (' + self._headingToCardinal(heading) + ')';
+                statusEl.innerHTML = '<p class="t-micro">Heading ' + Math.round(heading) + '&deg; (' + self._headingToCardinal(heading) + ')</p>';
             }
         }
     };
     window.addEventListener('deviceorientation', self._compassHandler);
 
     var statusEl = document.getElementById('wind-compass-status');
-    if (statusEl) statusEl.innerHTML = 'Waiting for compass...';
+    if (statusEl) statusEl.innerHTML = '<p class="t-micro">Waiting for compass&hellip;</p>';
 };
 
 WindCallManager.prototype._headingToCardinal = function (deg) {
@@ -230,17 +232,17 @@ WindCallManager.prototype._drawClock = function () {
 
     ctx.clearRect(0, 0, w, h);
 
-    // Background circle
+    // Background circle — raised panel on hairline (palette: --g1 / --line)
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e1e1e';
+    ctx.fillStyle = '#14171A';
     ctx.fill();
-    ctx.strokeStyle = '#444';
+    ctx.strokeStyle = '#2A3036';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Clock numbers and tick marks
-    ctx.fillStyle = '#888';
+    // Clock numbers and tick marks (secondary ink / hairlines)
+    ctx.fillStyle = '#9BA6AE';
     ctx.font = '13px -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -258,15 +260,15 @@ WindCallManager.prototype._drawClock = function () {
         ctx.beginPath();
         ctx.moveTo(tx1, ty1);
         ctx.lineTo(tx2, ty2);
-        ctx.strokeStyle = '#555';
+        ctx.strokeStyle = '#2A3036';
         ctx.lineWidth = 2;
         ctx.stroke();
     }
 
-    // Shooter dot at center
+    // Shooter dot at center (primary ink)
     ctx.beginPath();
     ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#4caf50';
+    ctx.fillStyle = '#EDF1F4';
     ctx.fill();
 
     // Wind direction hand
@@ -275,11 +277,11 @@ WindCallManager.prototype._drawClock = function () {
     var hx = cx + handLen * Math.cos(windRad);
     var hy = cy + handLen * Math.sin(windRad);
 
-    // Arrow line
+    // Arrow line (brass accent)
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(hx, hy);
-    ctx.strokeStyle = '#f44336';
+    ctx.strokeStyle = '#D9A13B';
     ctx.lineWidth = 3;
     ctx.stroke();
 
@@ -291,13 +293,13 @@ WindCallManager.prototype._drawClock = function () {
     ctx.lineTo(hx - arrowSize * Math.cos(arrowAngle - 0.4), hy - arrowSize * Math.sin(arrowAngle - 0.4));
     ctx.lineTo(hx - arrowSize * Math.cos(arrowAngle + 0.4), hy - arrowSize * Math.sin(arrowAngle + 0.4));
     ctx.closePath();
-    ctx.fillStyle = '#f44336';
+    ctx.fillStyle = '#D9A13B';
     ctx.fill();
 
-    // Clock position label
+    // Clock position label (primary ink)
     var clockPos = Math.round(this.windAngle / 30) % 12;
     if (clockPos === 0) clockPos = 12;
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = '#EDF1F4';
     ctx.font = 'bold 14px -apple-system, sans-serif';
     ctx.fillText(clockPos + " o'clock", cx, cy + r + 6);
 };
@@ -307,7 +309,7 @@ WindCallManager.prototype._calculate = function (groups) {
     if (!resultsEl) return;
 
     if (!this.selectedRifleId || !this.selectedLoadId) {
-        resultsEl.innerHTML = '<div class="wind-call-empty">Select a rifle and load above</div>';
+        resultsEl.innerHTML = '<p class="t-body u-quiet">Pick a rifle and load above to get holds.</p>';
         return;
     }
 
@@ -327,7 +329,7 @@ WindCallManager.prototype._calculate = function (groups) {
     }
 
     if (!rifle || !load || !load.bulletBC || !load.muzzleVelocity) {
-        resultsEl.innerHTML = '<div class="wind-call-empty">Missing BC or MV data for this load</div>';
+        resultsEl.innerHTML = '<p class="t-body u-quiet">This load is missing BC or muzzle velocity data.</p>';
         return;
     }
 
@@ -345,64 +347,61 @@ WindCallManager.prototype._calculate = function (groups) {
     // 3. Coriolis horizontal deflection
     var coriolis = this._calcCoriolis(distYds, load, this.latitude, this.heading);
 
-    // Build results HTML
-    var html = '';
-    html += '<div class="wind-call-result-header">Hold Adjustments at ' + distYds + ' yds</div>';
-
-    // Wind drift
-    html += '<div class="wind-call-result-row">';
-    html += '<span class="wind-call-result-label">Wind Drift (' + clockPos + " o'clock, " + windMph + ' mph)</span>';
-    html += '<span class="wind-call-result-value">' + windResult.driftInches.toFixed(1) + '" / ' + windResult.driftMOA.toFixed(2) + ' MOA</span>';
-    html += '</div>';
-
-    // Spin drift
-    if (spinDrift.inches !== 0) {
-        html += '<div class="wind-call-result-row">';
-        html += '<span class="wind-call-result-label">Spin Drift (' + spinDrift.direction + ')</span>';
-        html += '<span class="wind-call-result-value">' + Math.abs(spinDrift.inches).toFixed(1) + '" / ' + Math.abs(spinDrift.moa).toFixed(2) + ' MOA</span>';
-        html += '</div>';
-    }
-
-    // Coriolis
-    if (coriolis.horizontalMOA !== 0) {
-        html += '<div class="wind-call-result-row">';
-        html += '<span class="wind-call-result-label">Coriolis (horizontal)</span>';
-        html += '<span class="wind-call-result-value">' + Math.abs(coriolis.horizontalInches).toFixed(1) + '" / ' + Math.abs(coriolis.horizontalMOA).toFixed(2) + ' MOA ' + coriolis.horizontalDir + '</span>';
-        html += '</div>';
-
-        html += '<div class="wind-call-result-row">';
-        html += '<span class="wind-call-result-label">Coriolis (vertical)</span>';
-        html += '<span class="wind-call-result-value">' + Math.abs(coriolis.verticalInches).toFixed(1) + '" / ' + Math.abs(coriolis.verticalMOA).toFixed(2) + ' MOA</span>';
-        html += '</div>';
+    // The rifle's own turret unit — every hold below is spoken in it
+    var unit = String(rifle.angleUnit || '').toUpperCase() === 'MIL' ? 'MIL' : 'MOA';
+    function inUnit(moa) {
+        var v = unit === 'MIL' ? moa / WIND_MIL_TO_MOA : moa;
+        return Math.abs(v).toFixed(2);
     }
 
     // Total windage hold
     var totalWindageInches = windResult.driftInches + spinDrift.inches + (coriolis.horizontalInches || 0);
     var totalWindageMOA = totalWindageInches / (distYds / 100 * 1.047);
-    var holdDir = totalWindageMOA >= 0 ? 'Right' : 'Left';
+    var holdDir = totalWindageMOA >= 0 ? 'R' : 'L';
 
-    html += '<div class="wind-call-result-divider"></div>';
-    html += '<div class="wind-call-result-row wind-call-result-total">';
-    html += '<span class="wind-call-result-label">Total Windage Hold</span>';
-    html += '<span class="wind-call-result-value">' + Math.abs(totalWindageMOA).toFixed(2) + ' MOA ' + holdDir + '</span>';
+    // Results plate: label, then the four holds — total is the hero numeral
+    var html = '';
+    html += '<div class="plate">';
+    html += '<div class="instrument-label">Hold at ' + distYds + ' yds</div>';
+    html += '<p class="t-micro">Wind ' + clockPos + " o'clock at " + windMph + ' mph</p>';
+
+    html += '<div class="stat-strip">';
+    html += this._instrument('Wind', inUnit(windResult.driftMOA), unit + ' ' + (windResult.driftMOA >= 0 ? 'R' : 'L'));
+    html += this._instrument('Spin', inUnit(spinDrift.moa), unit + ' ' + (spinDrift.direction === 'Right' ? 'R' : 'L'));
+    if (coriolis.horizontalMOA !== 0) {
+        html += this._instrument('Coriolis', inUnit(coriolis.horizontalMOA), unit + ' ' + (coriolis.horizontalDir === 'Right' ? 'R' : 'L'));
+    } else {
+        html += this._instrument('Coriolis', '&mdash;', '');
+    }
+    html += this._instrument('Total', inUnit(totalWindageMOA), unit + ' ' + holdDir, true);
     html += '</div>';
 
     // Time of flight from solver
     if (windResult.tof) {
-        html += '<div class="wind-call-result-row">';
-        html += '<span class="wind-call-result-label">Time of Flight</span>';
-        html += '<span class="wind-call-result-value">' + windResult.tof.toFixed(3) + ' sec</span>';
-        html += '</div>';
+        html += '<p class="t-micro u-mt-10">Time of flight ' + windResult.tof.toFixed(3) + ' s</p>';
     }
-
+    if (coriolis.verticalMOA !== 0) {
+        html += '<p class="t-micro">Coriolis vertical ' + inUnit(coriolis.verticalMOA) + ' ' + unit +
+            (coriolis.verticalMOA >= 0 ? ' up' : ' down') + '</p>';
+    }
     if (!this.latitude) {
-        html += '<div class="wind-call-note">Enable GPS for Coriolis corrections</div>';
+        html += '<p class="t-micro">Enable GPS for Coriolis corrections.</p>';
     }
     if (this.heading === null) {
-        html += '<div class="wind-call-note">Enable compass for direction-dependent corrections</div>';
+        html += '<p class="t-micro">Enable compass for direction-dependent corrections.</p>';
     }
+    html += '</div>';
 
     resultsEl.innerHTML = html;
+};
+
+/** One labeled hold readout; hero=true renders the value at display scale. */
+WindCallManager.prototype._instrument = function (label, value, unitText, hero) {
+    return '<div class="instrument">' +
+        '<div class="instrument-label">' + label + '</div>' +
+        '<div class="instrument-value' + (hero ? ' t-display' : '') + '">' + value +
+        (unitText ? '<span class="instrument-unit">' + unitText + '</span>' : '') +
+        '</div></div>';
 };
 
 /**

@@ -4,7 +4,7 @@
  * Question: "What do I dial?" · Budget C (2-minute wizard at home).
  * Verdict: the card IS the verdict — laminated paper on the stock.
  * Empty state (in the wizard): "This load needs BC and muzzle velocity
- * — add them in Profiles." · Taps: 5 wizard taps → PDF.
+ * — add them in Profiles." · Taps: 5 wizard taps → preview → PDF.
  *
  * Uses the SAME trued inputs as the solver: computeTrajectory(), the
  * rifle's scope-tracking correction (come-ups pre-corrected on paper),
@@ -153,17 +153,26 @@ var DopeCards = (function () {
                         var loads = loadsByRifle[state.answers.rifle] || [];
                         var ready = loads.filter(function (l) { return l.bulletBC && l.muzzleVelocity; });
                         if (!ready.length) {
-                            el.innerHTML = '<p class="empty-state-sub" style="padding:0;">This rifle has no load with BC and muzzle velocity — open the load on its rifle page and add them.</p>';
+                            el.innerHTML = '<div class="empty-teach">' +
+                                '<p>This rifle has no load with BC and muzzle velocity — add them on the rifle page.</p>' +
+                                '<button class="action" id="dope-no-load">Open rifles</button></div>';
+                            el.querySelector('#dope-no-load').addEventListener('click', function () {
+                                var close = document.getElementById('wizard-close');
+                                if (close) close.click(); // wizard persists — resumable
+                                if (window.AppNav) window.AppNav.go('profiles');
+                            });
                             return;
                         }
-                        var html = '';
+                        var html = '<div class="choice-stack">';
                         for (var i = 0; i < ready.length; i++) {
-                            html += '<button class="wizard-choice" data-value="' + ready[i].id + '">' +
-                                '<span class="wizard-choice-label">' + escapeHtml(ready[i].name) + '</span>' +
-                                '<span class="wizard-choice-desc">BC ' + ready[i].bulletBC + ' · ' + ready[i].muzzleVelocity + ' fps</span></button>';
+                            html += '<button class="choice-plate" data-value="' + ready[i].id + '">' +
+                                '<span>' + escapeHtml(ready[i].name) +
+                                '<span class="choice-desc">BC ' + ready[i].bulletBC + ' &middot; ' + ready[i].muzzleVelocity + ' fps</span></span>' +
+                                Icon('chevron-right', 18) + '</button>';
                         }
+                        html += '</div>';
                         el.innerHTML = html;
-                        var btns = el.querySelectorAll('.wizard-choice');
+                        var btns = el.querySelectorAll('.choice-plate');
                         for (var b = 0; b < btns.length; b++) {
                             btns[b].addEventListener('click', function () {
                                 api.submit(this.getAttribute('data-value'));
@@ -196,25 +205,26 @@ var DopeCards = (function () {
                             return ft === 0 ? 'Sea level' : ft.toLocaleString() + ' ft';
                         }
 
-                        var html = '<p class="chrono-hint" style="margin:0 0 6px;">One card prints per altitude.</p>';
-                        html += '<div class="field-chips" id="dope-alts">';
-                        html += '<button class="field-chip field-chip-on" data-alt="current">Current altitude</button>';
+                        var html = '<p class="t-body u-quiet u-mb-12">One card prints per altitude.</p>';
+                        html += '<div class="u-label">Altitudes</div>';
+                        html += '<div class="chip-row u-mt-10" id="dope-alts">';
+                        html += '<button class="chip-opt is-selected" data-alt="current">' + Icon('map-pin', 14) + ' Current altitude</button>';
                         ALTS.forEach(function (ft) {
-                            html += '<button class="field-chip" data-alt="' + ft + '">' + altLabel(ft) + '</button>';
+                            html += '<button class="chip-opt" data-alt="' + ft + '">' + altLabel(ft) + '</button>';
                         });
+                        html += '<button class="chip-opt" id="dope-alt-toggle">' + Icon('pencil', 14) + ' custom</button>';
                         html += '</div>';
-                        html += '<div style="display:flex;gap:6px;margin:6px 0 10px;">';
-                        html += '<input type="number" id="dope-alt-custom" class="wizard-input" min="-1000" max="15000" step="100" inputmode="numeric" placeholder="Custom altitude (ft)" style="flex:1;margin:0;">';
-                        html += '<button class="btn btn-secondary" id="dope-alt-add" type="button">Add</button>';
-                        html += '</div>';
-                        html += '<div class="field-label">Wind columns (mph, full value)</div>';
-                        html += '<div class="field-chips" id="dope-winds">';
+                        html += '<div class="field u-mt-10 hidden" id="dope-alt-wrap">' +
+                            '<input type="number" id="dope-alt-custom" min="-1000" max="15000" step="100" inputmode="numeric" placeholder="Custom altitude (ft)">' +
+                            '<p class="field-hint">Enter an altitude — it joins the list, selected.</p></div>';
+                        html += '<div class="u-label u-mt-14">Wind columns (mph, full value)</div>';
+                        html += '<div class="chip-row u-mt-10" id="dope-winds">';
                         WINDS.forEach(function (mph) {
-                            html += '<button class="field-chip' + (sel.winds[mph] ? ' field-chip-on' : '') + '" data-wind="' + mph + '">' + mph + '</button>';
+                            html += '<button class="chip-opt' + (sel.winds[mph] ? ' is-selected' : '') + '" data-wind="' + mph + '">' + mph + '</button>';
                         });
                         html += '</div>';
-                        html += '<p class="wizard-error" id="dope-cards-error"></p>';
-                        html += '<div class="wizard-nav"><button class="btn btn-primary wizard-next" id="dope-cards-go" type="button">Create cards</button></div>';
+                        html += '<p class="field-error" id="dope-cards-error"></p>';
+                        html += '<button class="action-primary u-mt-14" id="dope-cards-go" type="button">Create cards</button>';
                         el.innerHTML = html;
 
                         // Label the current-altitude chip with the GPS number (best-effort)
@@ -222,26 +232,37 @@ var DopeCards = (function () {
                             NetService.getConditions().then(function (cond) {
                                 var chip = el.querySelector('[data-alt="current"]');
                                 if (chip && cond && cond.altitude !== null) {
-                                    chip.textContent = 'Current (' + cond.altitude.toLocaleString() + ' ft)';
+                                    chip.innerHTML = Icon('map-pin', 14) + ' Current (' + cond.altitude.toLocaleString() + ' ft)';
                                 }
                             }).catch(function () { /* GPS off — standard atmosphere fallback at print */ });
                         }
 
                         function bindToggles(rootId, attr, map) {
-                            var chips = el.querySelector('#' + rootId).querySelectorAll('.field-chip');
+                            var chips = el.querySelector('#' + rootId).querySelectorAll('.chip-opt[' + attr + ']');
                             for (var i = 0; i < chips.length; i++) {
                                 chips[i].addEventListener('click', function () {
                                     var key = this.getAttribute(attr);
                                     map[key] = !map[key];
-                                    this.classList.toggle('field-chip-on', !!map[key]);
+                                    this.classList.toggle('is-selected', !!map[key]);
                                 });
                             }
                         }
                         bindToggles('dope-alts', 'data-alt', sel.alts);
                         bindToggles('dope-winds', 'data-wind', sel.winds);
 
-                        el.querySelector('#dope-alt-add').addEventListener('click', function () {
-                            var input = el.querySelector('#dope-alt-custom');
+                        // The custom chip reveals a number field; a committed
+                        // value becomes a selected altitude chip.
+                        el.querySelector('#dope-alt-toggle').addEventListener('click', function () {
+                            var wrap = el.querySelector('#dope-alt-wrap');
+                            wrap.classList.toggle('hidden');
+                            this.classList.toggle('is-selected', !wrap.classList.contains('hidden'));
+                            if (!wrap.classList.contains('hidden')) {
+                                el.querySelector('#dope-alt-custom').focus();
+                            }
+                        });
+                        el.querySelector('#dope-alt-custom').addEventListener('change', function () {
+                            var input = this;
+                            if (input.value === '') return; // cleared — nothing to add
                             var ft = Math.round(parseFloat(input.value));
                             if (isNaN(ft) || ft < -1000 || ft > 15000) {
                                 el.querySelector('#dope-cards-error').textContent = 'Altitude must be between -1,000 and 15,000 ft.';
@@ -250,18 +271,18 @@ var DopeCards = (function () {
                             el.querySelector('#dope-cards-error').textContent = '';
                             if (!el.querySelector('[data-alt="' + ft + '"]')) {
                                 var chip = document.createElement('button');
-                                chip.className = 'field-chip field-chip-on';
+                                chip.className = 'chip-opt is-selected';
                                 chip.setAttribute('data-alt', String(ft));
                                 chip.textContent = altLabel(ft);
                                 chip.addEventListener('click', function () {
                                     sel.alts[ft] = !sel.alts[ft];
-                                    this.classList.toggle('field-chip-on', !!sel.alts[ft]);
+                                    this.classList.toggle('is-selected', !!sel.alts[ft]);
                                 });
-                                el.querySelector('#dope-alts').appendChild(chip);
+                                el.querySelector('#dope-alts').insertBefore(chip, el.querySelector('#dope-alt-toggle'));
                             }
                             sel.alts[ft] = true;
                             var existing = el.querySelector('[data-alt="' + ft + '"]');
-                            if (existing) existing.classList.add('field-chip-on');
+                            if (existing) existing.classList.add('is-selected');
                             input.value = '';
                         });
 
@@ -348,6 +369,18 @@ var DopeCards = (function () {
             ? NetService.getConditions().catch(function () { return null; })
             : Promise.resolve(null);
 
+        // Preview overlay: progress text now, first card + export once built
+        var overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.innerHTML = '<div class="overlay-card">' +
+            '<button class="overlay-close" aria-label="Close">' + Icon('x', 20) + '</button>' +
+            '<h3 class="overlay-title">Your cards</h3>' +
+            '<div id="dope-preview"><p class="t-body u-quiet">Building your cards…</p></div></div>';
+        document.body.appendChild(overlay);
+        overlay.querySelector('.overlay-close').addEventListener('click', function () {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        });
+
         condPromise.then(function (cond) {
             var canvases = altitudes.map(function (alt) {
                 var pressure = alt === null
@@ -386,7 +419,16 @@ var DopeCards = (function () {
                     windSpeeds: windSpeeds
                 }, fmt);
             });
-            exportPdf(canvases, fmt, rifle);
+            var box = overlay.querySelector('#dope-preview');
+            box.innerHTML = '<p class="t-body u-mb-12">' + canvases.length + ' card' +
+                (canvases.length === 1 ? '' : 's') + ' ready — ' + fmt.label +
+                (canvases.length > 1 ? ', one per altitude.' : '.') + '</p>' +
+                '<img class="plate-img" alt="DOPE card preview" src="' + canvases[0].toDataURL('image/png') + '">' +
+                '<p class="t-micro u-mt-10">Print at 100% scale and cut on the gray marks.</p>' +
+                '<button class="action-primary u-mt-14" id="dope-export">Export PDF</button>';
+            box.querySelector('#dope-export').addEventListener('click', function () {
+                exportPdf(canvases, fmt, rifle);
+            });
         });
     }
 

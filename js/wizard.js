@@ -1,16 +1,18 @@
 /**
  * wizard.js — WizardShell: the DOM layer over WizardCore.
  *
- * One question per screen, ≥44px choice buttons, big Next, Back,
- * skip-aware progress. State persists (localStorage via db.setSetting)
- * after EVERY transition, so an interrupted wizard resumes exactly
- * where it stopped; completing clears the saved state.
+ * Full-screen conversation (REDESIGN-SPEC III.5): one question per
+ * screen, machined progress ticks, choice plates that answer AND
+ * advance on tap, a single brass Next for typed answers. State
+ * persists (via db.setSetting) after EVERY transition, so an
+ * interrupted wizard resumes exactly where it stopped; completing
+ * clears the saved state.
  *
  * Usage:
  *   new WizardShell(db, def, {
  *     modal: true | container: element,
  *     onComplete: function (answers) {},
- *     onCancel: function () {}          // optional — shows an × when set
+ *     onCancel: function () {}          // optional — shows a close button when set
  *   }).start();
  */
 
@@ -32,12 +34,13 @@ WizardShell.prototype.start = function () {
 };
 
 WizardShell.prototype._mount = function () {
+    this._root = document.createElement('div');
     if (this.opts.container) {
-        this._root = this.opts.container;
+        // Inline: plain wrapper, same wiz-bar/body/foot structure inside
+        this.opts.container.appendChild(this._root);
         return;
     }
-    this._root = document.createElement('div');
-    this._root.className = 'wizard-overlay';
+    this._root.className = 'wiz';
     document.body.appendChild(this._root);
 };
 
@@ -53,18 +56,26 @@ WizardShell.prototype._finish = function () {
 };
 
 WizardShell.prototype._unmount = function () {
-    if (!this.opts.container && this._root && this._root.parentNode) {
+    if (this._root && this._root.parentNode) {
         this._root.parentNode.removeChild(this._root);
-    } else if (this._root) {
-        this._root.innerHTML = '';
+    }
+};
+
+WizardShell.prototype._setError = function (msg) {
+    var el = this._root.querySelector('.wiz-error');
+    if (!el) return;
+    el.innerHTML = msg ? Icon('alert', 16) : '';
+    if (msg) {
+        var span = document.createElement('span');
+        span.textContent = msg;
+        el.appendChild(span);
     }
 };
 
 WizardShell.prototype._advance = function (answer) {
     var verdict = WizardCore.canNext(this.def, this.state, answer);
     if (!verdict.ok) {
-        var err = this._root.querySelector('.wizard-error');
-        if (err) err.textContent = verdict.error;
+        this._setError(verdict.error);
         return;
     }
     this.state = WizardCore.next(this.def, this.state, answer);
@@ -84,60 +95,80 @@ WizardShell.prototype._render = function () {
     var progress = WizardCore.progress(this.def, this.state);
     var saved = this.state.answers[step.id];
 
-    var html = '<div class="wizard-card">';
-    if (this.opts.onCancel) {
-        html += '<button class="wizard-close" aria-label="Close" title="Close">×</button>';
-    }
+    // ── bar: back · ticks · close ─────────────────────────────
+    var html = '<div class="wiz-bar">';
+    html += this.state.index > 0
+        ? '<button class="toolbar-back" id="wizard-back" aria-label="Back">' + Icon('chevron-left', 20) + '</button>'
+        : '<span></span>';
     if (progress.total > 1) {
-        html += '<div class="wizard-progress"><div class="wizard-progress-bar" style="width:' +
-            Math.round(progress.fraction * 100) + '%"></div></div>';
-        html += '<div class="wizard-count">' + progress.current + ' of ' + progress.total + '</div>';
+        html += '<div class="wiz-ticks">';
+        for (var t = 1; t <= progress.total; t++) {
+            html += '<span class="wiz-tick' + (t <= progress.current ? ' is-done' : '') + '"></span>';
+        }
+        html += '</div>';
+    } else {
+        html += '<span></span>';
     }
-    html += '<h3 class="wizard-prompt">' + step.prompt + '</h3>';
+    html += this.opts.onCancel
+        ? '<button class="toolbar-act" id="wizard-close" aria-label="Close">' + Icon('x', 20) + '</button>'
+        : '<span></span>';
+    html += '</div>';
+
+    // ── body: kicker · question · answer UI · error ───────────
+    html += '<div class="wiz-body">';
+    if (progress.total > 1) {
+        html += '<div class="wiz-kicker">QUESTION ' + progress.current + ' OF ' + progress.total + '</div>';
+    }
+    html += '<h2 class="wiz-question">' + step.prompt + '</h2>';
 
     if (step.type === 'custom') {
         // Custom steps own their body and advance via api.submit(answer).
         // step.mount(bodyEl, state, api) is called after the shell renders.
-        html += '<div class="wizard-custom" id="wizard-custom-body"></div>';
+        html += '<div id="wizard-custom-body"></div>';
     } else if (step.type === 'choice') {
+        html += '<div class="choice-stack">';
         for (var c = 0; c < step.choices.length; c++) {
             var ch = step.choices[c];
-            html += '<button class="wizard-choice" data-value="' + ch.value + '">' +
-                '<span class="wizard-choice-label">' + ch.label + '</span>' +
-                (ch.desc ? '<span class="wizard-choice-desc">' + ch.desc + '</span>' : '') +
+            var selected = saved !== undefined && saved !== null && String(saved) === String(ch.value);
+            html += '<button class="choice-plate' + (selected ? ' is-selected' : '') +
+                '" data-value="' + ch.value + '">' +
+                '<span>' + ch.label +
+                (ch.desc ? '<span class="choice-desc">' + ch.desc + '</span>' : '') +
+                '</span>' +
+                (selected ? Icon('check', 18) : '') +
                 '</button>';
         }
+        html += '</div>';
     } else {
-        html += '<input class="wizard-input" id="wizard-input" type="' +
-            (step.type === 'number' ? 'number' : 'text') + '" value="' +
-            (saved !== undefined && saved !== null ? String(saved).replace(/"/g, '&quot;') : '') + '">';
+        html += '<div class="field">' +
+            '<input id="wizard-input" type="' + (step.type === 'number' ? 'number' : 'text') + '"' +
+            (step.type === 'number' ? ' inputmode="decimal"' : '') + ' value="' +
+            (saved !== undefined && saved !== null ? String(saved).replace(/"/g, '&quot;') : '') + '">' +
+            '</div>';
     }
 
-    html += '<p class="wizard-error"></p>';
-    html += '<div class="wizard-nav">';
-    if (this.state.index > 0) {
-        html += '<button class="btn btn-secondary" id="wizard-back">‹ Back</button>';
-    }
+    html += '<div class="wiz-error"></div>';
+    html += '</div>';
+
+    // ── foot: one brass Next for typed answers only ───────────
+    // (choice plates advance on tap; custom steps advance via api.submit)
     if (step.type !== 'choice' && step.type !== 'custom') {
-        html += '<button class="btn btn-primary wizard-next" id="wizard-next">Next</button>';
+        html += '<div class="wiz-foot">' +
+            '<button class="wiz-next action-primary" id="wizard-next">Next</button>' +
+            '</div>';
     }
-    html += '</div>';
-    html += '</div>';
 
     this._root.innerHTML = html;
 
     if (step.type === 'custom' && step.mount) {
         step.mount(this._root.querySelector('#wizard-custom-body'), this.state, {
             submit: function (answer) { self._advance(answer); },
-            error: function (msg) {
-                var errEl = self._root.querySelector('.wizard-error');
-                if (errEl) errEl.textContent = msg || '';
-            }
+            error: function (msg) { self._setError(msg || ''); }
         });
     }
 
     // Choice taps answer AND advance — one decision per screen
-    var choices = this._root.querySelectorAll('.wizard-choice');
+    var choices = this._root.querySelectorAll('.choice-plate');
     for (var i = 0; i < choices.length; i++) {
         choices[i].addEventListener('click', function () {
             self._advance(this.getAttribute('data-value'));
@@ -160,7 +191,7 @@ WizardShell.prototype._render = function () {
             self._render();
         });
     }
-    var closeBtn = this._root.querySelector('.wizard-close');
+    var closeBtn = this._root.querySelector('#wizard-close');
     if (closeBtn) {
         closeBtn.addEventListener('click', function () {
             self._persist(); // resumable — nothing lost
