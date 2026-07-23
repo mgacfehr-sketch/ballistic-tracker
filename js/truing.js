@@ -538,7 +538,7 @@ var TruingJob = (function () {
             '<div style="display:flex;gap:2px;height:10px;margin-top:10px">' +
             [1, 2, 3, 4, 5].map(function (i) {
                 return '<i style="flex:1;border-radius:2px;background:' +
-                    (i <= conf.segments ? segColor : 'var(--border-subtle, #ddd)') + '"></i>';
+                    (i <= conf.segments ? segColor : 'var(--dial-track)') + '"></i>';
             }).join('') + '</div>' +
             (conf.capNotes.length
                 ? '<p class="t-micro u-mt-10" style="line-height:1.5">' + UI.esc(conf.capNotes[0]) + '</p>'
@@ -547,7 +547,7 @@ var TruingJob = (function () {
             '</div>';
 
         // Tappable why — the normalization ledger, silent by default
-        html += '<button class="u-full" id="tr-why" style="background:none;border:none;padding:8px;color:var(--brand-gold-strong);font-weight:600">' +
+        html += '<button class="u-full" id="tr-why" style="background:none;border:none;min-height:52px;padding:8px;color:var(--brand-gold-strong);font-weight:600">' +
             '&#9662; Why? (what we removed before truing)</button>';
         html += '<div id="tr-ledger" class="hidden"></div>';
 

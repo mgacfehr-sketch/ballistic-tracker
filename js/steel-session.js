@@ -264,12 +264,9 @@ var SteelSession = (function () {
                 '" stroke="var(--brand-gold)" stroke-width="4" marker-end="url(#st-ah)"/>';
         }
         svg += '<circle cx="75" cy="75" r="5" fill="var(--brand-gold)"/>';
-        // 12 invisible tap zones, generous hit areas
-        for (var h = 1; h <= 12; h++) {
-            var a = (h % 12) * Math.PI / 6 - Math.PI / 2;
-            svg += '<circle cx="' + (75 + Math.cos(a) * 52) + '" cy="' + (75 + Math.sin(a) * 52) +
-                '" r="19" fill="transparent" data-clock="' + h + '" style="cursor:pointer"/>';
-        }
+        // The ENTIRE dial is the hit area (tap-target audit: a tap
+        // anywhere resolves to the nearest of the 12 zones by angle)
+        svg += '<circle cx="75" cy="75" r="74" fill="transparent" data-clock-dial="1" style="cursor:pointer"/>';
         svg += '</svg>';
         return svg;
     }
@@ -283,14 +280,20 @@ var SteelSession = (function () {
             bindClock();
         }
         function bindClock() {
-            var zones = wrap.querySelectorAll('[data-clock]');
-            for (var i = 0; i < zones.length; i++) {
-                zones[i].addEventListener('click', function () {
-                    S.wind.clock = parseInt(this.getAttribute('data-clock'), 10);
-                    if (S.wind.mph === 0) S.wind.mph = 5; // a direction implies wind
-                    refresh();
-                });
-            }
+            var dial = wrap.querySelector('[data-clock-dial]');
+            if (!dial) return;
+            dial.addEventListener('click', function (e) {
+                // nearest clock zone by tap angle — the whole dial taps
+                var box = this.getBoundingClientRect();
+                var dx = e.clientX - (box.left + box.width / 2);
+                var dy = e.clientY - (box.top + box.height / 2);
+                if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return; // dead center
+                var hour = Math.round(((Math.atan2(dy, dx) + Math.PI / 2) / (Math.PI / 6)));
+                hour = ((hour % 12) + 12) % 12;
+                S.wind.clock = hour === 0 ? 12 : hour;
+                if (S.wind.mph === 0) S.wind.mph = 5; // a direction implies wind
+                refresh();
+            });
         }
         bindClock();
         document.getElementById('st-mph-down').addEventListener('click', function () {

@@ -473,6 +473,82 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 12 — QA gates
+
+- **Tests:** 12 Node suites, **652 green** (calculations 71 · calibration-status
+  60 · crowd-data 37 · foundation 115 · garmin-import 49 · labradar 31 ·
+  onboarding 8 · records-core 18 · steel-core 55 · sync-queue 32 · truing-core
+  59 · velocity-stats 117). Run: `for t in tests/test-*.js; do node "$t"; done`.
+- **Airplane-mode walk, headless (real browser, real SyncQueue, stubbed
+  network): 11/11.** Offline session save returns a pending row; the photo
+  queues; a steel string + shot queue; history reads MERGE the queued rows;
+  reconnect flushes all four ops in FIFO order (session before its zero event,
+  string before its shot); the queued photo uploads after its session lands;
+  the queue drains; post-sync reads are clean. The live-device airplane walk
+  remains on the owner checklist below.
+- **Tap-target audit (390×844, all rendered screens): 0 violations** after two
+  fixes — the wind clock's tap zones were 38 px, so the ENTIRE dial is now the
+  hit area (a tap anywhere resolves to the nearest clock zone by angle — even
+  friendlier than the 12-zone spec), and the truing why-expander got min-height
+  52 px. Also fixed: the confidence meter's empty segments used a hex fallback —
+  now `var(--dial-track)` (hex gate clean).
+- **Headless screenshots vs mockups, both themes:** Home (7-job list, light +
+  dark graphite/brass), Calibration Status card, steel setup + logger, truing
+  mode picker + result (fork/meter/ledger, light + dark), generated paper
+  target. All match the mockup compositions.
+- **Generated target detection (the §2.1 verification):** the real js-aruco2
+  detector run against the generated PDF artwork found 4/4 markers with 0.00%
+  scale error vs the printed geometry.
+
+### The feature walk — every pre-reorg feature's new home
+Range Session job: target photo measurement, fiducial auto-calibration, full
+group stats, Zero Guardian verdict (now + zero events), quick mode, chrono
+import (ShotView + NEW LabRadar), blank target print/share (now + generated
+Letter/A4 PDFs). Steel/Field job: full per-shot logger (NEW), quick hit tally
+(the old field logger), wind-call grader data (quick tally), effective range
+(feeds strip + Data & Records). Ballistics job: G1/G7 solver (now with basis
+line + trued values), DOPE cards (trued values), wind call (beta-gated,
+unchanged), Device Export (NEW). Truing job: the two-stage engine (replaces
+the beta dope-log BC sweep as the truing path; dope-log module untouched
+behind its beta flag). Scope Tracking job: tall-target wizard (+ NEW
+verification events + tall-target PDF). Data & Records: session history,
+steel history (NEW), truing history (NEW), cleaning log, scope-adjustment log,
+cold bore, round counts, suppressor shift (per can — replaces the two-state
+toggle surface), lot drift, effective range, performance report, certificate
+(+ NEW transfer), data export (NEW). Rifles tab: fleet chips, slim rifle page
+(+ Calibration Status card + loads list), rifle/barrel/load forms, ammo-box
+OCR (in the load form), scan certificate. System: onboarding (now checklist),
+activation registry (jobs + More tools), auto-conditions, offline (now
+write-capable), admin dashboard + crowd export (unchanged), account/privacy/
+deletion (unchanged), cloud sync. Catalog items that were never shipped
+pre-reorg (miss forensics, called shot, handicap, guided ammo trial) are
+unchanged by this contract; the ★ Match load intelligence remains on the
+loads list and report.
+
+### Deferred-item seams (Part 0.5 — how each plugs in later)
+1. **Ask yorT + AI cap:** restore `aiAssistant.show()` in app.js's `'ai'`
+   branch (the coming-soon block marks the spot); drop a per-user daily-cap
+   check into api/chat.js keyed on auth.uid — ai_usage_logs and its
+   `(user_id, created_at)` index are already migrated, and the proxy already
+   logs tokens per call.
+2. **Crowd data warehouse:** capture is complete — every new table
+   (steel_strings/shots, events) is structured and user_id-scoped, so the
+   existing `crowd_get_data()` salted-anonymization RPC pattern extends by
+   adding columns to that one function. Adding the warehouse = a read-only
+   admin view; no data-shape work. Privacy copy is live on the privacy page.
+3. **Tier 3 (recipes, ladder, dev logbook):** the loadDev job, its category
+   rows, ladder engine, `session_type='ladder'`, and the recipe jsonb (shape
+   incl. CBTO/neck/trim documented in REORG-migrations.sql) all exist —
+   shipping it = adding `loadDevelopment` to STAGE_A_FEATURES in
+   beta-features.js (one line) and building the recipe editor + ladder target
+   PDF UIs.
+4. **Post-launch feedback pipeline (documented, not built):** a feedback@
+   address; AI reads/transcribes all beta feedback (including audio),
+   maintains a ranked build-and-bug list weekly; at scale, auto-triage +
+   auto-reply + a threshold-graduated to-do list.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase
@@ -508,10 +584,69 @@ The short version for review:
   contract-protected so I worked around it in truing-core; recommend the
   one-line fix after this contract ships.
 
-### 4. Final QA browser checklist  *(pending — written at Step 12)*
-Ordered post-migration checklist: browser walks per job, airplane-mode offline
-walk, certificate transfer test, Supabase Point-in-Time-Recovery/backup
-click-path, and anything else requiring the live database.
+### 4. Final QA browser checklist  *(READY — do these IN ORDER)*
+
+**Setup (one time):**
+1. **Vercel env vars** (for the certificate transfer): Vercel dashboard → the
+   ballistic-tracker project → Settings → Environment Variables → add
+   `SUPABASE_URL` (your project URL, same one in js/app.js) and
+   `SUPABASE_SERVICE_ROLE_KEY` (Supabase dashboard → Project Settings → API →
+   `service_role` secret — never put this anywhere client-side) → redeploy.
+2. **Run REORG-migrations.sql** (item 2 above — review externally first, then
+   Supabase dashboard → SQL Editor → New query → paste the whole file → Run).
+   Safe to re-run.
+3. **Backups (Part 0.6 #7):** Supabase dashboard → Project Settings →
+   Database → Backups: confirm daily backups are on, and enable
+   **Point in Time Recovery** (it's a paid add-on — if you don't see the
+   toggle there, it's under Project Settings → Add-ons → PITR). Local-first
+   storage is the device copy; "Export my data" is the third layer.
+
+**The walk (on your phone, redesign preview URL, hard-reload first — SW v106):**
+4. Sign in → onboarding shouldn't re-run (you're onboarded). Open Home →
+   "＋ More tools" → confirm all five jobs toggle; leave them all on.
+5. **Range Session:** start one → the suppressor/lot sheet appears (add a can
+   if you said Yes to suppressed) → shoot/photograph a target → save →
+   confirm the rifle page's Calibration Status card shows the zero.
+6. **Target PDF:** Range Session → Print or share a blank target → Letter PDF
+   → print it → photograph the print in a session → auto-calibration should
+   detect (aruco-test.html is the diagnostic if not).
+7. **Steel Session:** distance → wind dial (tap anywhere on the dial) → log
+   3–4 shots with the steppers (try a hold change and a per-shot MV) → Save.
+8. **Chrono:** import a ShotView file AND a LabRadar CSV → assign to a load →
+   Data & Records: the Calibration Status card's MV row should now read
+   "measured". Steel history → open your string → Pair chrono string.
+9. **Truing:** Quick true first (dialed/actual at distance) → then Full true
+   with your steel string → pick a correction → Apply → check Truing history,
+   the solver's basis line, and a DOPE card (both should use the trued value).
+10. **Scope Tracking:** print the tall target → run the wizard → the card's
+    tracking row updates → open **Device Export** under Ballistics and sanity-
+    check the compensated pair.
+11. **Data & Records:** monitors read honestly (suppressor shift needs bare +
+    can data; lot drift needs two lots) → **Export my data** → open a CSV.
+12. **Certificate transfer:** generate a certificate (needs confirmed strings
+    + a 3+ shot group) → scan its QR signed into a SECOND (test) account →
+    the rifle should import marked factory-certified → scan again → "already
+    redeemed."
+13. **Airplane-mode walk (the real one):** airplane mode ON → log a full paper
+    session with photo → log a steel string → both appear in history marked
+    pending → airplane mode OFF → within a minute they sync and the photo
+    lands in Supabase Storage.
+14. Flip to dark theme and glance through every job screen.
 
 ### Flagged decisions (running list)
-- *(none yet)*
+- db.js is additive-only (new-table CRUD + `flushQueuedRow`); existing methods
+  untouched. Solver decorated from outside (ballistics-job.js) — file untouched.
+- js/ballistic-solver.js falsy-input quirk (`params.tempF || 59`): 0 °F becomes
+  standard air. Worked around in truing-core; recommend the one-line fix
+  post-contract (Step 7 notes).
+- Steel = its own tables (steel_strings/steel_shots); field_shots stays for
+  the quick tally + effective range (Step 2/6 notes).
+- Wind dial is tap-anywhere (angle → nearest zone) rather than drag —
+  direction is stored as a 1–12 clock integer, so drag adds no precision.
+- Ask yorT tab shows "coming soon" (not hidden) to keep the three-tab bar
+  stable (§1.1 builder's call).
+- The certificate QR mints a transfer token when online; offline it falls back
+  to the plain rifle deep link and still prints.
+- ai_usage_logs `estimated_cost` vs `cost` column mismatch neutralized in the
+  migration (both columns guaranteed); reconcile in the admin dashboard
+  whenever convenient.
