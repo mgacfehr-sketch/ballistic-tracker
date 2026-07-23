@@ -249,6 +249,59 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 6 — Steel/Field Session
+
+- **New js/steel-core.js (pure, 55 checks):** the locked stepper increments
+  (MOA 0.25 · Inches 0.5 · MIL 0.1 per tap), center-hit detection (within half
+  an increment of 0/0), shot descriptions ("0.5 high · 0.25 R"), wind text
+  ("8 mph from 2 o'clock"), direction-of-fire chips ↔ compass headings, string
+  summaries (mean-of-group-centers — what truing consumes), and **chrono
+  reconciliation**: shot-1↔shot-1 in-order pairing that fills skipped MVs,
+  standardizes matches on the instrument, flags conflicts and count mismatches
+  — never applied without the confirm screen.
+- **New js/labradar-import.js (pure, 31 checks + 2 fixtures):** LabRadar series
+  report parser in the garmin-import discipline — structure found by content
+  ("Shot ID" + "V0" header), semicolon/comma + decimal-comma tolerant, m/s
+  converted to fps WITH a warning, LabRadar's own stats captured for the
+  reported-vs-recomputed cross-check, loud rejection of anything else. Emits the
+  exact ShotView session shape, so velocity-stats/clustering/dedup work unchanged.
+- **New js/steel-session.js — the two-tier job (§2.2):** setup (distance chips
+  500–1000 + custom, dialed steppers, **tap-first wind clock dial** with 12
+  generous tap zones + thick gold arrow + direction always in text + 1-mph
+  stepper + tap-to-type + Gusty/unstable flag, direction-of-fire chips at ≥800
+  with device-compass option and a "＋ more" fold below 800, suppressor chips
+  for enabled users, sticky lot) → **per-shot logger** (Inches/MOA/MIL seg
+  persisted to the rifle, glove-friendly ± steppers with tap-to-type, sticky
+  holds line defaulting 0/0 and applying forward, optional per-shot MV on a
+  digits-only pad, per-shot gust override, running mono string list with green
+  center hits, wrong-rifle-protected "Save to <rifle>"). Every shot stores
+  dial + hold + impact + wind + optional MV — the complete truing equation.
+  **Casual tier** = photo (compressed to the §2.9b settings) + note, with the
+  "no auto-scale on steel" honesty line. Two taps from setup to logging.
+  **Judgment call:** the wind dial is tap-only (no drag fine-tune) because wind
+  direction is STORED as a 1–12 clock integer — drag would imply precision the
+  data model doesn't keep. Contract's usability intent (big targets, obvious
+  arrow, text direction) fully honored.
+- Environment auto-attaches via weather lookup when online (source-stamped
+  'lookup'), null offline — truing's manual entry covers the gap (§2.5a).
+- Fully offline: string id is client-generated up front; string + shots write
+  FIFO through SyncQueue (string row lands before its shots — FK-safe);
+  casual photos queue with a new 'steel' image kind and upload after their
+  string lands.
+- **chrono.js integration:** CSV picker now tries ShotView then LabRadar
+  (error message matches what the file looks like); import copy updated;
+  **every string confirmed to a load writes an append-only mv_measurements
+  event** (§2.8) feeding the Calibration Status card. Steel↔chrono pairing
+  lives on `SteelSession.pairChrono` (confirm screen), surfaced from steel
+  history in Step 10; pairing is online-by-nature (you just imported a file).
+- db.js additive: steel_strings/steel_shots CRUD + `saveSteelPhoto`
+  (session-images bucket, `steel_` prefix).
+- CACHE_VERSION 100 → 101. Tests: **575 total, all green** (+55 steel-core,
+  +31 labradar). Headless screenshots: setup + logger match the
+  proven-steel-session mockup composition.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase

@@ -1,0 +1,19 @@
+Device ID;LBR-0012345;;
+Series No;0042;;
+Total number of shots;0005;;
+Units velocity;fps;;
+Units distances;yd;;
+Units kinetic energy;ft-lbf;;
+Units weight;grain (gr);;
+Stats - Average;2814.86;fps;
+Stats - Highest;2823.11;fps;
+Stats - Lowest;2806.20;fps;
+Stats - Ext. Spread;16.91;fps;
+Stats - Std. Dev;5.69;fps;
+;;;
+Shot ID;V0;V10;V20;Ke0;Proj. Weight;Date;Time
+0001;2823.11;2801.55;2780.10;2401.1;143.0;18.07.2026;09:41:12
+0002;2818.40;2796.90;2775.63;2393.2;143.0;18.07.2026;09:42:05
+0003;2806.20;2784.77;2763.55;2372.5;143.0;18.07.2026;09:42:58
+0004;2812.55;2791.02;2769.80;2383.2;143.0;18.07.2026;09:43:47
+0005;2814.03;2792.48;2771.20;2385.7;143.0;18.07.2026;09:44:31

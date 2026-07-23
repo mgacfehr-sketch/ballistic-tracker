@@ -11,7 +11,7 @@
  *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 100;
+var CACHE_VERSION = 101;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
@@ -53,8 +53,11 @@ var APP_SHELL = [
     './js/dope-log.js',
     './js/cold-bore.js',
     './js/garmin-import.js',
+    './js/labradar-import.js',
     './js/velocity-stats.js',
     './js/chrono.js',
+    './js/steel-core.js',
+    './js/steel-session.js',
     './js/rifle-report.js',
     './js/certificate.js',
     './js/zero-guardian.js',

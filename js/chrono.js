@@ -58,7 +58,7 @@ ChronoManager.prototype.show = function () {
     html += '<div id="chrono-import-section">';
     html += '<div class="plate">';
     html += '<h3 class="t-head">Import chrono data</h3>';
-    html += '<p class="t-body u-quiet">A ShotView file, straight from Garmin &mdash; CSV or XLSX.</p>';
+    html += '<p class="t-body u-quiet">Garmin ShotView (CSV or XLSX) or a LabRadar series report (CSV) &mdash; straight from the device.</p>';
     html += '<div class="field-row u-mt-14">';
     html += '<div class="field"><label class="field-label" for="chrono-rifle">Rifle for this import</label>';
     html += '<select id="chrono-rifle"><option value="">Pick a rifle</option></select></div>';
@@ -71,7 +71,7 @@ ChronoManager.prototype.show = function () {
         'Update the barrel round count to match (base + imported shots)</label>';
     html += '</div>'; // .plate
     html += '<label class="action-primary u-mt-14" id="chrono-file-label" for="chrono-file">' +
-        Icon('import', 20) + 'Choose ShotView file</label>';
+        Icon('import', 20) + 'Choose chrono file</label>';
     html += '<input type="file" id="chrono-file" accept=".csv,.xlsx" class="hidden">';
     html += '</div>'; // #chrono-import-section
 
@@ -146,7 +146,24 @@ ChronoManager.prototype._handleFile = function (file) {
 
     if (name.slice(-4) === '.csv') {
         file.text().then(function (text) {
-            self._setSessions([parseShotViewCSV(text, file.name)]);
+            // ShotView first; a LabRadar report (§2.2) parses as the
+            // fallback. The error shown matches what the file looks like.
+            var session;
+            try {
+                session = parseShotViewCSV(text, file.name);
+            } catch (svErr) {
+                if (typeof parseLabRadarCSV === 'function') {
+                    try {
+                        session = parseLabRadarCSV(text, file.name);
+                    } catch (lrErr) {
+                        throw (typeof looksLikeLabRadar === 'function' && looksLikeLabRadar(text))
+                            ? lrErr : svErr;
+                    }
+                } else {
+                    throw svErr;
+                }
+            }
+            self._setSessions([session]);
         }).catch(function (err) {
             document.getElementById('chrono-results').innerHTML = '';
             self._showError(err.message);
@@ -993,6 +1010,10 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
                     loadId: loadId,
                     lotNumber: lot,
                     assignmentStatus: 'confirmed'
+                }).then(function (updated) {
+                    // Every accepted import writes an MV measurement
+                    // EVENT (§2.8) — feeds the Calibration Status card.
+                    self._recordMvEvent(updated);
                 });
             });
         });
@@ -1002,6 +1023,36 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
     }).catch(function (err) {
         btn.disabled = false;
         status.textContent = 'Assignment failed: ' + err.message;
+    });
+};
+
+/**
+ * Write the append-only mv_measurements event for a string confirmed
+ * to a load (§2.8/§2.10). Best-effort; never blocks the assignment.
+ */
+ChronoManager.prototype._recordMvEvent = function (record) {
+    if (!record || !record.rifleId || !record.shots || !record.shots.length) return;
+    if (typeof velocityStats !== 'function') return;
+    var self = this;
+    var stats = velocityStats(record.shots);
+    var payload = {
+        rifleId: record.rifleId,
+        loadId: record.loadId || null,
+        velocityStringId: record.id,
+        date: record.date || new Date().toISOString(),
+        value: stats.avg,
+        sd: stats.sd,
+        es: stats.es,
+        shotCount: stats.n,
+        lotNumber: record.lotNumber || null,
+        suppressorId: record.suppressorId || null,
+        source: record.source === 'labradar_csv' ? 'labradar' : 'shotview'
+    };
+    var write = (typeof SyncQueue !== 'undefined' && SyncQueue)
+        ? function (fn, d) { return SyncQueue.write(fn, d); }
+        : function (fn, d) { return self.db[fn](d); };
+    write('addMvMeasurement', payload).catch(function (e) {
+        console.warn('[Chrono] mv event failed:', e);
     });
 };
 

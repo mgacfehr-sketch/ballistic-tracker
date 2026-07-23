@@ -1,0 +1,12 @@
+Device ID;LBR-0054321;;
+Series No;0007;;
+Total number of shots;0003;;
+Units velocity;m/s;;
+Stats - Average;858,05;m/s;
+Stats - Std. Dev;1,83;m/s;
+Stats - Ext. Spread;4,42;m/s;
+;;;
+Shot ID;V0;V10;Date;Time
+0001;859,90;851,20;18.07.2026;14:02:11
+0002;858,71;850,15;18.07.2026;14:03:04
+0003;855,48;847,00;18.07.2026;14:03:59

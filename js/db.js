@@ -1336,3 +1336,106 @@ BallisticDB.prototype.flushQueuedRow = function (table, record) {
             return _rowToJs(res.data);
         });
 };
+
+// ── Steel Session CRUD (§2.2) ─────────────────────────────────
+
+BallisticDB.prototype.addSteelString = function (data) {
+    var self = this;
+    var record = {
+        id: data.id || generateUUID(),
+        rifleId: data.rifleId,
+        loadId: data.loadId || null,
+        sessionDate: data.sessionDate || new Date().toISOString(),
+        distanceYd: data.distanceYd,
+        tier: data.tier || 'full',
+        dialedElev: typeof data.dialedElev === 'number' ? data.dialedElev : 0,
+        dialedWind: typeof data.dialedWind === 'number' ? data.dialedWind : 0,
+        units: data.units || 'MOA',
+        wind: data.wind || null,
+        directionOfFireDeg: typeof data.directionOfFireDeg === 'number' ? data.directionOfFireDeg : null,
+        dofSource: data.dofSource || null,
+        environment: data.environment || null,
+        suppressorId: data.suppressorId || null,
+        lotNumber: data.lotNumber || null,
+        photoRef: data.photoRef || null,
+        notes: data.notes || '',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('steel_strings').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getSteelStringsByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('steel_strings').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('session_date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.addSteelShot = function (data) {
+    var self = this;
+    var record = {
+        id: data.id || generateUUID(),
+        stringId: data.stringId,
+        seq: data.seq,
+        elevOff: typeof data.elevOff === 'number' ? data.elevOff : 0,
+        windOff: typeof data.windOff === 'number' ? data.windOff : 0,
+        units: data.units || 'MOA',
+        heldElev: typeof data.heldElev === 'number' ? data.heldElev : 0,
+        heldWind: typeof data.heldWind === 'number' ? data.heldWind : 0,
+        mvFps: typeof data.mvFps === 'number' ? data.mvFps : null,
+        mvSource: data.mvSource || null,
+        windOverride: data.windOverride || null,
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('steel_shots').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getSteelShotsByString = function (stringId) {
+    var self = this;
+    return self.supabase.from('steel_shots').select()
+        .eq('user_id', self.userId).eq('string_id', stringId)
+        .order('seq', { ascending: true })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.updateSteelShot = function (record) {
+    var self = this;
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('steel_shots').update(row)
+        .eq('id', record.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+/** Casual-tier steel photo → Storage (same bucket + rules as
+ *  session images; steel_ prefix). Failure never blocks a save. */
+BallisticDB.prototype.saveSteelPhoto = function (stringId, blob) {
+    var self = this;
+    var path = self.userId + '/steel_' + stringId + '.jpg';
+    return self.supabase.storage.from('session-images')
+        .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return path;
+        });
+};

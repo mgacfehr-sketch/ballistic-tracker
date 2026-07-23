@@ -249,12 +249,20 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
     }
 
     /** Photo blobs: upload now when possible; queue otherwise. The
-     *  existing rule holds — image failure never blocks a save. */
-    function writeImage(sessionId, fullBlob, thumbnailBlob) {
+     *  existing rule holds — image failure never blocks a save.
+     *  kind: 'session' (default) | 'steel' — picks the upload path. */
+    function writeImage(sessionId, fullBlob, thumbnailBlob, kind) {
+        kind = kind || 'session';
+        function upload() {
+            return kind === 'steel'
+                ? _db.saveSteelPhoto(sessionId, fullBlob)
+                : _db.saveSessionImage(sessionId, fullBlob, thumbnailBlob);
+        }
         function queueIt() {
             return _tx('images', 'readwrite', function (store) {
                 store.put({
                     sessionId: sessionId,
+                    kind: kind,
                     fullBlob: fullBlob,
                     thumbnailBlob: thumbnailBlob,
                     queuedAt: new Date().toISOString(),
@@ -262,16 +270,16 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                 });
             }).then(function () { _notify(); return { queued: true }; });
         }
-        if (!_db || !_idb) return _db.saveSessionImage(sessionId, fullBlob, thumbnailBlob);
+        if (!_db || !_idb) return upload();
 
-        return getPending('sessions').then(function (pendingSessions) {
-            var sessionQueued = pendingSessions.some(function (r) { return r.id === sessionId; });
-            if (!_online() || sessionQueued) return queueIt();
-            return _db.saveSessionImage(sessionId, fullBlob, thumbnailBlob)
-                .catch(function (err) {
-                    if (SyncQueueCore.isNetworkError(err, _online())) return queueIt();
-                    throw err;
-                });
+        var parentTable = kind === 'steel' ? 'steel_strings' : 'sessions';
+        return getPending(parentTable).then(function (pendingRows) {
+            var parentQueued = pendingRows.some(function (r) { return r.id === sessionId; });
+            if (!_online() || parentQueued) return queueIt();
+            return upload().catch(function (err) {
+                if (SyncQueueCore.isNetworkError(err, _online())) return queueIt();
+                throw err;
+            });
         });
     }
 
@@ -312,20 +320,21 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                     flushed++;
                     return _tx('ops', 'readwrite', function (store) { store.delete(op.seq); })
                         .then(function () {
-                            if (op.table !== 'sessions') return null;
-                            // A landed session may have a queued photo
+                            if (op.table !== 'sessions' && op.table !== 'steel_strings') return null;
+                            // A landed session/string may have a queued photo
                             return _pendingImage(op.row.id).then(function (img) {
                                 if (!img) return null;
-                                return _db.saveSessionImage(op.row.id, img.fullBlob, img.thumbnailBlob)
-                                    .then(function () {
-                                        return _tx('images', 'readwrite', function (store) {
-                                            store.delete(op.row.id);
-                                        });
-                                    })
-                                    .catch(function (e) {
-                                        // image failure never blocks the flush
-                                        console.warn('[Sync] queued image upload failed:', e);
+                                var up = img.kind === 'steel'
+                                    ? _db.saveSteelPhoto(op.row.id, img.fullBlob)
+                                    : _db.saveSessionImage(op.row.id, img.fullBlob, img.thumbnailBlob);
+                                return up.then(function () {
+                                    return _tx('images', 'readwrite', function (store) {
+                                        store.delete(op.row.id);
                                     });
+                                }).catch(function (e) {
+                                    // image failure never blocks the flush
+                                    console.warn('[Sync] queued image upload failed:', e);
+                                });
                             });
                         })
                         .then(function () { return step(i + 1); });
