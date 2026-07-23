@@ -197,7 +197,22 @@ CertificateManager.prototype._onGenerate = function () {
     }
 
     status.textContent = 'Rendering…';
-    this.db.getSessionImage(session.id).then(function (record) {
+    // §2.11: mint the single-use transfer token FIRST so the printed
+    // QR is the cross-account transfer. Offline / mint failure falls
+    // back to the plain rifle deep link — the certificate still prints.
+    var mintPromise = (typeof TransferClient !== 'undefined' &&
+        typeof navigator !== 'undefined' && navigator.onLine !== false)
+        ? TransferClient.mint(this.db, c.rifle.id).then(function (out) {
+            self._transferUrl = out.url;
+        }).catch(function (e) {
+            console.warn('[Certificate] transfer mint failed — QR falls back to deep link:', e);
+            self._transferUrl = null;
+        })
+        : Promise.resolve(self._transferUrl = null);
+
+    mintPromise.then(function () {
+        return self.db.getSessionImage(session.id);
+    }).then(function (record) {
         if (record && record.fullBlob) {
             var url = URL.createObjectURL(record.fullBlob);
             var img = new Image();
@@ -379,9 +394,11 @@ CertificateManager.prototype._renderCertificate = function (session, loadRow, ta
         }
     }
 
-    // QR deep link to this rifle (empty square if lib/feature missing)
+    // QR: the single-use TRANSFER token when minted (§2.11 — scan
+    // imports the rifle into the buyer's account), else the plain
+    // rifle deep link. Empty square if the QR lib failed to load.
     if (typeof Onboarding !== 'undefined') {
-        Onboarding.stampQR(ctx, c.rifle.id, CertificateManager.QR_BOX);
+        Onboarding.stampQR(ctx, c.rifle.id, CertificateManager.QR_BOX, this._transferUrl || null);
     }
 
     // Footer: generated date + signature line (QR square stays reserved)

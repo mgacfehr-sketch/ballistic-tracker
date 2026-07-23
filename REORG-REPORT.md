@@ -411,6 +411,47 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 10 — Data & Records dashboard + transfer package + data export
+
+- **The dashboard (§2.7):** the records job screen now opens with the
+  **Calibration Status card at the top**, then the computed monitor surfaces
+  (rendered only when true — silence is a feature): **per-can suppressor shift**
+  ("with Nomad 30: 0.65 low · 0.35 L · −24 fps" — grouped by rifle+suppressor,
+  honest [] when there's no bare baseline), **lot drift** with ≥30 fps
+  highlighted + "confirm zero", cold bore, effective range — then round counts
+  (editable) and all histories. New sub-screens: **Steel history** (strings →
+  per-shot sheet → "Pair chrono string ›" runs the §2.2 confirm-gated
+  reconciliation) and **Truing history** (the append-only event log:
+  "BC 0.330 → 0.319 · 7/22 · full · 900 yd · confidence Moderate").
+- **New pure js/records-core.js (18 checks):** `suppressorShiftByCan` (the
+  §1.3b per-can analytics) + `csvEncode` (RFC-4180).
+- **New js/data-export.js (Part 0.6 #6):** "Export my data" — one CSV per data
+  type (rifles, loads, sessions, velocity strings AND per-shot velocities,
+  steel strings/shots, zero/MV/tracking/truing events, cold bore, scope
+  adjustments, suppressors), generated client-side, Web Share with download
+  fallback. Row counts shown as each export builds.
+- **§2.11 certificate transfer, end to end:**
+  - **New api/transfer.js** (serverless, beside api/chat.js): verifies the
+    caller's Supabase JWT, mints single-use opaque tokens (crypto random,
+    service-role insert — clients can never write the transfers table), and
+    redeems atomically (`redeemed_at IS NULL` PATCH — second scan gets "already
+    redeemed"). Needs two Vercel env vars: SUPABASE_URL +
+    SUPABASE_SERVICE_ROLE_KEY (owner checklist item).
+  - **New js/transfer.js:** builds the transfer package (build sheet, latest
+    zero event, measured MV, tracking factor, trued values, loads), mint sheet
+    with QR under Data & Records, and the redeem flow: rifle + barrel + loads +
+    factory-stamped calibration events import into the buyer's account with
+    `origin='factory'`, `certified_by`, `certified_at` (applied via
+    update-after-create since addRifle/addLoad whitelist their fields).
+  - **The printed certificate QR now IS the transfer** (§2.11): generation
+    mints a token first and stamps its URL; offline or mint failure falls back
+    to the plain rifle deep link and the certificate still prints. Deep link
+    `?transfer=<token>` redeems on the buyer's device and overrides onboarding,
+    same as `?rifle=`.
+- CACHE_VERSION 103 → 104. Tests: **652 total, all green** (+18 records-core).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase

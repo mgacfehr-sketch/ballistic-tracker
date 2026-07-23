@@ -215,9 +215,11 @@ var Onboarding = (function () {
         if (typeof WizardShell === 'undefined' || typeof ToolRegistry === 'undefined') return;
 
         // Deep link is the better first-run (the rifle arrives knowing
-        // itself) — skip onboarding entirely on that path
+        // itself) — skip onboarding entirely on that path. Certificate
+        // transfers (§2.11) override the same way.
         try {
-            if (new URLSearchParams(window.location.search).get('rifle')) return;
+            var qp = new URLSearchParams(window.location.search);
+            if (qp.get('rifle') || qp.get('transfer')) return;
         } catch (e) { /* no URLSearchParams — proceed */ }
 
         db.getUserSetting('onboarding_done').then(function (done) {
@@ -267,10 +269,12 @@ var Onboarding = (function () {
      * box from CertificateManager.QR_BOX). No-op if the pinned QR lib
      * failed to load — the square simply stays empty.
      */
-    function stampQR(ctx, rifleId, box) {
+    function stampQR(ctx, rifleId, box, urlOverride) {
         if (typeof qrcode === 'undefined') return false;
         var qr = qrcode(0, 'M');
-        qr.addData(rifleUrl(rifleId));
+        // §2.11: a minted transfer URL supersedes the plain deep link —
+        // the buyer's scan imports the rifle into THEIR account
+        qr.addData(urlOverride || rifleUrl(rifleId));
         qr.make();
         var count = qr.getModuleCount();
         var quiet = 8; // quiet-zone padding inside the box
@@ -303,11 +307,21 @@ var Onboarding = (function () {
         if (!enabled()) return;
         var params = new URLSearchParams(window.location.search);
         var rifleId = params.get('rifle');
-        if (!rifleId) return;
+        var transferToken = params.get('transfer');
+        if (!rifleId && !transferToken) return;
 
         params.delete('rifle');
+        params.delete('transfer');
         var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
         window.history.replaceState(null, '', clean);
+
+        // Certificate transfer (§2.11): redeem the single-use token and
+        // the rifle imports into THIS account with factory provenance
+        if (transferToken && typeof TransferClient !== 'undefined') {
+            TransferClient.redeemFlow(db, transferToken, openRifle);
+            return;
+        }
+        if (!rifleId) return;
 
         db.getRifle(rifleId).then(function (rifle) {
             if (rifle) openRifle(rifle.id);

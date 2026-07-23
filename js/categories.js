@@ -290,6 +290,7 @@ var Categories = (function () {
             title: 'Data & Records',
             desc: 'History, dashboards, reports, proof',
             registryTools: [],
+            statusCard: true, // Calibration Status card at the top (§2.7)
             tools: [
                 {
                     id: 'session-history',
@@ -302,6 +303,20 @@ var Categories = (function () {
                             _managers.history.showSessionList(ctx.rifle.id);
                         }
                     }
+                },
+                {
+                    id: 'steel-history',
+                    title: 'Steel history',
+                    sub: 'Strings at distance — pair chrono data here',
+                    gate: function () { return typeof SteelSession !== 'undefined'; },
+                    launch: function (ctx) { showSteelHistory(ctx); }
+                },
+                {
+                    id: 'truing-history',
+                    title: 'Truing history',
+                    sub: 'Every correction, append-only — nothing erased',
+                    gate: function () { return typeof TruingJob !== 'undefined'; },
+                    launch: function (ctx) { showTruingHistory(ctx); }
                 },
                 {
                     id: 'cleaning-log',
@@ -359,6 +374,24 @@ var Categories = (function () {
                     sub: 'Proven by Workhorse',
                     gate: function () { return featureOn('certificate'); },
                     launch: function (ctx) { showCertificate(ctx); }
+                },
+                {
+                    id: 'transfer-package',
+                    title: 'Transfer package',
+                    sub: 'One-time code — the rifle arrives in the buyer\'s account knowing itself',
+                    gate: function () {
+                        return featureOn('certificate') && typeof TransferClient !== 'undefined';
+                    },
+                    launch: function (ctx) {
+                        if (ctx.rifle) TransferClient.mintSheet(ctx.db, ctx.rifle);
+                    }
+                },
+                {
+                    id: 'export-data',
+                    title: 'Export my data',
+                    sub: 'CSV per data type, built on this device — your data is yours',
+                    gate: function () { return typeof DataExport !== 'undefined'; },
+                    launch: function (ctx) { DataExport.open(ctx.db); }
                 }
             ],
             strip: stripRecords
@@ -466,6 +499,142 @@ var Categories = (function () {
         new ColdBoreManager(_db).renderSection(document.getElementById('cb-body'), ctx.rifle.id, ctx.rifle);
     }
 
+    /** Steel history: strings at distance; chrono pairing lives here. */
+    function showSteelHistory(ctx) {
+        if (!ctx.rifle || !_container) return;
+        _container.setAttribute('data-screen', 'cat-records-steel');
+        _container.innerHTML =
+            '<div class="screen">' +
+            '<div class="pagehead">' +
+            '<button class="backline" id="sh-back">&lsaquo; Data &amp; Records</button>' +
+            '<div class="pagetitle">Steel history &middot; ' + UI.esc(ctx.rifle.name || 'Rifle') + '</div>' +
+            '</div>' +
+            '<div id="sh-body"><div class="card"><div class="rowlink"><div class="txt">' +
+            '<span class="t-micro">Loading&hellip;</span></div></div></div></div>' +
+            '</div>';
+        document.getElementById('sh-back').addEventListener('click', function () {
+            show('records', ctx.rifle.id);
+        });
+        ctx.db.getSteelStringsByRifle(ctx.rifle.id).catch(function () { return []; })
+            .then(function (strings) {
+                var body = document.getElementById('sh-body');
+                if (!body || !body.isConnected) return;
+                if (!strings.length) {
+                    body.innerHTML = '<div class="empty-teach"><p>No steel strings yet — ' +
+                        'log one from the Steel/Field Session job.</p></div>';
+                    return;
+                }
+                var rows = '';
+                strings.forEach(function (st) {
+                    var when = st.sessionDate ? new Date(st.sessionDate).toLocaleDateString() : '';
+                    var bits = [when, st.tier];
+                    if (st.wind && st.wind.mph) bits.push(steelWindText(st.wind.clock, st.wind.mph));
+                    if (st.lotNumber) bits.push('Lot ' + st.lotNumber);
+                    if (st._pending) bits.push('pending sync');
+                    rows += UI.rowlink({
+                        button: true,
+                        title: st.distanceYd + ' yd',
+                        sub: bits.filter(Boolean).join(' · '),
+                        subMono: true,
+                        chev: true,
+                        data: { steel: st.id }
+                    });
+                });
+                body.innerHTML = UI.card(rows);
+                var items = body.querySelectorAll('[data-steel]');
+                for (var i = 0; i < items.length; i++) {
+                    items[i].addEventListener('click', function () {
+                        var id = this.getAttribute('data-steel');
+                        var st = strings.filter(function (s) { return s.id === id; })[0];
+                        if (st) _steelStringSheet(ctx, st);
+                    });
+                }
+            });
+    }
+
+    function _steelStringSheet(ctx, st) {
+        ctx.db.getSteelShotsByString(st.id).catch(function () { return []; })
+            .then(function (shots) {
+                var overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                var rows = '';
+                shots.forEach(function (s) {
+                    var units = s.units || st.units || 'MOA';
+                    rows += '<div class="rowlink"><div class="txt"><span class="mono">Shot ' + s.seq +
+                        ' &middot; ' + UI.esc(steelDescribeShot(s.elevOff, s.windOff, units)) +
+                        (s.mvFps ? ' &middot; ' + Math.round(s.mvFps) + ' fps' : '') +
+                        '</span></div></div>';
+                });
+                overlay.innerHTML = '<div class="overlay-card">' +
+                    '<div class="overlay-title">' + st.distanceYd + ' yd &middot; ' +
+                    (st.sessionDate ? new Date(st.sessionDate).toLocaleDateString() : '') + '</div>' +
+                    (rows ? '<div class="card" style="margin:0;max-height:40vh;overflow-y:auto">' + rows + '</div>'
+                        : '<p class="overlay-text">Casual string — no per-shot log.' +
+                          (st.notes ? ' Note: ' + UI.esc(st.notes) : '') + '</p>') +
+                    (shots.length
+                        ? '<button class="btn u-full u-mt-10" id="ss-pair">Pair chrono string &rsaquo;</button>'
+                        : '') +
+                    '<button class="btn u-full u-mt-10" id="ss-close">Close</button>' +
+                    '</div>';
+                document.body.appendChild(overlay);
+                function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+                overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+                overlay.querySelector('#ss-close').addEventListener('click', close);
+                var pair = overlay.querySelector('#ss-pair');
+                if (pair) pair.addEventListener('click', function () {
+                    close();
+                    if (typeof SteelSession !== 'undefined') {
+                        SteelSession.pairChrono(ctx.db, st, function () {
+                            showSteelHistory(ctx);
+                        });
+                    }
+                });
+            });
+    }
+
+    /** Truing history: the append-only event log (§2.5/§2.7). */
+    function showTruingHistory(ctx) {
+        if (!ctx.rifle || !_container) return;
+        _container.setAttribute('data-screen', 'cat-records-truing');
+        _container.innerHTML =
+            '<div class="screen">' +
+            '<div class="pagehead">' +
+            '<button class="backline" id="th-back">&lsaquo; Data &amp; Records</button>' +
+            '<div class="pagetitle">Truing history &middot; ' + UI.esc(ctx.rifle.name || 'Rifle') + '</div>' +
+            '</div>' +
+            '<div id="th-body"><div class="card"><div class="rowlink"><div class="txt">' +
+            '<span class="t-micro">Loading&hellip;</span></div></div></div></div>' +
+            '</div>';
+        document.getElementById('th-back').addEventListener('click', function () {
+            show('records', ctx.rifle.id);
+        });
+        ctx.db.getTruingEventsByRifle(ctx.rifle.id).catch(function () { return []; })
+            .then(function (events) {
+                var body = document.getElementById('th-body');
+                if (!body || !body.isConnected) return;
+                if (!events.length) {
+                    body.innerHTML = '<div class="empty-teach"><p>Untrued so far — ' +
+                        'true this rifle and every correction lives here forever.</p></div>';
+                    return;
+                }
+                var rows = '';
+                events.forEach(function (e) {
+                    var when = e.appliedAt ? new Date(e.appliedAt).toLocaleDateString() : '';
+                    var what = e.correctionType === 'bc'
+                        ? 'BC ' + Number(e.oldValue).toFixed(3) + ' → ' + Number(e.newValue).toFixed(3)
+                        : 'MV ' + Math.round(e.oldValue) + ' → ' + Math.round(e.newValue) + ' fps';
+                    var far = e.far && e.far.rangeYds ? e.far.rangeYds + ' yd' : '';
+                    rows += UI.rowlink({
+                        title: what,
+                        subHtml: '<span class="mono">' + UI.esc([when, e.mode, far,
+                            e.confidence ? 'confidence ' + e.confidence : null]
+                            .filter(Boolean).join(' · ')) + '</span>'
+                    });
+                });
+                body.innerHTML = UI.card(rows);
+            });
+    }
+
     function openLogbook(ctx) {
         // The logbook lives on the load detail — open the ★/first load
         if (!ctx.rifle || !_managers.profile) return;
@@ -570,6 +739,11 @@ var Categories = (function () {
             sub: chipSub.join(' · ')
         });
 
+        // Calibration Status card at the top (§2.7 — Data & Records)
+        if (def.statusCard) {
+            html += '<div id="cat-status-card" class="u-mt-14"></div>';
+        }
+
         // Tools
         var tools = visibleTools(def.key);
         var dormant = dormantTools(def.key);
@@ -623,6 +797,10 @@ var Categories = (function () {
         bindTools(def, ctx);
         if (def.configToggle && ctx.rifle.hasConfigs) bindConfigToggle(def, ctx);
         if (def.loadsList) renderLoadsList(ctx);
+        if (def.statusCard && typeof CalibrationStatusCard !== 'undefined' && CalibrationStatusCard) {
+            var scEl = document.getElementById('cat-status-card');
+            if (scEl) CalibrationStatusCard.render(scEl, _db, ctx.rifle);
+        }
 
         // chip readiness word + load line (".264 · Federal 143 ELD-X · READY")
         Readiness.assess(_db, ctx.rifle).then(function (r) {
@@ -954,7 +1132,9 @@ var Categories = (function () {
         el.innerHTML = stripRows(rows);
     }
 
-    /** RECORDS: rounds total/since-cleaning (editable) · best group. */
+    /** RECORDS (§2.7): rounds · best group · computed monitor surfaces —
+     *  per-can suppressor shift, lot drift (≥30 fps highlighted), cold
+     *  bore, effective range. Monitors speak HERE, never on Home. */
     function stripRecords(el, ctx) {
         var barrel = ctx.activeBarrel;
         var pTotals = barrel
@@ -962,7 +1142,11 @@ var Categories = (function () {
             : Promise.resolve([]);
         Promise.all([
             pTotals,
-            ctx.db.getSessionsByRifle(ctx.rifle.id).catch(function () { return []; })
+            ctx.db.getSessionsByRifle(ctx.rifle.id).catch(function () { return []; }),
+            ctx.db.getVelocityStringsByRifle(ctx.rifle.id).catch(function () { return []; }),
+            ctx.db.getSuppressors ? ctx.db.getSuppressors().catch(function () { return []; }) : Promise.resolve([]),
+            ctx.db.getFieldShotsByRifle(ctx.rifle.id).catch(function () { return []; }),
+            coldBoreLine(ctx)
         ]).then(function (res) {
             if (!el || !el.isConnected) return;
             var total = barrel ? (barrel.totalRounds || 0) : 0;
@@ -974,7 +1158,50 @@ var Categories = (function () {
                 ? aggregateRifle({ sessions: res[1] || [], strings: [], loads: ctx.loads || [] })
                 : null;
 
-            var html = '<div class="card">';
+            // computed surfaces (silence is a feature — rows render only when true)
+            var monitorRows = '';
+            if (typeof suppressorShiftByCan === 'function' && (res[3] || []).length) {
+                suppressorShiftByCan(res[1], res[2], res[3]).forEach(function (shift) {
+                    monitorRows += UI.rowlink({
+                        title: 'Suppressor shift',
+                        subHtml: '<span class="mono">' + UI.esc(suppressorShiftLine(shift)) + '</span>'
+                    });
+                });
+            }
+            if (typeof lotDrift === 'function') {
+                (lotDrift(res[2] || []) || []).forEach(function (a) {
+                    var big = Math.abs(a.deltaFps) >= 30;
+                    monitorRows += UI.rowlink({
+                        title: 'Lot drift',
+                        subHtml: '<span class="mono"' + (big ? ' style="color:var(--status-caution)"' : '') + '>Lot ' +
+                            UI.esc(a.newLot) + ' runs ' + Math.abs(a.deltaFps) + ' fps ' +
+                            (a.deltaFps > 0 ? 'faster' : 'slower') + ' than ' + UI.esc(a.prevLot) +
+                            (big ? ' — confirm zero' : '') + '</span>'
+                    });
+                });
+            }
+            if (res[5]) {
+                monitorRows += UI.rowlink({
+                    title: 'Cold bore',
+                    subHtml: '<span class="mono">' + UI.esc(res[5]) + '</span>'
+                });
+            }
+            if ((res[4] || []).length && typeof FieldCore !== 'undefined') {
+                var eff = FieldCore.computeEffectiveRange(res[4]);
+                var positions = Object.keys(eff);
+                if (positions.length) {
+                    monitorRows += UI.rowlink({
+                        title: 'Effective range',
+                        subHtml: '<span class="mono">90% on ' + FieldCore.VITALS_IN + '&Prime;: ' +
+                            positions.map(function (p) {
+                                return UI.esc(p) + ' ' + Number(eff[p].yards).toLocaleString();
+                            }).join(' · ') + '</span>'
+                    });
+                }
+            }
+
+            var html = monitorRows ? UI.card(monitorRows) : '';
+            html += '<div class="card' + (monitorRows ? ' u-mt-10' : '') + '">';
             if (barrel) {
                 html += UI.statStrip([
                     { value: Number(total).toLocaleString(), label: 'Rounds' },
