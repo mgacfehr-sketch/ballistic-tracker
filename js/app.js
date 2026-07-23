@@ -407,9 +407,20 @@
                 profileManager.showRifleList();
             }
 
-            // Show AI assistant when switching to AI tab
-            if (viewName === 'ai' && aiAssistant) {
-                aiAssistant.show();
+            // Ask yorT is DEFERRED in v1 (Contract Part 0.5 — cost
+            // control ships with it). The proxy, tables, and assistant
+            // code all remain; re-enabling = replacing this block with
+            // `aiAssistant.show()` and dropping the cap into api/chat.js.
+            if (viewName === 'ai') {
+                var aiView = views.ai;
+                if (aiView) {
+                    aiView.innerHTML = '<div class="screen">' +
+                        (typeof UI !== 'undefined' ? UI.brandBar() : '') +
+                        '<div class="empty-teach">' +
+                        '<p><b>Ask yorT is coming.</b></p>' +
+                        '<p class="t-micro" style="line-height:1.5">Answers grounded in YOUR rifles, sessions, and history — not forum guesses. It ships once the beta settles.</p>' +
+                        '</div></div>';
+                }
             }
 
             // Show solver when switching to solver tab

@@ -452,6 +452,27 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 11 — Polish pass
+
+- **Ask yorT deferred per Part 0.5 (judgment call, documented seam):** the nav
+  tab stays (three-tab bar is locked) but now shows a quiet coming-soon state.
+  The assistant code, /api/chat proxy, ai_conversations + ai_usage_logs tables
+  all remain — re-enabling is restoring one `aiAssistant.show()` call in app.js
+  and dropping the daily-cap check into the proxy (the `(user_id, created_at)`
+  index for it is already in REORG-migrations.sql).
+- **Privacy page (Part 0.5 crowd-data copy):** added the plain statement —
+  "anonymized, aggregated data may be published in annual community reports" —
+  plus the Part 0.6 #5/#6 trust items: data retained and exportable on lapse,
+  "Export my data" named explicitly.
+- **Wording gate:** no user-visible "yorT" outside Ask yorT (the two hits are
+  the assistant's own system prompt and dead-code rifle-cards.js). No emoji
+  anywhere (fullwidth ＋, arrows, and ● dots are typographic, matching the
+  existing icon discipline). Hex gate: only tokens.css (+ the frozen,
+  pre-existing ballistic-solver.js:533 exception and unlinked legacy main.css).
+- CACHE_VERSION 104 → 105. Full pass: **652 tests green across 12 suites.**
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase
