@@ -350,11 +350,19 @@ var DopeCards = (function () {
         var load = (loadsByRifle[answers.rifle] || []).filter(function (l) { return l.id === answers.load; })[0];
         if (!rifle || !load) return;
 
-        var mv = parseFloat(load.muzzleVelocity);
-        if (rifle.hasConfigs && rifle.activeConfig === 'suppressed' &&
+        // Trued values first (§2.4/§2.5 — every future solution uses them),
+        // then the measured/box MV with the legacy config delta.
+        var mv = typeof load.truedMv === 'number' && load.truedMv > 0
+            ? load.truedMv
+            : parseFloat(load.muzzleVelocity);
+        if (!(typeof load.truedMv === 'number' && load.truedMv > 0) &&
+            rifle.hasConfigs && rifle.activeConfig === 'suppressed' &&
             typeof rifle.configVelocityDelta === 'number') {
             mv += rifle.configVelocityDelta;
         }
+        var bcUsed = typeof load.truedBc === 'number' && load.truedBc > 0
+            ? load.truedBc
+            : parseFloat(load.bulletBC);
 
         var picks = answers.cards || {};
         // 'current' → null sentinel = live GPS conditions at print time
@@ -393,7 +401,7 @@ var DopeCards = (function () {
 
                 var result = computeTrajectory({
                     muzzleVelocity: mv,
-                    bc: parseFloat(load.bulletBC),
+                    bc: bcUsed,
                     dragModel: load.dragModel || 'G1',
                     zeroRange: rifle.zeroRange ? parseFloat(rifle.zeroRange) : 100,
                     scopeHeight: rifle.scopeHeight ? parseFloat(rifle.scopeHeight) : 1.5,

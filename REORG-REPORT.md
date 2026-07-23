@@ -382,6 +382,35 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 9 — Ballistics job + Device Export
+
+- The Ballistics job screen (solver · DOPE cards · Device Export · "For this
+  rifle" strip) was framed in Step 4; this step wires the substance:
+- **Trued values flow into every solution.** dope-cards.js (unprotected) now
+  prefers `load.truedMv`/`truedBc` (legacy suppressed-delta applies only when no
+  trued MV exists — a trued/measured MV already reflects the can it was measured
+  with). The SOLVER file is contract-protected, so **new js/ballistics-job.js
+  decorates `BallisticSolverManager` from outside** (the same
+  decoration-not-edit pattern as the db read merge): solutions silently swap in
+  trued MV/BC, come-ups are scope-tracking-corrected exactly like DOPE cards
+  (`applyScopeCorrection`), and every solution appends its **basis line**
+  (Part 0.6 #3): "Using trued MV 2,831 (7/22) · BC .319 trued ·
+  tracking-corrected ×1.04" — upgrading to "measured MV (date)" async when a
+  measurement event exists.
+- **New js/device-export.js (§2.12):** per-rifle screen from the Ballistics job.
+  "The true profile" (MV with trued/measured/box provenance, BC, scope factor
+  + tall-target date) vs "The device profile" — the compensated BC+MV pair from
+  `truingCore.deviceCompensation` in big mono copy-friendly numbers, with the
+  sweet-spot line ("best 200–800 · within 0.05 MOA there") and the plain-English
+  labeling: clicks run N% small/large, numbers bake that back in, stay inside
+  the sweet spot, **if you fix or replace the scope, regenerate**. Honest
+  degradations: tracking never verified → "enter the true profile as-is, verify
+  tracking to unlock this"; scope tracks true → "the device profile IS the true
+  profile." Manual copy-out only — no device APIs (guardrail).
+- CACHE_VERSION 102 → 103 (covers steps 8+9).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase
