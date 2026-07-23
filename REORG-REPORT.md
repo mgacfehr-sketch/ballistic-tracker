@@ -302,6 +302,68 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 7 — Truing: the two-stage transonic-aware engine + UI
+
+- **New pure js/truing-core.js (59 checks)** — the §2.5c doctrine core:
+  - `machDistances`: where THIS rifle/load crosses Mach 1.2 / 1.0 / 0.9 in
+    today's air, by interpolating the solver's own machNumber column. Verified
+    against known cartridges: 6.5 PRC class supersonic to ~1,580 yd; .308 175
+    to ~1,000 yd; hotter MV pushes every crossing farther; cold dense air
+    shortens reach (1,510 vs 1,579 vs 1,624 yd at 0/59/100 °F).
+  - `prescribeTruingDistances`: MV trues at ~85% of the Mach-1.2 distance
+    (≥300 yd / 3× zero floor); drag brackets Mach 1.2→0.9.
+  - `classifyDistance`: zero / mv / drag / beyond routing + supersonicPct.
+  - `normalizeGroups`: per-shot MV deviation removed via central-difference
+    come-up sensitivity; vertical Coriolis (Eötvös) removed at ≥800 yd with
+    latitude + direction of fire (sign flips east↔west, magnitude ~0.1–0.3 MOA
+    at 900 — verified); wind-flagged strings down-weighted ×0.3; aerodynamic
+    jump explicitly "not modeled" in the ledger (honest gap); truing operates
+    on GROUP-CENTER means only, never single shots.
+  - `solveMvCorrection` / `solveBcCorrection`: secant root-finds with bisection
+    fallback inside brackets (MV ±15%, BC ±30%), tolerance 0.02 MOA, ~6
+    trajectory evals. **Round-trip proven:** MV ±40 fps recovered within 6 fps
+    from 300/450/600 observations; BC −0.020 recovered within 0.004 in the
+    transonic bracket — beats the legacy dope-log 0.005 grid.
+  - `solveTruing`: computes BOTH corrections (the §2.5 fork — user picks),
+    routes the recommendation by doctrine: transonic data → BC; measured-MV
+    rifles → "the honest fix is BC" with the distance-honesty label
+    ("your 900-yd data is at 62% of supersonic — that's MV/zero territory");
+    unmeasured MV in the supersonic band → "MV is the likely culprit — or
+    better, chronograph it."
+  - `truingConfidence`: 5 segments + word, capped by quick-mode (≤3), drag
+    corrections short of transonic (≤3), assumed environment (≤3), lookup
+    environment (≤4), group disagreement, unconfirmed zero (≤2), unverified
+    tracking (≤3), MV-from-drop-alone (≤3). Every cap emits its plain-English
+    note.
+  - `deviceCompensation` (§2.12 math): golden-section on BC over a secant MV
+    fit against comeUp/scopeFactor. Factor-1.0 identity proven; dialing the
+    compensated numbers through a 4%-small scope lands within **0.024 MOA**
+    across 300–900 in test.
+- **New js/truing.js — the job UI** per the proven-truing mockup: bands
+  summary ("supersonic to ~1,579 yd; MV trues near 1,125; drag 1,325–1,850"),
+  prerequisites status lines (never a gate, §2.5b), environment capture
+  (manual always/offline + one-tap lookup, source-stamped; latitude grabbed
+  for Coriolis), Quick flow (assumptions stated verbatim), Full flow (string
+  tie-in with the "Your data" checklist, coach-voice thin-data/no-MV/no-wind
+  interventions with the "true anyway" escape), MV↔BC fork radios with both
+  values auto-calculated, gold result card, 5-segment meter tinted by level,
+  "▾ Why?" ledger (raw − velocity − earth = trued-on, per shot), Apply →
+  **append-only truing_event** (full inputs + ledger + confidence persisted)
+  + derived `trued_bc`/`trued_mv`/`trued_event_id` cached on the load.
+  "Send string to Truing ›" handoff from Steel Session works via the
+  session-stash + preselect.
+- **Solver quirk found & flagged (owner queue):** `computeTrajectory` defaults
+  falsy inputs (`params.tempF || 59`), so an honest 0 °F silently becomes
+  standard air. ballistic-solver.js is contract-protected, so truing-core
+  works around it (0 °F → 0.001 °F); the one-line solver fix
+  (`typeof params.tempF === 'number' ? params.tempF : STD_TEMP_F`) is
+  recommended post-contract.
+- CACHE_VERSION 101 → 102. Tests: **634 total, all green** (+59 truing-core).
+  Headless screenshots: mode picker + fork/result/meter/ledger match the
+  proven-truing mockup.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase
@@ -320,8 +382,22 @@ Editor → New query → paste the whole file → Run). It is additive-only and 
 re-runnable — running it twice is harmless. The app is built assuming it ran;
 new features will show empty states (not errors) until it has.
 
-### 3. Truing-engine review notes  *(pending — written at Step 7)*
-Key functions, test results, and judgment calls for js/truing-core.js.
+### 3. Truing-engine review notes  *(READY — Step 7)*
+Read the **Step 7 section above** for the full function-by-function summary.
+The short version for review:
+- The engine recovers known perturbations by round-trip test (MV ±40 fps
+  within 6 fps; BC −0.020 within 0.004) and computes your rifle's Mach
+  1.2/1.0/0.9 distances from the real solver — 59 Node checks green
+  (`node tests/test-truing-core.js`).
+- Judgment calls: wind deflection is removed from the HORIZONTAL only (we
+  true vertical; a note in the ledger says so); aerodynamic jump is NOT
+  modeled and the ledger admits it; wind-flagged (gusty) strings are
+  down-weighted ×0.3 rather than excluded; both fork values always compute,
+  doctrine only picks the RECOMMENDED radio.
+- **Flagged decision:** js/ballistic-solver.js has a falsy-input quirk
+  (`params.tempF || 59` — an entered 0 °F becomes 59 °F). The solver is
+  contract-protected so I worked around it in truing-core; recommend the
+  one-line fix after this contract ships.
 
 ### 4. Final QA browser checklist  *(pending — written at Step 12)*
 Ordered post-migration checklist: browser walks per job, airplane-mode offline
