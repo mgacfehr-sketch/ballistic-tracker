@@ -266,7 +266,19 @@ var Categories = (function () {
                         return toolVisible('scopeTracking') && typeof TargetPDF !== 'undefined' &&
                             !!TargetPDF.tallTarget;
                     },
-                    launch: function () { TargetPDF.tallTarget(); }
+                    launch: function () {
+                        var overlay = document.createElement('div');
+                        overlay.className = 'overlay';
+                        overlay.innerHTML = '<div class="overlay-card">' +
+                            '<div class="overlay-title">Tall target</div>' +
+                            '<button class="btn-primary u-full" id="tt-letter">Letter PDF</button>' +
+                            '<button class="btn u-full u-mt-10" id="tt-a4">A4 PDF</button></div>';
+                        document.body.appendChild(overlay);
+                        function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+                        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+                        overlay.querySelector('#tt-letter').addEventListener('click', function () { close(); TargetPDF.tallTarget('letter'); });
+                        overlay.querySelector('#tt-a4').addEventListener('click', function () { close(); TargetPDF.tallTarget('a4'); });
+                    }
                 }
             ],
             strip: stripScopeTrack

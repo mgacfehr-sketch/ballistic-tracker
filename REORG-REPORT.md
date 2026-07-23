@@ -364,6 +364,24 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 8 — Scope Tracking job
+
+- The tall-target wizard (scope-check.js) was already re-homed as its own job in
+  Step 4's re-slice; this step completes it: **every completed test now writes an
+  append-only `tracking_verifications` event** (factor, click value, cant flag,
+  method) through the sync queue, with the rifle columns kept as the cached
+  "current" — feeding the Calibration Status card and Device Export. Readiness
+  invalidates on completion so chips refresh.
+- **Tall-target PDF** added to js/target-pdf.js (`TargetPDF.tallTarget`, Letter +
+  A4 chooser on the job screen): plumb line with 1.00" ruler ticks, bottom aim
+  dot, and two bold SCALE marks **exactly 6.00" apart** — matching the wizard's
+  two photo-tap scale points verbatim (`dist(tapA, tapB) / 6.0` in
+  scope-check.js). Printed instructions: hang plumb at exactly 100, shoot the
+  dot, dial UP 20–30 clicks, shoot again, photograph.
+- (Cache bump for steps 8+9 lands together as v103 in the next commit.)
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase

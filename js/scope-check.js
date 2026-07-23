@@ -187,7 +187,26 @@ var ScopeCheck = (function () {
                     rifle.scopeTrackingTestedAt = new Date().toISOString();
                     rifle.scopeCantWarn = analysis.cantWarn;
 
+                    // Append-only verification EVENT (§2.6, Part 0.6 #2) —
+                    // the rifle columns above stay as the cached "current".
+                    // Feeds the Calibration Status card + Device Export.
+                    var eventPayload = {
+                        rifleId: rifle.id,
+                        factor: analysis.factor,
+                        clickValue: clickVal,
+                        cantWarn: analysis.cantWarn,
+                        method: 'tall-target',
+                        date: rifle.scopeTrackingTestedAt
+                    };
+                    var writeEvent = (typeof SyncQueue !== 'undefined' && SyncQueue)
+                        ? SyncQueue.write('addTrackingVerification', eventPayload)
+                        : db.addTrackingVerification(eventPayload);
+                    writeEvent.catch(function (e) {
+                        console.warn('[ScopeCheck] verification event failed:', e);
+                    });
+
                     db.updateRifle(rifle).then(function () {
+                        if (typeof Readiness !== 'undefined') Readiness.invalidate(rifle.id);
                         showVerdict(analysis, rifle, onDone);
                     }).catch(function (err) {
                         alert('Could not save the correction: ' + err.message);
