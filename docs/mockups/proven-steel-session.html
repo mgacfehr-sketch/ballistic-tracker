@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROVEN — Steel Session</title>
+<style>
+:root, [data-theme="light"]{
+  --bg:#F7F6F3;--card:#FFFFFF;--ink:#16181B;--ink2:#4A4E54;--ink3:#9AA2AB;
+  --line:#D8D5CF;--line2:#EDEBE6;--gold:#B08D2F;--goldS:#8F711F;--subtle:#F3EEDF;
+  --primary:#16181B;--onprimary:#FFFFFF;
+  --ready:#2E7D32;--readyBg:#E3F0E4;--caution:#B26A00;--cautionBg:#F6EBD9;--prob:#C62828;--probBg:#F8E2E2;
+}
+[data-theme="dark"]{
+  --bg:#0D0F12;--card:#171A1F;--ink:#EDEEF0;--ink2:#AAB1B9;--ink3:#6A727B;
+  --line:#272D35;--line2:#20252c;--gold:#C9A24B;--goldS:#D9B564;--subtle:#2A2415;
+  --primary:#C9A24B;--onprimary:#171105;
+  --ready:#57B87A;--readyBg:#1C2B21;--caution:#E0A63C;--cautionBg:#2F2715;--prob:#E36A5C;--probBg:#331D1A;
+}
+:root{
+  --f:-apple-system,'Segoe UI',Roboto,system-ui,sans-serif;--m:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --title:700 26px/1.2 var(--f);--head:600 20px/1.3 var(--f);--body:400 18px/1.45 var(--f);
+  --bodyB:600 18px/1.45 var(--f);--label:600 15px/1.4 var(--f);--mbig:700 28px/1.05 var(--m);
+  --edge:20px;--r:12px;--rl:16px;--tap:52px;--tapP:58px;--row:60px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{background:#CFCDC6;font:var(--body);color:var(--ink);padding:40px 24px}
+.stage{display:flex;gap:34px;align-items:flex-start;overflow-x:auto;padding-bottom:20px}
+.frame{width:384px;flex:0 0 384px;background:var(--bg);border:1px solid #B9B5AC;border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(20,20,18,.25);display:flex;flex-direction:column}
+.screen{height:810px;overflow-y:auto;scrollbar-width:none}.screen::-webkit-scrollbar{display:none}
+.flabel{text-align:center;font:var(--label);color:#6B6961;margin:12px 0 10px;letter-spacing:.1em;text-transform:uppercase}
+.toolbar{max-width:1100px;margin:0 auto 24px;display:flex;justify-content:center}
+.tbtn{font:var(--bodyB);padding:14px 28px;border-radius:12px;border:1px solid #B9B5AC;background:#fff;cursor:pointer}
+.icon{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.brand{display:flex;align-items:center;gap:10px;padding:22px var(--edge) 8px}
+.mark{width:28px;height:28px;color:var(--gold)}.mark svg{width:100%;height:100%;stroke:currentColor;fill:none}
+.wm{font:700 21px/1 var(--f);letter-spacing:.05em}.wm i{font-style:normal;color:var(--gold)}
+.sec{font:var(--head);padding:18px var(--edge) 8px;display:flex;align-items:center;gap:10px}
+.sec::after{content:'';flex:1;height:2px;background:var(--gold);opacity:.32}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin:0 var(--edge)}
+.note{font:var(--label);color:var(--ink2);padding:2px var(--edge) 4px;line-height:1.5}
+.job{display:flex;align-items:center;gap:15px;background:var(--card);border:1px solid var(--line);border-radius:var(--rl);margin:0 var(--edge) 9px;padding:15px;min-height:74px}
+.job .bx{width:42px;height:42px;flex:0 0 42px;border-radius:11px;background:var(--subtle);display:flex;align-items:center;justify-content:center;color:var(--goldS)}
+.job .t{flex:1}.job .t b{font:var(--bodyB);display:block}.job .t span{font:var(--label);color:var(--ink2)}
+.job .chev{color:var(--ink3)}
+.rc{display:flex;align-items:center;gap:12px;background:var(--card);border:2px solid var(--gold);border-radius:var(--rl);margin:12px var(--edge) 4px;padding:14px 16px}
+.rc .t{flex:1}.rc .t b{font:var(--bodyB);display:block}.rc .t span{font:var(--label);color:var(--ink2)}.rc .ch{font:var(--label);color:var(--goldS)}
+.dist{display:flex;gap:8px;flex-wrap:wrap;margin:0 var(--edge) 6px}
+.dist .d{padding:11px 15px;border-radius:999px;border:1px solid var(--line);background:var(--card);font:var(--bodyB)}
+.dist .d.on{background:var(--primary);color:var(--onprimary);border-color:var(--primary)}
+
+/* wind clock dial */
+.clockwrap{display:flex;gap:16px;align-items:center;margin:0 var(--edge)}
+.clock{width:150px;height:150px;flex:0 0 150px}
+.clock svg{width:100%;height:100%}
+.windmeta{flex:1}
+.windmeta .wv{font:var(--mbig);display:block}
+.windmeta .wl{font:var(--label);color:var(--ink2)}
+.windmeta .row{margin-bottom:12px}
+
+/* per-shot logger */
+.shot-entry{margin:0 var(--edge)}
+.axis{display:flex;gap:10px;margin-bottom:10px}
+.axis .col{flex:1}
+.axis label{font:var(--label);color:var(--ink2);display:block;margin-bottom:5px}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:var(--r);background:var(--card);overflow:hidden}
+.stepper button{width:48px;min-height:56px;border:none;background:none;font:700 24px/1 var(--f);color:var(--goldS)}
+.stepper .val{flex:1;text-align:center;font:var(--mbig);font-size:24px}
+.stepper .dir{font:var(--label);color:var(--ink3);padding-right:10px}
+.unit-seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:3px;margin:0 var(--edge) 10px}
+.unit-seg button{flex:1;min-height:40px;border:none;border-radius:8px;background:none;font:var(--bodyB);color:var(--ink3);font-size:15px}
+.unit-seg button.on{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.logshot{display:flex;align-items:center;justify-content:center;min-height:var(--tapP);border-radius:var(--r);font:var(--bodyB);background:var(--primary);color:var(--onprimary);margin:2px var(--edge) 0}
+.shotlist .ls{display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line2);font-family:var(--m);font-weight:600;font-size:15px}
+.shotlist .ls:last-child{border:none}
+.ls .g{color:var(--ready)}.ls .b{color:var(--caution)}
+.btnGhost{display:flex;align-items:center;justify-content:center;gap:8px;min-height:var(--tap);border-radius:var(--r);font:var(--bodyB);background:var(--card);color:var(--gold);border:1px solid var(--gold);margin:10px var(--edge) 0}
+</style>
+</head>
+<body>
+<div class="toolbar"><button class="tbtn" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='light'?'dark':'light'">Toggle light / dark</button></div>
+<div class="stage">
+
+<!-- 7-JOB HOME, no alerts -->
+<div>
+<div class="flabel">Home — 7 jobs, no alerts</div>
+<div class="frame"><div class="screen">
+  <div class="brand"><div class="mark"><svg viewBox="0 0 48 48" stroke-width="2.4"><circle cx="24" cy="24" r="20"/><line x1="24" y1="4" x2="24" y2="10"/><line x1="24" y1="38" x2="24" y2="44"/><line x1="4" y1="24" x2="10" y2="24"/><line x1="38" y1="24" x2="44" y2="24"/><path d="M14 24l6-9 4 6 2-3 6 8" stroke-width="2.2"/><text x="24" y="34" text-anchor="middle" font-family="Arial Black" font-size="13" font-weight="900" fill="currentColor" stroke="none">W</text></svg></div><div class="wm">PROVEN<i>.</i></div></div>
+  <div class="sec">What are you doing?</div>
+  <div class="job"><div class="bx"><svg class="icon" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.4"/></svg></div><div class="t"><b>Range Session</b><span>Paper targets, chrono, document</span></div><span class="chev">›</span></div>
+  <div class="job"><div class="bx"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/></svg></div><div class="t"><b>Steel Session</b><span>Log hits past 500 by impact</span></div><span class="chev">›</span></div>
+  <div class="job"><div class="bx"><svg class="icon" viewBox="0 0 24 24"><path d="M6 20V8M12 20V4M18 20v-8"/></svg></div><div class="t"><b>Load Development</b><span>Ladder, recipes, ammo compare</span></div><span class="chev">›</span></div>
+  <div class="job"><div class="bx"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 1 9 9"/><path d="M3 12a9 9 0 0 0 9 9"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><div class="t"><b>Ballistics</b><span>Firing solution &amp; DOPE cards</span></div><span class="chev">›</span></div>
+  <div class="job"><div class="bx"><svg class="icon" viewBox="0 0 24 24"><path d="M3 17c5-9 13-9 18 0"/></svg></div><div class="t"><b>Truing</b><span>Make solutions match reality</span></div><span class="chev">›</span></div>
+  <div class="job"><div class="bx"><svg class="icon" viewBox="0 0 24 24"><path d="M3 21L21 3"/><path d="M7 17l-1 1M11 13l-1 1"/></svg></div><div class="t"><b>Scope Tracking</b><span>Verify clicks are true</span></div><span class="chev">›</span></div>
+  <div class="job"><div class="bx"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><div class="t"><b>Data &amp; Records</b><span>History, dashboards, proof</span></div><span class="chev">›</span></div>
+  <div style="height:14px"></div>
+</div></div>
+</div>
+
+<!-- STEEL SESSION: setup + wind clock -->
+<div>
+<div class="flabel">Steel Session — string setup + wind</div>
+<div class="frame"><div class="screen">
+  <div class="brand"><div class="wm" style="font-size:18px">‹ Steel Session</div></div>
+  <div class="rc"><div class="t"><b>TB 6.5 PRC</b><span>.264 · Federal 143 · MIL</span></div><span class="ch">Change ›</span></div>
+  <div class="sec">Distance</div>
+  <div class="dist"><span class="d">500</span><span class="d">600</span><span class="d on">700</span><span class="d">800</span><span class="d">900</span><span class="d">1000</span><span class="d">＋</span></div>
+  <div class="sec">Wind for this string</div>
+  <div class="clockwrap">
+    <div class="clock"><svg viewBox="0 0 150 150">
+      <circle cx="75" cy="75" r="66" fill="none" stroke="var(--line)" stroke-width="2"/>
+      <!-- clock ticks -->
+      <g stroke="var(--ink3)" stroke-width="2">
+        <line x1="75" y1="12" x2="75" y2="22"/><line x1="138" y1="75" x2="128" y2="75"/>
+        <line x1="75" y1="138" x2="75" y2="128"/><line x1="12" y1="75" x2="22" y2="75"/>
+      </g>
+      <text x="75" y="34" text-anchor="middle" font-family="var(--f)" font-size="11" fill="var(--ink3)">12</text>
+      <text x="120" y="79" text-anchor="middle" font-family="var(--f)" font-size="11" fill="var(--ink3)">3</text>
+      <text x="75" y="126" text-anchor="middle" font-family="var(--f)" font-size="11" fill="var(--ink3)">6</text>
+      <text x="30" y="79" text-anchor="middle" font-family="var(--f)" font-size="11" fill="var(--ink3)">9</text>
+      <!-- wind arrow from ~2 o'clock -->
+      <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--gold)"/></marker></defs>
+      <line x1="112" y1="42" x2="82" y2="68" stroke="var(--gold)" stroke-width="4" marker-end="url(#ah)"/>
+      <circle cx="75" cy="75" r="5" fill="var(--gold)"/>
+    </svg></div>
+    <div class="windmeta">
+      <div class="row"><span class="wv">8 mph</span><span class="wl">from 2 o'clock</span></div>
+      <div class="row"><span class="wv">0.3 mil</span><span class="wl">your wind hold (left)</span></div>
+    </div>
+  </div>
+  <div class="note">Set the wind once for the string; each shot inherits it. Tap a shot later to override if a gust changes things. Heavy wind is flagged so it won't corrupt your truing.</div>
+  <div class="logshot">Start logging shots</div>
+  <div class="btnGhost"><svg class="icon" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.4"/></svg> Or just photograph the steel</div>
+  <div class="note">Photo mode saves the picture, but you'll measure MOA yourself — no auto-scale on steel.</div>
+  <div style="height:14px"></div>
+</div></div>
+</div>
+
+<!-- STEEL SESSION: per-shot impact logger -->
+<div>
+<div class="flabel">Steel Session — per-shot impact</div>
+<div class="frame"><div class="screen">
+  <div class="brand"><div class="wm" style="font-size:18px">‹ 700 yd · 8mph @2</div></div>
+  <div class="sec">Shot 4 — where did it land?</div>
+  <div class="unit-seg"><button>Inches</button><button class="on">MOA</button><button>MIL</button></div>
+  <div class="shot-entry">
+    <div class="axis">
+      <div class="col"><label>Elevation</label>
+        <div class="stepper"><button>−</button><span class="val">0.5</span><span class="dir">HIGH</span><button>+</button></div>
+      </div>
+    </div>
+    <div class="axis">
+      <div class="col"><label>Windage</label>
+        <div class="stepper"><button>−</button><span class="val">0.4</span><span class="dir">RIGHT</span><button>+</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="logshot">Log shot 4</div>
+  <div class="sec">This string</div>
+  <div class="card shotlist">
+    <div class="ls"><span>Shot 1</span><span class="b">0.6 high · 0.3 R</span></div>
+    <div class="ls"><span>Shot 2</span><span class="b">0.4 high · 0.5 R</span></div>
+    <div class="ls"><span>Shot 3</span><span class="g">0.1 low · 0.1 L · center</span></div>
+  </div>
+  <div class="btnGhost">Send string to Truing ›</div>
+  <div class="logshot" style="background:var(--card);color:var(--ink);border:1px solid var(--line)">Save to TB 6.5 PRC</div>
+  <div style="height:14px"></div>
+</div></div>
+</div>
+
+</div>
+</body>
+</html>

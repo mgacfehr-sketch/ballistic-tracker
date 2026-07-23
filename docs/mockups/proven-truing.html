@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROVEN — Truing</title>
+<style>
+:root, [data-theme="light"]{
+  --bg:#F7F6F3;--card:#FFFFFF;--ink:#16181B;--ink2:#4A4E54;--ink3:#9AA2AB;
+  --line:#D8D5CF;--line2:#EDEBE6;--gold:#B08D2F;--goldS:#8F711F;--subtle:#F3EEDF;
+  --primary:#16181B;--onprimary:#FFFFFF;
+  --ready:#2E7D32;--readyBg:#E3F0E4;--caution:#B26A00;--cautionBg:#F6EBD9;--prob:#C62828;--probBg:#F8E2E2;
+}
+[data-theme="dark"]{
+  --bg:#0D0F12;--card:#171A1F;--ink:#EDEEF0;--ink2:#AAB1B9;--ink3:#6A727B;
+  --line:#272D35;--line2:#20252c;--gold:#C9A24B;--goldS:#D9B564;--subtle:#2A2415;
+  --primary:#C9A24B;--onprimary:#171105;
+  --ready:#57B87A;--readyBg:#1C2B21;--caution:#E0A63C;--cautionBg:#2F2715;--prob:#E36A5C;--probBg:#331D1A;
+}
+:root{
+  --f:-apple-system,'Segoe UI',Roboto,system-ui,sans-serif;--m:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --title:700 26px/1.2 var(--f);--head:600 20px/1.3 var(--f);--body:400 18px/1.45 var(--f);
+  --bodyB:600 18px/1.45 var(--f);--label:600 15px/1.4 var(--f);--mbig:700 30px/1.05 var(--m);
+  --edge:20px;--r:12px;--rl:16px;--tap:52px;--tapP:58px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{background:#CFCDC6;font:var(--body);color:var(--ink);padding:40px 24px}
+.stage{display:flex;gap:34px;align-items:flex-start;overflow-x:auto;padding-bottom:20px}
+.frame{width:384px;flex:0 0 384px;background:var(--bg);border:1px solid #B9B5AC;border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(20,20,18,.25);display:flex;flex-direction:column}
+.screen{height:820px;overflow-y:auto;scrollbar-width:none}.screen::-webkit-scrollbar{display:none}
+.flabel{text-align:center;font:var(--label);color:#6B6961;margin:12px 0 10px;letter-spacing:.1em;text-transform:uppercase}
+.toolbar{max-width:1100px;margin:0 auto 24px;display:flex;justify-content:center}
+.tbtn{font:var(--bodyB);padding:14px 28px;border-radius:12px;border:1px solid #B9B5AC;background:#fff;cursor:pointer}
+.icon{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.wm{font:700 18px/1 var(--f)}
+.brand{padding:22px var(--edge) 8px}
+.sec{font:var(--head);padding:18px var(--edge) 8px;display:flex;align-items:center;gap:10px}
+.sec::after{content:'';flex:1;height:2px;background:var(--gold);opacity:.32}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin:0 var(--edge)}
+.note{font:var(--label);color:var(--ink2);padding:2px var(--edge) 4px;line-height:1.5}
+.rc{display:flex;align-items:center;gap:12px;background:var(--card);border:2px solid var(--gold);border-radius:var(--rl);margin:12px var(--edge) 4px;padding:14px 16px}
+.rc .t{flex:1}.rc .t b{font:var(--bodyB);display:block}.rc .t span{font:var(--label);color:var(--ink2)}.rc .ch{font:var(--label);color:var(--goldS)}
+
+/* mode picker */
+.mode{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:var(--rl);margin:0 var(--edge) 12px;padding:18px}
+.mode.pick{border:2px solid var(--gold)}
+.mode .mh{display:flex;align-items:center;gap:12px}
+.mode .mh .icon{color:var(--goldS)}
+.mode b{font:var(--head)}
+.mode p{font:var(--label);color:var(--ink2);line-height:1.5;margin-top:6px}
+.mode .tag{font:var(--label);color:var(--goldS);margin-top:8px}
+
+/* data quality coaching */
+.coach{display:flex;gap:12px;align-items:flex-start;border-radius:var(--r);padding:14px;margin:0 var(--edge) 10px;font:var(--label);line-height:1.5}
+.coach.warn{background:var(--cautionBg);color:var(--caution)}
+.coach.ok{background:var(--readyBg);color:var(--ready)}
+.coach .icon{flex:0 0 auto;margin-top:1px}
+.coach b{font-weight:700}
+
+/* input rows */
+.ir{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line2);gap:12px}
+.ir:last-child{border:none}.ir .t{flex:1}.ir .t b{font:var(--bodyB);display:block}.ir .t span{font:var(--label);color:var(--ink2)}
+.ir .v{font:var(--mbig);font-size:22px}
+.ir .add{font:var(--label);color:var(--goldS)}
+.ir .miss{font:var(--label);color:var(--caution)}
+
+/* confidence meter */
+.conf{margin:0 var(--edge) 8px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.conf .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.conf .top b{font:var(--head)}
+.conf .top .lvl{font:var(--bodyB);color:var(--ready)}
+.meter{height:10px;background:var(--line2);border-radius:5px;overflow:hidden;display:flex;gap:2px}
+.meter i{flex:1;background:var(--line);border-radius:2px}
+.meter i.on{background:var(--ready)}
+.conf .why{font:var(--label);color:var(--ink2);margin-top:10px;line-height:1.5}
+
+/* result */
+.result{background:var(--card);border:2px solid var(--gold);border-radius:var(--rl);margin:0 var(--edge) 8px;padding:20px;text-align:center}
+.result .rl{font:var(--label);color:var(--ink2)}
+.result .rv{font:var(--mbig);color:var(--goldS);margin:4px 0}
+.result .rsub{font:var(--label);color:var(--ink2)}
+.whytap{font:var(--label);color:var(--goldS);text-align:center;padding:8px}
+.btnP{display:flex;align-items:center;justify-content:center;min-height:var(--tapP);border-radius:var(--r);font:var(--bodyB);background:var(--primary);color:var(--onprimary);margin:8px var(--edge) 0}
+.btnG{display:flex;align-items:center;justify-content:center;min-height:var(--tap);border-radius:var(--r);font:var(--bodyB);background:var(--card);color:var(--ink);border:1px solid var(--line);margin:8px var(--edge) 0}
+
+.fork{margin:0 var(--edge) 10px}
+.fo{display:flex;align-items:center;gap:12px;border:2px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;background:var(--card)}
+.fo.on{border-color:var(--gold);background:var(--subtle)}
+.fo .t{flex:1}.fo .t b{font:var(--bodyB);display:block}.fo .t span{font:var(--label);color:var(--ink2);font-family:var(--m)}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--ink3);flex:0 0 auto}
+.fo.on .radio{border-color:var(--gold);background:radial-gradient(circle,var(--gold) 40%,transparent 45%)}
+</style>
+</head>
+<body>
+<div class="toolbar"><button class="tbtn" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='light'?'dark':'light'">Toggle light / dark</button></div>
+<div class="stage">
+
+<!-- MODE PICKER -->
+<div>
+<div class="flabel">Truing — pick your mode up front</div>
+<div class="frame"><div class="screen">
+  <div class="brand"><div class="wm">‹ Truing</div></div>
+  <div class="rc"><div class="t"><b>TB 6.5 PRC</b><span>Federal 143 · MIL</span></div><span class="ch">Change ›</span></div>
+  <div class="sec">How do you want to true?</div>
+  <div class="mode pick">
+    <div class="mh"><svg class="icon" viewBox="0 0 24 24"><path d="M13 2L3 14h8l-1 8 10-12h-8z"/></svg><b>Quick true</b></div>
+    <p>"I dialed 15.0, it took 15.75." Assumes no wind and your saved muzzle velocity. Fast — good for a rough correction in the field.</p>
+    <div class="tag">Best when you're in a hurry ›</div>
+  </div>
+  <div class="mode">
+    <div class="mh"><svg class="icon" viewBox="0 0 24 24"><path d="M3 17c5-9 13-9 18 0"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg><b>Full true</b></div>
+    <p>Ties in your per-shot velocity and wind calls, removes them from the math, and trues on real ballistic error only. This is the dope you bet a hunt on.</p>
+    <div class="tag">Best with a chrono'd string ›</div>
+  </div>
+  <div class="note">Both correct your rifle to how it actually shot — Full true just removes the noise first, so it's trustworthy at distance.</div>
+</div></div>
+</div>
+
+<!-- FULL TRUE with coaching + missing data -->
+<div>
+<div class="flabel">Full true — with data coaching</div>
+<div class="frame"><div class="screen">
+  <div class="brand"><div class="wm">‹ Full true — TB 6.5 PRC</div></div>
+  <div class="sec">Your data</div>
+  <div class="card">
+    <div class="ir"><div class="t"><b>Shots tied in</b><span>from Steel Session · 700–1000 yd</span></div><span class="v">4</span></div>
+    <div class="ir"><div class="t"><b>Per-shot velocity</b><span>chrono paired to each shot</span></div><span class="v">✓</span></div>
+    <div class="ir"><div class="t"><b>Wind calls</b><span>logged per string</span></div><span class="v">✓</span></div>
+    <div class="ir"><div class="t"><b>Muzzle velocity</b><span>today's string avg 2,841</span></div><span class="v">✓</span></div>
+  </div>
+  <div class="coach warn"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg><span><b>4 shots is a little thin.</b> Truing is most reliable at 8+. Your velocity spread was 22 fps — a couple of these could be velocity, not a real error. True anyway (rough), or shoot more?</span></div>
+  <div class="sec">How should we correct it?</div>
+  <div class="fork">
+    <div class="fo on"><div class="t"><b>Adjust Ballistic Coefficient</b><span>BC 0.326 → 0.319 G7</span></div><div class="radio"></div></div>
+    <div class="fo"><div class="t"><b>Adjust Muzzle Velocity</b><span>MV 2,841 → 2,828 fps</span></div><div class="radio"></div></div>
+  </div>
+  <div class="note">You chrono this rifle, so BC is the honest fix — velocity is already measured.</div>
+  <div class="btnP">Review correction</div>
+  <div style="height:14px"></div>
+</div></div>
+</div>
+
+<!-- RESULT with confidence meter + silent normalization / tappable why -->
+<div>
+<div class="flabel">Result — confidence meter + tappable why</div>
+<div class="frame"><div class="screen">
+  <div class="brand"><div class="wm">‹ Correction</div></div>
+  <div class="result">
+    <div class="rl">Corrected Ballistic Coefficient</div>
+    <div class="rv">0.319 G7</div>
+    <div class="rsub">was 0.326 · your solutions now match how you shot</div>
+  </div>
+  <div class="conf">
+    <div class="top"><b>Truing confidence</b><span class="lvl" style="color:var(--caution)">Moderate</span></div>
+    <div class="meter"><i class="on" style="background:var(--caution)"></i><i class="on" style="background:var(--caution)"></i><i class="on" style="background:var(--caution)"></i><i></i><i></i></div>
+    <div class="why">Based on 4 shots, per-shot velocity, and wind removed. Add more shots at 900–1000 to reach High confidence.</div>
+  </div>
+  <div class="whytap">▾ Why 0.319? (velocity &amp; wind we removed)</div>
+  <div class="card" style="margin-top:0">
+    <div class="ir"><div class="t"><b>Raw miss at 1000</b><span>where it actually hit</span></div><span class="v" style="font-size:18px">0.7 low</span></div>
+    <div class="ir"><div class="t"><b>− velocity effect</b><span>this shot ran 14 fps slow</span></div><span class="v" style="font-size:18px;color:var(--caution)">0.3</span></div>
+    <div class="ir"><div class="t"><b>− wind effect</b><span>8 mph @ 2 o'clock</span></div><span class="v" style="font-size:18px;color:var(--caution)">0.1</span></div>
+    <div class="ir"><div class="t"><b>= real ballistic error</b><span>the only part we trued on</span></div><span class="v" style="font-size:18px;color:var(--ready)">0.3</span></div>
+  </div>
+  <div class="btnP">Apply to TB 6.5 PRC</div>
+  <div class="btnG">True anyway (rough) — skip the warnings</div>
+  <div style="height:14px"></div>
+</div></div>
+</div>
+
+</div>
+</body>
+</html>
