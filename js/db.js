@@ -1113,3 +1113,63 @@ BallisticDB.prototype.deleteSetting = function (key) {
     localStorage.removeItem('yort_' + key);
     return Promise.resolve();
 };
+
+// ═════════════════════════════════════════════════════════════
+// v2.3 Range-Day Reorg — ADDITIVE CRUD ONLY below this line.
+// New tables from REORG-migrations.sql. Nothing above changed
+// (STANDARDS.md: db.js is additive-only from v2.3 forward).
+// ═════════════════════════════════════════════════════════════
+
+// ── Suppressor library CRUD (§1.3b) ───────────────────────────
+
+BallisticDB.prototype.addSuppressor = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        name: data.name,
+        brand: data.brand || null,
+        model: data.model || null,
+        lengthIn: typeof data.lengthIn === 'number' ? data.lengthIn : null,
+        weightOz: typeof data.weightOz === 'number' ? data.weightOz : null,
+        notes: data.notes || '',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('suppressors').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getSuppressors = function () {
+    var self = this;
+    return self.supabase.from('suppressors').select()
+        .eq('user_id', self.userId)
+        .order('created_at', { ascending: true })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.updateSuppressor = function (record) {
+    var self = this;
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('suppressors').update(row)
+        .eq('id', record.id).eq('user_id', self.userId)
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.deleteSuppressor = function (id) {
+    var self = this;
+    return self.supabase.from('suppressors').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};

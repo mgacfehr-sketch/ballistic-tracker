@@ -14,7 +14,7 @@ function check(label, actual, expected) {
     else { failed++; console.log('  ✗ ' + label + ' — expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual)); }
 }
 
-// ── ToolsCore ─────────────────────────────────────────────────
+// ── ToolsCore (v2.3 job registry) ─────────────────────────────
 var T = require('../js/tools.js');
 var ToolsCore = T.ToolsCore;
 var TOOLS = T.TOOLS;
@@ -24,36 +24,60 @@ console.log('\nToolsCore:');
 var featureOn = function () { return true; };
 var featureOff = function () { return false; };
 
-check('core tool active with empty map', ToolsCore.isActive(TOOLS.checkTarget, {}), true);
-check('non-core inactive with empty map', ToolsCore.isActive(TOOLS.chrono, {}), false);
+check('core job (records) active with empty map', ToolsCore.isActive(TOOLS.records, {}), true);
+check('non-core job inactive with empty map', ToolsCore.isActive(TOOLS.steelSession, {}), false);
 
-var m1 = ToolsCore.setActive(TOOLS.chrono, {}, true, '2026-07-16T00:00:00Z');
-check('activate marks active', ToolsCore.isActive(TOOLS.chrono, m1), true);
-check('activation is immutable (source map untouched)', ToolsCore.isActive(TOOLS.chrono, {}), false);
+var m1 = ToolsCore.setActive(TOOLS.steelSession, {}, true, '2026-07-16T00:00:00Z');
+check('activate marks active', ToolsCore.isActive(TOOLS.steelSession, m1), true);
+check('activation is immutable (source map untouched)', ToolsCore.isActive(TOOLS.steelSession, {}), false);
 
-var m2 = ToolsCore.setActive(TOOLS.chrono, m1, false);
-check('deactivate works', ToolsCore.isActive(TOOLS.chrono, m2), false);
-check('deactivate preserves the entry (data-preserved semantics)', !!m2.chrono, true);
+var m2 = ToolsCore.setActive(TOOLS.steelSession, m1, false);
+check('deactivate works', ToolsCore.isActive(TOOLS.steelSession, m2), false);
+check('deactivate preserves the entry (hiding keeps all data)', !!m2.steelSession, true);
 
-var m3 = ToolsCore.setActive(TOOLS.checkTarget, m1, false);
-check('core tools cannot deactivate', ToolsCore.isActive(TOOLS.checkTarget, m3), true);
+var m3 = ToolsCore.setActive(TOOLS.records, m1, false);
+check('core jobs cannot deactivate', ToolsCore.isActive(TOOLS.records, m3), true);
 
-check('visible = active AND feature on', ToolsCore.visible(TOOLS.chrono, m1, featureOn), true);
-check('feature gate blocks even when active', ToolsCore.visible(TOOLS.chrono, m1, featureOff), false);
-check('core tool with no feature visible regardless', ToolsCore.visible(TOOLS.solver, {}, featureOff), true);
-check('inactive tool invisible despite feature', ToolsCore.visible(TOOLS.chrono, {}, featureOn), false);
+check('visible = active AND feature on', ToolsCore.visible(TOOLS.steelSession, m1, featureOn), true);
+check('tier gate hides loadDev even when active',
+    ToolsCore.visible(TOOLS.loadDev, ToolsCore.setActive(TOOLS.loadDev, {}, true), featureOff), false);
+check('core job with no feature visible regardless', ToolsCore.visible(TOOLS.records, {}, featureOff), true);
+check('inactive job invisible despite feature', ToolsCore.visible(TOOLS.steelSession, {}, featureOn), false);
 
-var mIdem = ToolsCore.setActive(TOOLS.chrono, m1, true, '2026-07-17T00:00:00Z');
-check('re-activate idempotent (still active)', ToolsCore.isActive(TOOLS.chrono, mIdem), true);
+var mIdem = ToolsCore.setActive(TOOLS.steelSession, m1, true, '2026-07-17T00:00:00Z');
+check('re-activate idempotent (still active)', ToolsCore.isActive(TOOLS.steelSession, mIdem), true);
 
-var mPreset = ToolsCore.applyPreset(TOOLS, {}, T.ToolPresets.handload);
-check('handload preset activates chrono', ToolsCore.isActive(TOOLS.chrono, mPreset), true);
-var mHunt = ToolsCore.applyPreset(TOOLS, {}, T.ToolPresets.hunt);
-check('hunt preset activates nothing extra', ToolsCore.isActive(TOOLS.chrono, mHunt), false);
-check('unknown preset keys ignored', ToolsCore.isActive(TOOLS.chrono, ToolsCore.applyPreset(TOOLS, {}, ['bogus'])), false);
+// Checklist activation (the onboarding primitive)
+var mList = ToolsCore.applyPreset(TOOLS, {}, ['rangeSession', 'truing']);
+check('checklist activates listed jobs (rangeSession)', ToolsCore.isActive(TOOLS.rangeSession, mList), true);
+check('checklist activates listed jobs (truing)', ToolsCore.isActive(TOOLS.truing, mList), true);
+check('checklist leaves unlisted jobs off', ToolsCore.isActive(TOOLS.steelSession, mList), false);
+check('unknown checklist keys ignored', ToolsCore.isActive(TOOLS.steelSession, ToolsCore.applyPreset(TOOLS, {}, ['bogus'])), false);
 
+// Legacy key resolution
+check('legacy key resolves (bench → loadDev)', ToolsCore.resolveKey('bench'), 'loadDev');
+check('legacy key resolves (scopeTruth → scopeTracking)', ToolsCore.resolveKey('scopeTruth'), 'scopeTracking');
+check('job keys resolve to themselves', ToolsCore.resolveKey('truing'), 'truing');
+check('checklist accepts legacy keys', ToolsCore.isActive(TOOLS.steelSession, ToolsCore.applyPreset(TOOLS, {}, ['field'])), true);
+
+// v2 round-trip + v1 migration
 var round = ToolsCore.hydrate(ToolsCore.serialize(m1));
-check('serialize→hydrate round-trip', ToolsCore.isActive(TOOLS.chrono, round), true);
+check('serialize→hydrate round-trip (v2)', ToolsCore.isActive(TOOLS.steelSession, round), true);
+check('serialize marks v2', ToolsCore.serialize({}).v, 2);
+
+var v1saved = { v: 1, tools: {
+    field: { active: true, at: '2026-07-01T00:00:00Z' },
+    scopeTruth: { active: true, at: '2026-07-01T00:00:00Z' },
+    dopeCards: { active: false, at: '2026-07-01T00:00:00Z' }
+} };
+var migrated = ToolsCore.hydrate(v1saved);
+check('v1 field migrates to steelSession', ToolsCore.isActive(TOOLS.steelSession, migrated), true);
+check('v1 scopeTruth migrates to scopeTracking', ToolsCore.isActive(TOOLS.scopeTracking, migrated), true);
+check('v1 inactive entries stay off (truing untouched)', ToolsCore.isActive(TOOLS.truing, migrated), false);
+check('v1 users always get rangeSession (was core)', ToolsCore.isActive(TOOLS.rangeSession, migrated), true);
+check('v1 users always get ballistics (was core)', ToolsCore.isActive(TOOLS.ballistics, migrated), true);
+check('v1 migration preserves original timestamp', migrated.steelSession.at, '2026-07-01T00:00:00Z');
+
 check('hydrate of garbage → empty map', Object.keys(ToolsCore.hydrate({ v: 99 })).length, 0);
 check('hydrate of null → empty map', Object.keys(ToolsCore.hydrate(null)).length, 0);
 

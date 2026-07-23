@@ -138,28 +138,77 @@ var Onboarding = (function () {
         });
     }
 
-    // ── First-run onboarding (the wizard's first consumer) ────
+    // ── First-run onboarding: the feature CHECKLIST (v2.3 §1.3) ──
+    // Not tiers, not presets — "Which of these will you use?" with
+    // checkboxes. Range Session pre-checked; Data & Records always on;
+    // everything toggleable later from the "More tools" surface.
+
+    /** Custom wizard step: multi-select job checklist. */
+    function _mountJobChecklist(el, state, api) {
+        var rows = (typeof ToolRegistry !== 'undefined' && ToolRegistry.getChecklist)
+            ? ToolRegistry.getChecklist()
+            : [];
+        // Restore a prior visit's selection, else pre-check defaults
+        var prior = state.answers.jobs;
+        var checked = {};
+        rows.forEach(function (r) {
+            checked[r.key] = prior ? prior.indexOf(r.key) !== -1 : (r.defaultOn || r.active);
+        });
+
+        var html = '';
+        rows.forEach(function (r) {
+            html += '<button class="option-row' + (checked[r.key] ? ' on' : '') +
+                '" data-job="' + r.key + '">' +
+                '<span>' + UI.esc(r.label) +
+                '<span class="choice-desc">' + UI.esc(r.desc) + '</span></span>' +
+                '</button>';
+        });
+        html += '<p class="t-micro u-mt-10">Data &amp; Records is always on. ' +
+            'Change any of this later under More tools — hiding a job keeps all its data.</p>';
+        html += '<button class="btn-primary u-full u-mt-10" id="onb-jobs-next">Continue</button>';
+        el.innerHTML = html;
+
+        var opts = el.querySelectorAll('[data-job]');
+        for (var i = 0; i < opts.length; i++) {
+            opts[i].addEventListener('click', function () {
+                var key = this.getAttribute('data-job');
+                checked[key] = !checked[key];
+                this.classList.toggle('on', checked[key]);
+            });
+        }
+        el.querySelector('#onb-jobs-next').addEventListener('click', function () {
+            var selected = rows.filter(function (r) { return checked[r.key]; })
+                .map(function (r) { return r.key; });
+            api.submit(selected.length ? selected : ['__none__']);
+        });
+    }
 
     var ONBOARDING_WIZARD = {
         id: 'onboarding',
-        version: 1,
-        steps: [{
-            id: 'main-use',
-            prompt: 'What do you mainly do?',
-            type: 'choice',
-            choices: [
-                { value: 'hunt', label: 'Hunt', desc: 'Zero checks, dope, first-shot confidence' },
-                { value: 'compete', label: 'Compete', desc: 'Chrono data, groups, trends' },
-                { value: 'handload', label: 'Handload', desc: 'Loads, velocities, testing' },
-                { value: 'all', label: 'All of it', desc: 'Wake everything up' }
-            ]
-        }]
+        version: 2,
+        steps: [
+            {
+                id: 'jobs',
+                prompt: 'Which of these will you use?',
+                type: 'custom',
+                mount: _mountJobChecklist
+            },
+            {
+                id: 'suppressed',
+                prompt: 'Do you ever shoot suppressed?',
+                type: 'choice',
+                choices: [
+                    { value: 'no', label: 'No', desc: 'Sessions will never ask about a can' },
+                    { value: 'yes', label: 'Yes', desc: 'Sessions will ask which can is on' }
+                ]
+            }
+        ]
     };
 
     /**
-     * One question, ten seconds, and the app is shaped like its owner
-     * (UX Architecture rule 6). Runs once per account, cross-device via
-     * user_settings; a certificate QR deep link always wins.
+     * Two questions and the app is shaped like its owner. Runs once per
+     * account, cross-device via user_settings; a certificate QR deep
+     * link always wins.
      */
     function maybeRunFirstRun(db) {
         if (!enabled()) return;
@@ -176,9 +225,26 @@ var Onboarding = (function () {
             new WizardShell(db, ONBOARDING_WIZARD, {
                 modal: true,
                 onComplete: function (answers) {
-                    ToolRegistry.applyPreset(answers['main-use']);
-                    db.setUserSetting('onboarding_done', true);
-                    if (window.AppNav) window.AppNav.go('home');
+                    var jobs = (answers.jobs || []).filter(function (k) { return k !== '__none__'; });
+                    ToolRegistry.applyPreset(jobs);
+                    var suppressed = answers.suppressed === 'yes';
+                    var pDone = [
+                        db.setUserSetting('onboarding_done', true)
+                    ];
+                    if (typeof Suppressors !== 'undefined') {
+                        pDone.push(Suppressors.setEnabled(db, suppressed));
+                    }
+                    Promise.all(pDone).catch(function () { /* cached locally */ });
+                    if (suppressed && typeof Suppressors !== 'undefined') {
+                        Suppressors.addSheet(db, {
+                            intro: true,
+                            onDone: function () {
+                                if (window.AppNav) window.AppNav.go('home');
+                            }
+                        });
+                    } else if (window.AppNav) {
+                        window.AppNav.go('home');
+                    }
                 },
                 onCancel: function () {
                     // Resumable next launch; never nag twice in a session

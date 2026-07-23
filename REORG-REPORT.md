@@ -111,6 +111,45 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 3 — Registry rewire + checklist onboarding
+
+- **js/tools.js rewritten around JOBS** (rangeSession, steelSession, loadDev,
+  ballistics, truing, scopeTracking, records). Data & Records is core (always on);
+  Load Development is tier-hidden in v1 (`feature: 'loadDevelopment'`, not in
+  STAGE_A_FEATURES — flipping that single entry ships it later, the Part 0.5 seam).
+  Activation persists as `tool_activations {v:2, tools}` in user_settings.
+- **LEGACY_ALIASES** keeps every pre-v2.3 call site working unchanged
+  (`isVisible('bench')` → loadDev, `'checkTarget'` → rangeSession, etc.), so
+  profiles.js/session-flow.js/categories.js needed no edits this step. Note:
+  `bench`-gated recipe/ladder UI now correctly hides in v1 (Tier-3 deferral) via
+  the loadDev tier gate.
+- **v1→v2 activation migration** in `ToolsCore.hydrate`: active legacy tools wake
+  their job; rangeSession + ballistics always wake (their v1 equivalents were
+  core). Migration persists once on init. Original activation timestamps kept.
+- `ToolPresets` (hunt/compete/handload/all) **retired** — the three-tier/preset
+  onboarding is dead per contract. `applyPreset(keys)` remains as the generic
+  checklist-activation primitive.
+- **Checklist onboarding (js/onboarding.js), wizard v2:** Screen 1 = "Which of
+  these will you use?" multi-select of the five v1 jobs (Range Session
+  pre-checked), with the "Data & Records is always on / hiding keeps data" note.
+  Screen 2 = "Do you ever shoot suppressed?" Yes/No. Yes → suppressor-add sheet
+  (skippable); `suppressor_enabled` stored in user_settings. Deep links still
+  override onboarding. Wizard version bump auto-resets any half-finished v1 state.
+- **New js/suppressors.js**: the §1.3b library — add-a-can overlay (name required,
+  brand/model optional), `suppressor_enabled` setting, last-used-per-rifle memory
+  (`last_suppressor_<rifleId>` user_settings keys). Session flows will call this
+  in Steps 5/6 so range and steel phrase the question identically.
+- **js/db.js additive section** (bottom of file, nothing above changed):
+  suppressor CRUD (`addSuppressor/getSuppressors/updateSuppressor/deleteSuppressor`).
+- index.html + sw.js APP_SHELL gained suppressors.js; **CACHE_VERSION 97 → 98**.
+- Tests: ToolsCore suite rewritten for the job registry + migration
+  (**385 → 397 total, all green**).
+- Deferred within this step (lands with Step 4's Home rebuild, same seam): the
+  visible "+ More tools" row UI. The registry API for it (`getChecklist`,
+  `getDormant`, `deactivate`) is done.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase

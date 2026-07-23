@@ -1,77 +1,99 @@
 /**
- * tools.js — the tool activation registry (UX Architecture, Surface 3).
+ * tools.js — the JOB activation registry (Contract v2.3 §1.2/§1.3).
  *
- * Two visibility axes compose everywhere:
- *   hasFeature(tool.feature)   — the TIER axis (beta-features.js, unchanged)
- *   ToolRegistry.isActive(key) — the USER axis (per-user activations)
- * A tool is visible only when both say yes. Core tools are always active.
+ * v2.3 reorganizes activation around JOBS (Range Session, Steel Session,
+ * Load Development, Ballistics, Truing, Scope Tracking, Data & Records)
+ * instead of individual tools. Two visibility axes still compose:
+ *   hasFeature(def.feature)    — the TIER axis (beta-features.js)
+ *   ToolRegistry.isActive(key) — the USER axis (checklist onboarding /
+ *                                the "More tools" surface)
+ * A job is visible only when both say yes. Data & Records is core
+ * (always on). Jobs the user has off do not render on Home — hiding
+ * keeps all data.
  *
- * Activations persist cross-device via db.setUserSetting('tool_activations')
- * (Supabase user_settings, localStorage write-through). All reads after
- * init() are synchronous against an in-memory cache.
+ * Activations persist cross-device via db.setUserSetting
+ * ('tool_activations', {v:2, tools}) — Supabase user_settings with
+ * localStorage write-through. v1 maps (the retired preset era) migrate
+ * transparently in ToolsCore.hydrate. All reads after init() are
+ * synchronous against an in-memory cache.
  *
- * ToolsCore (pure, Node-testable) holds the transition/visibility logic;
- * ToolRegistry is the thin stateful wrapper the app talks to.
+ * LEGACY_ALIASES keeps every pre-v2.3 call site working
+ * (ToolRegistry.isVisible('bench') → the loadDev job, etc.).
+ *
+ * ToolsCore (pure, Node-tested) holds the logic; ToolRegistry is the
+ * thin stateful wrapper the app talks to.
  */
 
 var TOOLS = {
-    checkTarget: {
-        key: 'checkTarget', core: true, feature: null,
-        problem: 'Check a target',
-        homeAction: { id: 'check-target', icon: 'camera', label: 'Check a target', view: 'session' }
+    rangeSession: {
+        key: 'rangeSession', core: false, feature: null,
+        label: 'Range Session',
+        desc: 'Paper targets, chrono, document the day',
+        defaultOn: true // pre-checked in onboarding
     },
-    solver: {
-        key: 'solver', core: true, feature: null,
-        problem: 'Get a firing solution',
-        homeAction: { id: 'firing-solution', icon: 'gauge', label: 'Get a firing solution', view: 'solver' }
+    steelSession: {
+        key: 'steelSession', core: false, feature: null,
+        label: 'Steel/Field Session',
+        desc: 'Log hits at distance — casual or full'
     },
-    chrono: {
-        key: 'chrono', core: false, feature: 'chronoImport',
-        problem: 'Track my velocities',
-        homeAction: { id: 'import-chrono', icon: 'import', label: 'Import chrono data', view: 'chrono' },
-        rifleCards: []
+    loadDev: {
+        key: 'loadDev', core: false, feature: 'loadDevelopment', // tier-hidden in v1 (Part 0.5)
+        label: 'Load Development',
+        desc: 'Ladder tests, recipes, ammo comparison'
     },
-    scopeTruth: {
-        key: 'scopeTruth', core: false, feature: null,
-        problem: 'Verify my scope dials true',
-        homeAction: { id: 'scope-check', icon: 'ruler', label: 'Verify scope tracking', run: 'scopeCheck' },
-        rifleCards: ['scope-truth']
+    ballistics: {
+        key: 'ballistics', core: false, feature: null,
+        label: 'Ballistics',
+        desc: 'Firing solution & DOPE cards'
     },
-    dopeCards: {
-        key: 'dopeCards', core: false, feature: null,
-        problem: 'Put my dope on paper (range cards)',
-        homeAction: { id: 'dope-cards', icon: 'table', label: 'Print a DOPE card', run: 'dopeCards' },
-        rifleCards: []
+    truing: {
+        key: 'truing', core: false, feature: null,
+        label: 'Truing',
+        desc: 'Make solutions match reality'
     },
-    field: {
-        key: 'field', core: false, feature: null,
-        problem: 'Know my ethical range',
-        homeAction: { id: 'field-log', icon: 'mountain', label: 'Log field shots', run: 'fieldLog' },
-        rifleCards: ['effective-range']
+    scopeTracking: {
+        key: 'scopeTracking', core: false, feature: null,
+        label: 'Scope Tracking',
+        desc: 'Verify your clicks are true'
     },
-    bench: {
-        key: 'bench', core: false, feature: null,
-        problem: 'Track my handloads',
-        homeAction: { id: 'ladder-info', icon: 'flask', label: 'Run a ladder test', run: 'ladderInfo' },
-        rifleCards: []
+    records: {
+        key: 'records', core: true, feature: null,
+        label: 'Data & Records',
+        desc: 'History, dashboards, reports, proof'
     }
     // Feature waves add entries here — never a new registry, never a nav tab.
 };
 
-// Onboarding answer → which tools wake up
-var ToolPresets = {
-    hunt: ['dopeCards', 'field'],
-    compete: ['chrono', 'scopeTruth', 'dopeCards', 'field'],
-    handload: ['chrono', 'bench'],
-    all: ['chrono', 'scopeTruth', 'dopeCards', 'field', 'bench']
+/**
+ * Pre-v2.3 tool keys → their v2.3 job. Old call sites and persisted v1
+ * activation maps both resolve through this. chrono maps to rangeSession
+ * (chrono import is reachable inside it and stays neutrally launchable).
+ */
+var LEGACY_ALIASES = {
+    checkTarget: 'rangeSession',
+    solver: 'ballistics',
+    chrono: 'rangeSession',
+    scopeTruth: 'scopeTracking',
+    dopeCards: 'ballistics',
+    field: 'steelSession',
+    bench: 'loadDev'
 };
+
+/** The onboarding checklist rows (order shown to the user). Data &
+ *  Records is core and never asked. loadDev is tier-hidden in v1. */
+var CHECKLIST_JOBS = ['rangeSession', 'steelSession', 'ballistics', 'truing', 'scopeTracking'];
 
 // ── Pure core ─────────────────────────────────────────────────
 
 var ToolsCore = {
+    /** Resolve a possibly-legacy key to its v2.3 job key. */
+    resolveKey: function (key) {
+        return LEGACY_ALIASES[key] || key;
+    },
+
     /**
-     * Is this tool active for the user? Core tools always are.
-     * activeMap: { toolKey: {active: bool, at: iso} }
+     * Is this job active for the user? Core jobs always are.
+     * activeMap: { jobKey: {active: bool, at: iso} }
      */
     isActive: function (toolDef, activeMap) {
         if (!toolDef) return false;
@@ -91,8 +113,9 @@ var ToolsCore = {
     },
 
     /**
-     * Returns a NEW activeMap with the tool switched. Core tools cannot
+     * Returns a NEW activeMap with the job switched. Core jobs cannot
      * be deactivated (they define the app's floor). Idempotent.
+     * Deactivating preserves the entry (hiding keeps all data).
      */
     setActive: function (toolDef, activeMap, active, nowIso) {
         var map = {};
@@ -105,12 +128,14 @@ var ToolsCore = {
     },
 
     /**
-     * Apply a preset: activate every listed tool. Unknown keys ignored.
+     * Apply a checklist: activate every listed job. Unknown keys ignored.
+     * (The old named presets are retired; this generic list activation is
+     * the checklist onboarding's primitive.)
      */
-    applyPreset: function (tools, activeMap, presetKeys, nowIso) {
+    applyPreset: function (tools, activeMap, keys, nowIso) {
         var map = activeMap;
-        for (var i = 0; i < (presetKeys || []).length; i++) {
-            var def = tools[presetKeys[i]];
+        for (var i = 0; i < (keys || []).length; i++) {
+            var def = tools[ToolsCore.resolveKey(keys[i])];
             if (def) map = ToolsCore.setActive(def, map, true, nowIso);
         }
         return map;
@@ -118,10 +143,33 @@ var ToolsCore = {
 
     /** Serialization contract for the user_settings row. */
     serialize: function (activeMap) {
-        return { v: 1, tools: activeMap || {} };
+        return { v: 2, tools: activeMap || {} };
     },
+
+    /**
+     * Hydrate a saved activation map.
+     * v2 → as-is. v1 (preset era) → migrated: each active legacy tool
+     * wakes its job, and rangeSession + ballistics always wake (their
+     * v1 equivalents, checkTarget and solver, were core — every v1 user
+     * had them). Garbage → empty map.
+     */
     hydrate: function (saved) {
-        if (saved && saved.v === 1 && saved.tools) return saved.tools;
+        if (saved && saved.v === 2 && saved.tools) return saved.tools;
+        if (saved && saved.v === 1 && saved.tools) {
+            var map = {};
+            var at = new Date().toISOString();
+            // v1 core equivalents were always on
+            map.rangeSession = { active: true, at: at };
+            map.ballistics = { active: true, at: at };
+            for (var k in saved.tools) {
+                if (!saved.tools.hasOwnProperty(k)) continue;
+                var entry = saved.tools[k];
+                if (!entry || !entry.active) continue;
+                var job = ToolsCore.resolveKey(k);
+                if (TOOLS[job]) map[job] = { active: true, at: entry.at || at };
+            }
+            return map;
+        }
         return {};
     }
 };
@@ -130,11 +178,15 @@ var ToolsCore = {
 
 var ToolRegistry = (function () {
     var _db = null;
-    var _active = {};       // hydrated activeMap
+    var _active = {};       // hydrated activeMap (v2 job keys)
     var _listeners = [];
 
     function _hasFeatureSafe(name) {
         return typeof hasFeature === 'function' ? hasFeature(name) : false;
+    }
+
+    function _def(key) {
+        return TOOLS[ToolsCore.resolveKey(key)];
     }
 
     function _notify() {
@@ -158,50 +210,58 @@ var ToolRegistry = (function () {
             if (!db) { _active = {}; return Promise.resolve(); }
             return db.getUserSetting('tool_activations').then(function (saved) {
                 _active = ToolsCore.hydrate(saved);
+                // Persist a v1→v2 migration so it happens exactly once
+                if (saved && saved.v === 1) _persist();
             }).catch(function () {
                 _active = {};
             });
         },
 
         isActive: function (key) {
-            return ToolsCore.isActive(TOOLS[key], _active);
+            return ToolsCore.isActive(_def(key), _active);
         },
 
         isVisible: function (key) {
-            return ToolsCore.visible(TOOLS[key], _active, _hasFeatureSafe);
+            return ToolsCore.visible(_def(key), _active, _hasFeatureSafe);
         },
 
         activate: function (key) {
-            _active = ToolsCore.setActive(TOOLS[key], _active, true);
+            _active = ToolsCore.setActive(_def(key), _active, true);
             _notify();
             return _persist();
         },
 
         deactivate: function (key) {
-            _active = ToolsCore.setActive(TOOLS[key], _active, false);
+            _active = ToolsCore.setActive(_def(key), _active, false);
             _notify();
             return _persist();
         },
 
-        applyPreset: function (presetKey) {
-            _active = ToolsCore.applyPreset(TOOLS, _active, ToolPresets[presetKey] || []);
+        /** Checklist onboarding: activate this explicit list of jobs. */
+        applyPreset: function (keys) {
+            _active = ToolsCore.applyPreset(TOOLS, _active, keys || []);
             _notify();
             return _persist();
         },
 
-        /** Visible tools that add a Home action, registry order. */
-        getHomeActions: function () {
+        /** The onboarding/"More tools" row set: tier-eligible jobs with
+         *  their current activation state (core jobs excluded — always on). */
+        getChecklist: function () {
             var out = [];
-            for (var k in TOOLS) {
-                if (!TOOLS.hasOwnProperty(k)) continue;
-                if (TOOLS[k].homeAction && this.isVisible(k)) {
-                    out.push(TOOLS[k]);
-                }
+            for (var i = 0; i < CHECKLIST_JOBS.length; i++) {
+                var def = TOOLS[CHECKLIST_JOBS[i]];
+                if (!def) continue;
+                if (def.feature && !_hasFeatureSafe(def.feature)) continue;
+                out.push({
+                    key: def.key, label: def.label, desc: def.desc,
+                    active: ToolsCore.isActive(def, _active),
+                    defaultOn: !!def.defaultOn
+                });
             }
             return out;
         },
 
-        /** Tier-eligible but not active — what the drawer offers. */
+        /** Tier-eligible but not active — what the "More tools" surface offers. */
         getDormant: function () {
             var out = [];
             for (var k in TOOLS) {
@@ -222,5 +282,10 @@ var ToolRegistry = (function () {
 
 // Export for Node unit tests
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { TOOLS: TOOLS, ToolPresets: ToolPresets, ToolsCore: ToolsCore };
+    module.exports = {
+        TOOLS: TOOLS,
+        LEGACY_ALIASES: LEGACY_ALIASES,
+        CHECKLIST_JOBS: CHECKLIST_JOBS,
+        ToolsCore: ToolsCore
+    };
 }
