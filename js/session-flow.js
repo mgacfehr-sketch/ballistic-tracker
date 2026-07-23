@@ -475,8 +475,12 @@ SessionFlow.prototype._selectProfile = function (rifleId, loadId) {
             self.els.inputDistance.value = rifle.zeroRange;
         }
 
-        self._validateDataInputs();
-        self._nextStep();
+        // §2.1: suppressor question (suppressor-enabled users only) +
+        // lot question (every session) — one sheet, sticky defaults.
+        self._askSessionQuestions(rifle, load).then(function () {
+            self._validateDataInputs();
+            self._nextStep();
+        });
     });
 };
 
@@ -486,7 +490,167 @@ SessionFlow.prototype._selectQuickMode = function () {
     this.barrelId = null;
     this.selectedRifle = null;
     this.selectedLoad = null;
+    this.suppressorId = null;
+    this.lotNumber = null;
     this._nextStep();
+};
+
+/**
+ * The two session questions (§2.1), one sheet, ≤2 taps when the
+ * defaults are right: "Suppressed?" (Bare | which can, last-used
+ * preselected, + Add inline) and "Which lot?" (last lot preselected,
+ * prior lots listed, New lot… entry). Backdrop tap accepts the
+ * current selection — never a gate.
+ */
+SessionFlow.prototype._askSessionQuestions = function (rifle, load) {
+    var self = this;
+    self.suppressorId = null;
+    self.lotNumber = load ? (load.lotNumber || null) : null;
+
+    if (!rifle) return Promise.resolve();
+    var supEnabled = (typeof Suppressors !== 'undefined')
+        ? Suppressors.isEnabled(this.db) : Promise.resolve(false);
+
+    return Promise.all([
+        supEnabled,
+        (typeof Suppressors !== 'undefined')
+            ? Suppressors.getLastUsed(this.db, rifle.id) : Promise.resolve(null),
+        this.db.getSuppressors ? this.db.getSuppressors().catch(function () { return []; }) : Promise.resolve([]),
+        this.db.getSessionsByRifle(rifle.id).catch(function () { return []; }),
+        this.db.getVelocityStringsByRifle(rifle.id).catch(function () { return []; })
+    ]).then(function (res) {
+        var enabled = res[0];
+        var lastCan = res[1];
+        var cans = res[2] || [];
+        var sessions = res[3] || [];
+        var strings = res[4] || [];
+
+        // Prior lots for THIS load, most recent first, plus the load's own
+        var lots = [];
+        function addLot(l) { if (l && lots.indexOf(l) === -1) lots.push(l); }
+        sessions.slice().sort(function (a, b) {
+            return String(b.date || '').localeCompare(String(a.date || ''));
+        }).forEach(function (s) {
+            if (load && s.loadId === load.id) addLot(s.lotNumber);
+        });
+        if (load) addLot(load.lotNumber);
+
+        var askSuppressor = enabled;
+        var askLot = !!load;
+        if (!askSuppressor && !askLot) return null;
+
+        // Inline lot-drift note (monitors speak where contextually true)
+        var driftNote = null;
+        if (typeof lotDrift === 'function') {
+            var drifts = lotDrift(strings) || [];
+            if (drifts.length) {
+                var d = drifts[0];
+                driftNote = 'Lot ' + d.newLot + ' ran ' + Math.abs(d.deltaFps) + ' fps ' +
+                    (d.deltaFps > 0 ? 'faster' : 'slower') + ' than ' + d.prevLot + ' — worth a zero check.';
+            }
+        }
+
+        return new Promise(function (resolve) {
+            var pickedCan = lastCan && cans.some(function (c) { return c.id === lastCan; })
+                ? lastCan : null;
+            var pickedLot = lots.length ? lots[0] : null;
+
+            var overlay = document.createElement('div');
+            overlay.className = 'overlay';
+
+            function render() {
+                var html = '<div class="overlay-card">' +
+                    '<div class="overlay-title">' + escapeHtml(rifle.name || 'Session') + '</div>';
+
+                if (askSuppressor) {
+                    html += '<p class="t-label u-mt-10">Suppressor</p>';
+                    html += '<button class="option-row' + (pickedCan === null ? ' on' : '') +
+                        '" data-can="bare"><span>Bare</span></button>';
+                    cans.forEach(function (c) {
+                        html += '<button class="option-row' + (pickedCan === c.id ? ' on' : '') +
+                            '" data-can="' + c.id + '"><span>' + escapeHtml(c.name) +
+                            (c.brand ? '<span class="choice-desc">' + escapeHtml(c.brand) + '</span>' : '') +
+                            '</span></button>';
+                    });
+                    html += '<button class="option-row" data-can-add="1">' +
+                        '<span class="u-gold">＋ Add a can</span></button>';
+                }
+
+                if (askLot) {
+                    html += '<p class="t-label u-mt-10">Which lot?</p>';
+                    lots.forEach(function (l, i) {
+                        html += '<button class="option-row' + (pickedLot === l ? ' on' : '') +
+                            '" data-lot="' + escapeHtml(l) + '"><span>Lot ' + escapeHtml(l) +
+                            (i === 0 ? '<span class="choice-desc">same as last time</span>' : '') +
+                            '</span></button>';
+                    });
+                    if (!lots.length) {
+                        html += '<p class="t-micro">No lot on record yet — enter the box\'s lot below.</p>';
+                    }
+                    html += '<div class="field u-mt-10"><input type="text" id="sq-new-lot" ' +
+                        'placeholder="New lot…" maxlength="40"></div>';
+                    if (driftNote) {
+                        html += '<p class="t-micro u-mt-10">' + escapeHtml(driftNote) + '</p>';
+                    }
+                }
+
+                html += '<button class="btn-primary u-full u-mt-10" id="sq-continue">Continue</button>';
+                html += '</div>';
+                overlay.innerHTML = html;
+                bind();
+            }
+
+            function finish() {
+                var newLot = overlay.querySelector('#sq-new-lot');
+                if (newLot && newLot.value.trim()) pickedLot = newLot.value.trim();
+                self.suppressorId = (pickedCan === null || pickedCan === 'bare') ? null : pickedCan;
+                self.lotNumber = pickedLot || null;
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                resolve();
+            }
+
+            function bind() {
+                var canBtns = overlay.querySelectorAll('[data-can]');
+                for (var i = 0; i < canBtns.length; i++) {
+                    canBtns[i].addEventListener('click', function () {
+                        var v = this.getAttribute('data-can');
+                        pickedCan = v === 'bare' ? null : v;
+                        render();
+                    });
+                }
+                var addBtn = overlay.querySelector('[data-can-add]');
+                if (addBtn) addBtn.addEventListener('click', function () {
+                    if (typeof Suppressors === 'undefined') return;
+                    Suppressors.addSheet(self.db, {
+                        onDone: function (added) {
+                            (added || []).forEach(function (c) { cans.push(c); });
+                            if (added && added.length) pickedCan = added[added.length - 1].id;
+                            render();
+                        }
+                    });
+                });
+                var lotBtns = overlay.querySelectorAll('[data-lot]');
+                for (var j = 0; j < lotBtns.length; j++) {
+                    lotBtns[j].addEventListener('click', function () {
+                        pickedLot = this.getAttribute('data-lot');
+                        var input = overlay.querySelector('#sq-new-lot');
+                        if (input) input.value = '';
+                        render();
+                    });
+                }
+                overlay.querySelector('#sq-continue').addEventListener('click', finish);
+            }
+
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) finish(); // backdrop = accept defaults
+            });
+            document.body.appendChild(overlay);
+            render();
+        });
+    }).catch(function () {
+        // Question sheet is never a gate — proceed with defaults
+        return null;
+    });
 };
 
 // ── UI Binding ─────────────────────────────────────────────────
@@ -1048,10 +1212,7 @@ SessionFlow.prototype._renderResults = function () {
 SessionFlow.prototype._saveSession = function () {
     if (!this.results || !this.db) return;
     if (this.savedSessionId) return; // already saved
-    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
-        alert('Session saving requires an internet connection.');
-        return;
-    }
+    // Offline saves queue in SyncQueue (Part 0.6 #1) — no online gate.
 
     // Warn if POA missing — cold-bore tracking needs it
     if (!this.poa) {
@@ -1083,9 +1244,14 @@ SessionFlow.prototype._saveSession = function () {
         // Zero Guardian: a confirmed verdict marks this as a zero session
         isZeroSession: typeof ZeroGuardian !== 'undefined' && this.poa
             ? ZeroGuardian.isConfirmed(this.results) : false,
-        // Suppressor configuration tag (null when the rifle has no configs)
-        config: this.selectedRifle && this.selectedRifle.hasConfigs
-            ? (this.selectedRifle.activeConfig || 'bare') : null,
+        // Suppressor: the per-session question (§2.1). Bare = null.
+        suppressorId: this.suppressorId || null,
+        // Lot: asked every session; drift computes silently from these tags
+        lotNumber: this.lotNumber || null,
+        // Legacy two-state tag kept in sync for old analytics surfaces
+        config: this.suppressorId ? 'suppressed'
+            : (this.selectedRifle && this.selectedRifle.hasConfigs
+                ? (this.selectedRifle.activeConfig || 'bare') : null),
         // Ladder test attachment (bench tool)
         sessionType: this.ladderResult ? 'ladder' : null,
         ladder: this.ladderResult || null
@@ -1107,12 +1273,49 @@ SessionFlow.prototype._saveSession = function () {
     btn.disabled = true;
     btn.textContent = 'Saving…';
 
-    this.db.addSession(sessionData).then(function (saved) {
+    var writeFn = (typeof SyncQueue !== 'undefined' && SyncQueue)
+        ? function (fn, data) { return SyncQueue.write(fn, data); }
+        : function (fn, data) { return self.db[fn](data); };
+
+    writeFn('addSession', sessionData).then(function (saved) {
         self.savedSessionId = saved.id;
         self.ladderResult = null; // consumed by this save
-        btn.innerHTML = Icon('check', 20) + ' Saved to history';
+        btn.innerHTML = Icon('check', 20) + (saved._pending
+            ? ' Saved — will sync when you\'re back online'
+            : ' Saved to history');
         if (typeof Recents !== 'undefined') Recents.touchSession(saved.id, self.selectedRifle);
         self._storeAnnotatedImage(saved.id);
+        // A confirmed zero writes an append-only zero EVENT (§2.10) —
+        // the Calibration Status card derives from these. Best-effort.
+        if (sessionData.isZeroSession && sessionData.rifleId && self.results) {
+            writeFn('addZeroEvent', {
+                rifleId: sessionData.rifleId,
+                loadId: sessionData.loadId,
+                sessionId: saved.id,
+                date: sessionData.date,
+                distanceYards: sessionData.distanceYards,
+                shotCount: (sessionData.impacts || []).length,
+                groupData: {
+                    groupSizeMOA: self.results.groupSizeMOA,
+                    atzElevationMOA: self.results.atzElevationMOA,
+                    atzWindageMOA: self.results.atzWindageMOA,
+                    meanRadius: self.results.meanRadius
+                },
+                suppressorId: sessionData.suppressorId,
+                lotNumber: sessionData.lotNumber,
+                source: 'session'
+            }).catch(function (e) { console.warn('[Session] zero event failed:', e); });
+            if (typeof Readiness !== 'undefined') Readiness.invalidate(sessionData.rifleId);
+        }
+        // Sticky defaults: remember the can + latest lot for next time
+        if (sessionData.rifleId && typeof Suppressors !== 'undefined') {
+            Suppressors.rememberLastUsed(self.db, sessionData.rifleId, sessionData.suppressorId);
+        }
+        if (self.selectedLoad && sessionData.lotNumber &&
+            self.selectedLoad.lotNumber !== sessionData.lotNumber) {
+            self.selectedLoad.lotNumber = sessionData.lotNumber;
+            self.db.updateLoad(self.selectedLoad).catch(function () {});
+        }
         // Handload bookkeeping: a session on a recipe load = one firing
         // on its brass (best-effort, never blocks anything)
         if (self.selectedLoad && self.selectedLoad.recipe && self.selectedLoad.recipe.brass) {
@@ -1150,25 +1353,40 @@ SessionFlow.prototype._storeAnnotatedImage = function (sessionId) {
         var exportCanvas = this._getExportCanvas();
         console.log('[Session] Export canvas rendered — size:', exportCanvas.width, 'x', exportCanvas.height);
 
-        var thumbCanvas = generateThumbnail(exportCanvas, 400);
-        console.log('[Session] Thumbnail generated — size:', thumbCanvas.width, 'x', thumbCanvas.height);
+        // §2.9b image compression: cap the stored display version to a
+        // 2048px longest edge at JPEG q0.80 — plenty for viewing and
+        // shot review, a fraction of a raw phone photo. Shot marking
+        // already happened on the full-res in-memory image; this only
+        // affects the STORED copy. Full-res is not retained (no feature
+        // needs it today).
+        var storedCanvas = typeof capCanvasSize === 'function'
+            ? capCanvasSize(exportCanvas, 2048) : exportCanvas;
+        console.log('[Session] Stored size:', storedCanvas.width, 'x', storedCanvas.height);
+
+        var thumbCanvas = generateThumbnail(storedCanvas, 400);
 
         Promise.all([
-            canvasToJpegBlob(exportCanvas, 0.85),
+            canvasToJpegBlob(storedCanvas, 0.80),
             canvasToJpegBlob(thumbCanvas, 0.75)
         ]).then(function (blobs) {
             console.log('[Session] Blobs created — full:', blobs[0].size, 'bytes, thumb:', blobs[1].size, 'bytes');
-            return self.db.saveSessionImage(sessionId, blobs[0], blobs[1]);
-        }).then(function () {
+            return (typeof SyncQueue !== 'undefined' && SyncQueue)
+                ? SyncQueue.writeImage(sessionId, blobs[0], blobs[1])
+                : self.db.saveSessionImage(sessionId, blobs[0], blobs[1]);
+        }).then(function (result) {
+            if (result && result.queued) {
+                console.log('[Session] Image queued — uploads when back online');
+                return null;
+            }
             console.log('[Session] Annotated image saved to DB successfully');
             // Verification: read it back
-            return self.db.getSessionImage(sessionId);
-        }).then(function (record) {
-            if (record && record.fullBlob) {
-                console.log('[Session] Image verified in DB — full blob size:', record.fullBlob.size);
-            } else {
-                console.error('[Session] Image verification FAILED — record:', record);
-            }
+            return self.db.getSessionImage(sessionId).then(function (record) {
+                if (record && record.fullBlob) {
+                    console.log('[Session] Image verified in DB — full blob size:', record.fullBlob.size);
+                } else {
+                    console.error('[Session] Image verification FAILED — record:', record);
+                }
+            });
         }).catch(function (err) {
             console.error('[Session] Failed to store annotated image:', err);
         });

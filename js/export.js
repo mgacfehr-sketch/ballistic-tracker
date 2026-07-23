@@ -394,3 +394,23 @@ function canvasToJpegBlob(canvas, quality) {
 }
 
 // _roundRect is defined in utils.js (loaded before export.js)
+
+/**
+ * Cap a canvas to a maximum LONGEST-EDGE size (§2.9b image
+ * compression). Unlike generateThumbnail (width-only), this bounds
+ * both dimensions — portrait target photos compress too. Returns the
+ * source canvas unchanged when already within bounds.
+ * @param {HTMLCanvasElement} sourceCanvas
+ * @param {number} maxEdge - longest edge in pixels (e.g. 2048)
+ * @returns {HTMLCanvasElement}
+ */
+function capCanvasSize(sourceCanvas, maxEdge) {
+    var longest = Math.max(sourceCanvas.width, sourceCanvas.height);
+    if (!maxEdge || longest <= maxEdge) return sourceCanvas;
+    var scale = maxEdge / longest;
+    var out = document.createElement('canvas');
+    out.width = Math.round(sourceCanvas.width * scale);
+    out.height = Math.round(sourceCanvas.height * scale);
+    out.getContext('2d').drawImage(sourceCanvas, 0, 0, out.width, out.height);
+    return out;
+}

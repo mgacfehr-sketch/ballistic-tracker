@@ -1318,3 +1318,21 @@ BallisticDB.prototype.getTruingEventsByRifle = function (rifleId) {
             return (res.data || []).map(_rowToJs);
         });
 };
+
+// ── Offline sync support (js/sync-queue.js) ───────────────────
+// The ONE generic write the flush path uses: upsert a queued row by
+// its client UUID. Client wins by definition (Part 0.6 #1 — the
+// device is the source of truth; server data never overwrites
+// unsynced local work).
+
+BallisticDB.prototype.flushQueuedRow = function (table, record) {
+    var self = this;
+    var row = _jsToRow(record, self.userId);
+    delete row._pending;
+    return self.supabase.from(table).upsert(row, { onConflict: 'id' })
+        .select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};

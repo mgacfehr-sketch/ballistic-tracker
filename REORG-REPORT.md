@@ -195,6 +195,60 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 5 — Range Session job: offline queue, session questions, compression, target PDF
+
+- **New js/sync-queue.js — the offline write queue (Part 0.6 #1)** + 32-check
+  pure-core test suite. Write-through with fallback: `SyncQueue.write(fn, data)`
+  calls db.js unchanged when online; when offline (or on a NETWORK failure —
+  never a server rejection) the row queues in IndexedDB `yort_sync` with its
+  client UUID and returns `{_pending: true}`. Flush is FIFO/sequential on
+  online / visibility / app start / after any online write; landed sessions then
+  upload their queued photo. Upsert-by-client-UUID = the device is the source of
+  truth; server data never overwrites unsynced local work. Server-rejected rows
+  retry 5× then park as status 'error' — surfaced, never dropped. Read methods
+  are decorated on the db INSTANCE (db.js file untouched beyond one additive
+  `flushQueuedRow`) so queued rows appear in history immediately. Out of scope
+  by design: offline deletes, multi-device merge, Background Sync API, offline
+  rifle/load creation. **The old "session saving requires internet" block in
+  session-flow.js is gone.**
+- **§2.1 session questions:** after picking rifle+load, one sheet asks
+  Suppressor (suppressor-enabled users only: Bare | can list, last-used
+  preselected, "＋ Add a can" inline) and "Which lot?" (last lot preselected
+  with "same as last time", prior lots from session tags, "New lot…" entry —
+  new lots join the list forever via the session tags; no lot-manager feature).
+  Backdrop tap accepts defaults — never a gate. Sticky: last can per rifle
+  (user_settings), latest lot written back to the load. The lot sheet shows the
+  inline lot-drift note when true ("Lot X ran 45 fps faster — worth a zero
+  check") — monitors speak in context, not on Home.
+- Sessions now store `suppressorId` + `lotNumber` (legacy `config` tag kept in
+  sync for old analytics). **A confirmed zero writes an append-only
+  `zero_events` row** (shot count, distance, group snapshot, can, lot) feeding
+  the Calibration Status card; Readiness invalidates so chips update.
+- **§2.9b image compression (documented settings):** stored session images are
+  capped to a **2048 px longest edge at JPEG q0.80** (thumbnail 400 px q0.75)
+  via a new `capCanvasSize` in export.js — shot marking still happens on the
+  full-res in-memory photo, so detection accuracy is unaffected (compression
+  applies only to the stored copy; originals are not retained — no feature
+  needs them). Typical raw 12 MP phone photo ≈ 3–6 MB → stored ≈ 400–800 KB.
+- **§2.1 paper target PDF (js/target-pdf.js):** vector jsPDF generator, Letter
+  + A4. Geometry is IDENTICAL to js/aruco-calibration.js law (6.0" grid, 0.6"
+  markers, centers 7.00" apart) — markers sit ~1.3–1.7" inside the paper
+  corners (staple-tear zone clear) and ~3" off center (shot zone clear), with a
+  printed staple hint. Adds a **1.00" scale bar with tap dots** (exactly the
+  manual 2-tap calibration distance) + human-readable reference text. Markers
+  drawn from the live js-aruco2 dictionary bit-for-bit.
+  **Verified:** headless Playwright ran the REAL detector against the generated
+  artwork — 4/4 markers found (ids 0–3) and detected marker spacing matched the
+  printed geometry with **0.00% error**. Classic target remains reachable
+  (print/share) beside the new PDFs.
+- app.js: `SyncQueue.init(db)` after OfflineCache. index.html/sw.js gained
+  target-pdf.js + sync-queue.js; **CACHE_VERSION 99 → 100**.
+- Tests: **489 total, all green** (+32 sync-queue; ledger: 71 calculations +
+  60 calibration-status + 37 crowd-data + 115 foundation + 49 garmin-import +
+  8 onboarding + 32 sync-queue + 117 velocity-stats).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase

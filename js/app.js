@@ -348,6 +348,10 @@
             if (typeof OfflineCache !== 'undefined') {
                 OfflineCache.init(db);
             }
+            // Offline write queue (Part 0.6 #1) — after the read cache
+            if (typeof SyncQueue !== 'undefined' && SyncQueue) {
+                SyncQueue.init(db);
+            }
 
             // Certificate-QR deep link (?rifle=<id>) — after auth only
             if (typeof Onboarding !== 'undefined') {
