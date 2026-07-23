@@ -645,8 +645,10 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     if (specBits.length) html += '<div class="pagesub mono">' + specBits.join(' &middot; ') + '</div>';
     html += '</div>';
 
-    // Readiness verdict banner + Confirm zero (fills in async)
-    html += '<div id="rifle-verdict"></div>';
+    // CALIBRATION STATUS CARD (§2.10) — the page's status centerpiece,
+    // replacing the one-word verdict banner. Fills in async.
+    html += '<div id="rifle-cal-status" class="u-mt-14"><div class="card"><div class="rowlink">' +
+        '<div class="txt"><span class="t-micro">Reading the rifle&hellip;</span></div></div></div></div>';
     html += '<button type="button" class="btn-primary btn-edge" id="btn-confirm-zero">Confirm zero</button>';
 
     // Stat strip: rounds · best MOA · 90% yd (fills in async)
@@ -684,7 +686,32 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         html += '<div class="card card-pad">' + specRows + '</div>';
     }
 
-    // Five shortcut rows — one per job category, chip pre-set to this rifle
+    // Loads for this rifle (v2.3 §1.5 — loads live on the rifle page)
+    html += UI.sectionHead('Loads');
+    var loadRows = '';
+    (loads || []).forEach(function (ld) {
+        var bits = [];
+        if (ld.muzzleVelocity) bits.push(Math.round(ld.muzzleVelocity) + ' fps');
+        if (ld.lotNumber) bits.push('Lot ' + ld.lotNumber);
+        if (ld.truedMv || ld.truedBc) bits.push('trued');
+        loadRows += UI.rowlink({
+            button: true,
+            title: ld.name || 'Load',
+            sub: bits.join(' · ') || '—',
+            subMono: true,
+            chev: true,
+            data: { 'load-row': ld.id }
+        });
+    });
+    loadRows += UI.rowlink({
+        button: true,
+        titleHtml: '<span class="u-gold">＋ Add load</span>',
+        sub: 'Factory box or bare basics',
+        data: { 'load-add': '1' }
+    });
+    html += UI.card(loadRows);
+
+    // Shortcut rows — one per job, chip pre-set to this rifle
     html += UI.sectionHead('Everything else');
     var catRows = '';
     if (typeof Categories !== 'undefined') {
@@ -712,21 +739,10 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
 ProfileManager.prototype._fillRifleDetailAsync = function (rifle, loads, activeBarrel) {
     var self = this;
 
-    // Verdict banner
-    if (typeof Readiness !== 'undefined') {
-        Readiness.assess(this.db, rifle).then(function (r) {
-            var el = document.getElementById('rifle-verdict');
-            if (!el || !el.isConnected) return;
-            var kind = r.state === 'ready' ? 'ready' : (r.state === 'adjust' ? 'caution' : 'problem');
-            var text = r.state === 'ready'
-                ? 'READY — ' + r.note + '.'
-                : (r.state === 'adjust' && r.correction
-                    ? 'ADJUST — ' + r.correction + ', then shoot a confirmation group.'
-                    : (r.state === 'adjust'
-                        ? 'ALMOST THERE — less than 1 click off, shoot a confirmation group.'
-                        : 'NOT CHECKED — photograph a target and Proven confirms your zero.'));
-            el.innerHTML = UI.banner(kind, UI.esc(text), true);
-        });
+    // Calibration Status card (§2.10) — passively derived from events
+    if (typeof CalibrationStatusCard !== 'undefined' && CalibrationStatusCard) {
+        var calEl = document.getElementById('rifle-cal-status');
+        if (calEl) CalibrationStatusCard.render(calEl, this.db, rifle);
     }
 
     // Stats: best MOA + 90% yd
@@ -786,6 +802,20 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
     for (var i = 0; i < shortcuts.length; i++) {
         shortcuts[i].addEventListener('click', function () {
             if (window.AppNav) AppNav.openCategory(this.getAttribute('data-cat-shortcut'), rifle.id);
+        });
+    }
+
+    // Loads list rows + Add load
+    var loadRows = this.container.querySelectorAll('[data-load-row]');
+    for (var lr = 0; lr < loadRows.length; lr++) {
+        loadRows[lr].addEventListener('click', function () {
+            self.showLoadDetail(rifle.id, this.getAttribute('data-load-row'));
+        });
+    }
+    var loadAdd = this.container.querySelector('[data-load-add]');
+    if (loadAdd) {
+        loadAdd.addEventListener('click', function () {
+            self.showLoadForm(rifle.id, null);
         });
     }
 };

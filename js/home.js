@@ -1,19 +1,19 @@
 /**
- * home.js — HomeManager: the action-first Home (Proven §3.1).
+ * home.js — HomeManager: Home = the jobs (Contract v2.3 §1.2).
  *
  * Top to bottom:
  *   BRAND BAR  — W-dial mark + PROVEN wordmark
- *   ALERTS     — one-sentence monitors; render ONLY when true
- *   THE FIVE JOB CATEGORIES — "What do you want to do?" as large rows
- *   RECENT     — last session/rifle rows with status chips
+ *   THE JOBS   — "What are you doing?" as large rows, contract order
+ *   + MORE TOOLS — quiet row; toggle any job on/off (hiding keeps data)
+ *   RECENT     — last session/rifle row with its status chip
  *
- * The old adaptive per-tool actions and the "+ Add a tool" drawer are
- * gone: tool activation (ToolRegistry) now governs which rows appear
- * INSIDE each category screen (js/categories.js). A category with
- * zero active tools is hidden here.
+ * NO ALERTS SECTION (removed per owner). Monitors speak inside
+ * Data & Records and inline where contextually true (the lot question
+ * can note "this lot ran 45 fps fast") — never as a Home feed.
  *
- * HomeCore (pure ordering logic) and Recents are kept: HomeCore is
- * Node-tested; Recents feeds the rifle chip default and this screen.
+ * Jobs the user has off do not render (ToolRegistry). HomeCore (pure
+ * ordering logic) and Recents are kept: HomeCore is Node-tested;
+ * Recents feeds the rifle chip default and this screen.
  */
 
 // ── Pure core (kept for tests + usage counting) ───────────────
@@ -91,7 +91,6 @@ var Recents = {
 function HomeManager(db) {
     this.db = db;
     this.container = null;
-    this._alertProviders = [];
 }
 
 HomeManager.prototype.init = function () {
@@ -99,55 +98,13 @@ HomeManager.prototype.init = function () {
     this.container = document.getElementById('view-home');
     if (typeof ToolRegistry !== 'undefined') {
         ToolRegistry.onChange(function () {
-            // Category visibility can change when activations change
+            // Job visibility can change when activations change
             if (self.container && self.container.classList.contains('active') &&
                 self.container.getAttribute('data-screen') === 'home') {
                 self.show();
             }
         });
     }
-    this._registerBuiltinAlerts();
-};
-
-/**
- * Alerts: providers return Promise<[{id, text, onTap?}]>.
- * Silence is a feature — nothing renders when nothing is true.
- */
-HomeManager.prototype.registerAlertProvider = function (fn) {
-    this._alertProviders.push(fn);
-};
-
-/** The lot-drift monitor feeds Home alerts (mockup's example alert). */
-HomeManager.prototype._registerBuiltinAlerts = function () {
-    var self = this;
-    this.registerAlertProvider(function (db) {
-        if (!db || typeof lotDrift !== 'function') return Promise.resolve([]);
-        return Promise.all([db.getAllRifles(), db.getAllVelocityStrings()]).then(function (res) {
-            var rifles = res[0] || [];
-            var strings = res[1] || [];
-            var byRifle = {};
-            strings.forEach(function (s) {
-                if (!s.rifleId) return;
-                (byRifle[s.rifleId] = byRifle[s.rifleId] || []).push(s);
-            });
-            var alerts = [];
-            rifles.forEach(function (rifle) {
-                var drifts = lotDrift(byRifle[rifle.id] || []);
-                drifts.forEach(function (a, i) {
-                    alerts.push({
-                        id: 'lot-drift-' + rifle.id + '-' + i,
-                        text: 'New lot ' + a.newLot + ' on ' + (rifle.name || 'a rifle') + ' runs ' +
-                            Math.abs(a.deltaFps) + ' fps ' + (a.deltaFps > 0 ? 'faster' : 'slower') +
-                            ' — confirm zero.',
-                        onTap: function () {
-                            if (window.Categories) Categories.show('check', rifle.id);
-                        }
-                    });
-                });
-            });
-            return alerts;
-        }).catch(function () { return []; });
-    });
 };
 
 HomeManager.prototype.show = function () {
@@ -155,18 +112,16 @@ HomeManager.prototype.show = function () {
     this.container.setAttribute('data-screen', 'home');
 
     var html = UI.brandBar();
-    html += '<div id="home-alerts"></div>';
-    html += UI.sectionHead('What do you want to do?');
+    html += UI.sectionHead('What are you doing?');
     html += '<div id="home-cats"></div>';
     html += '<div id="home-recent"></div>';
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
 
     this._renderCategories();
-    this._renderAlerts();
     this._renderRecent();
 };
 
-/** The five job categories as large rows; hidden when toolless. */
+/** The job rows (contract order); hidden when toolless. */
 HomeManager.prototype._renderCategories = function () {
     var el = document.getElementById('home-cats');
     if (!el || typeof Categories === 'undefined') return;
@@ -183,7 +138,7 @@ HomeManager.prototype._renderCategories = function () {
             data: { cat: key }
         });
     });
-    el.innerHTML = html;
+    el.innerHTML = html + this._moreToolsRowHtml();
 
     var rows = el.querySelectorAll('[data-cat]');
     for (var i = 0; i < rows.length; i++) {
@@ -191,31 +146,58 @@ HomeManager.prototype._renderCategories = function () {
             Categories.show(this.getAttribute('data-cat'));
         });
     }
+    var more = document.getElementById('home-more-tools');
+    if (more) more.addEventListener('click', function () { self._openMoreTools(); });
 };
 
-HomeManager.prototype._renderAlerts = function () {
-    var el = document.getElementById('home-alerts');
-    if (!el || !this._alertProviders.length) return; // silence is a feature
-    var self = this;
-    Promise.all(this._alertProviders.map(function (fn) {
-        return fn(self.db).catch(function () { return []; });
-    })).then(function (lists) {
-        var alerts = [];
-        lists.forEach(function (l) { alerts = alerts.concat(l || []); });
-        if (!alerts.length || !el.isConnected) return;
-        var html = UI.sectionHead('Alerts');
-        for (var i = 0; i < alerts.length; i++) {
-            html += '<button class="alert-strip' + (i > 0 ? ' u-mt-10' : '') +
-                '" data-alert-id="' + UI.esc(alerts[i].id) + '">' +
-                '<span>' + UI.esc(alerts[i].text) + '</span></button>';
-        }
-        el.innerHTML = html;
-        var nodes = el.querySelectorAll('.alert-strip');
-        for (var n = 0; n < nodes.length; n++) {
-            (function (node, alert) {
-                if (alert.onTap) node.addEventListener('click', alert.onTap);
-            })(nodes[n], alerts[n]);
-        }
+/** Quiet "+ More tools" row — shown whenever any job is toggleable. */
+HomeManager.prototype._moreToolsRowHtml = function () {
+    if (typeof ToolRegistry === 'undefined' || !ToolRegistry.getChecklist) return '';
+    var list = ToolRegistry.getChecklist();
+    if (!list.length) return '';
+    return '<button class="rowlink u-full" id="home-more-tools" style="border:none;background:none">' +
+        '<div class="txt"><span class="u-gold">＋ More tools</span></div></button>';
+};
+
+/** The job on/off surface (§1.3): toggling hides/shows, never deletes. */
+HomeManager.prototype._openMoreTools = function () {
+    var overlay = document.createElement('div');
+    overlay.className = 'overlay';
+
+    function rowsHtml() {
+        var html = '';
+        ToolRegistry.getChecklist().forEach(function (r) {
+            html += '<button class="option-row' + (r.active ? ' on' : '') +
+                '" data-more-job="' + r.key + '">' +
+                '<span>' + UI.esc(r.label) +
+                '<span class="choice-desc">' + UI.esc(r.desc) + '</span></span>' +
+                '</button>';
+        });
+        return html;
+    }
+
+    overlay.innerHTML =
+        '<div class="overlay-card">' +
+        '<div class="overlay-title">Your jobs</div>' +
+        '<p class="overlay-text">Checked jobs show on Home. Turning one off hides it — all its data stays.</p>' +
+        '<div id="more-tools-rows">' + rowsHtml() + '</div>' +
+        '<button class="btn u-full u-mt-10" id="more-tools-done">Done</button>' +
+        '</div>';
+    document.body.appendChild(overlay);
+
+    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    overlay.querySelector('#more-tools-done').addEventListener('click', close);
+
+    overlay.querySelector('#more-tools-rows').addEventListener('click', function (e) {
+        var row = e.target.closest ? e.target.closest('[data-more-job]') : null;
+        if (!row) return;
+        var key = row.getAttribute('data-more-job');
+        var turningOn = !row.classList.contains('on');
+        row.classList.toggle('on', turningOn);
+        if (turningOn) ToolRegistry.activate(key);
+        else ToolRegistry.deactivate(key);
+        // Home re-renders via ToolRegistry.onChange
     });
 };
 

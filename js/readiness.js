@@ -69,6 +69,23 @@ var Readiness = (function () {
             var whenStr = when ? when.toLocaleDateString() : '';
 
             if (verdict.confirmed) {
+                // Aging softens wording (§2.10): a confirmed zero past the
+                // stale window reads STALE, never deleted. Constant shared
+                // with the Calibration Status card.
+                var staleDays = (typeof CALIBRATION_AGING !== 'undefined')
+                    ? CALIBRATION_AGING.zeroStaleDays : 90;
+                var ageDays = when ? (Date.now() - when.getTime()) / 86400000 : null;
+                if (ageDays !== null && ageDays > staleDays) {
+                    return {
+                        state: 'ready',
+                        word: 'STALE',
+                        chip: { kind: 'caution', text: 'Stale' },
+                        note: 'Zero confirmed ' + whenStr + ' — stale, confirm before the hunt',
+                        correction: null,
+                        lastChecked: when,
+                        session: latest
+                    };
+                }
                 return {
                     state: 'ready',
                     word: 'READY',

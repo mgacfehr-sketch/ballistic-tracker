@@ -150,6 +150,51 @@ built assuming it ran. Blocks:
 
 ---
 
+## Step 4 — Home job list, Categories re-slice, Calibration Status card
+
+- **categories.js re-sliced** from five categories to the seven v2.3 jobs:
+  `range, steel, loaddev, ballistics, truing, scopetrack, records` (contract §1.2
+  order). Rifle chip, switcher, wrong-rifle protection unchanged. Tool rows
+  re-homed: chrono import → Range Session (also stays neutrally launchable);
+  quick hit tally (legacy field logger) lives inside Steel/Field until the full
+  logger lands in Step 6; the full Steel logger, Truing, tall-target PDF and
+  Device Export rows gate on their modules existing (`typeof SteelSession`…), so
+  those jobs appear on Home automatically as Steps 6–9 land. Load Development is
+  fully tier-hidden in v1. The old Bare/Suppressed config toggle was REMOVED from
+  category screens (superseded by the per-session suppressor question, Step 5);
+  legacy `rifle.activeConfig` data untouched.
+- **home.js rebuilt:** NO alerts section (removed per owner — the built-in
+  lot-drift Home alert provider was deleted; lot drift speaks inline at the lot
+  question and in Data & Records). Brand bar → "What are you doing?" → job rows →
+  quiet "+ More tools" row (the §1.3 toggle surface: checked jobs show on Home;
+  turning one off hides it, all data stays) → Recent strip.
+- **New pure js/calibration-status.js + tests/test-calibration-status.js (60
+  checks):** derives Scope tracking / Zero / MV / Trued + one-word rollup +
+  "Calibrated to X yards" from the append-only event tables. **Aging defaults
+  (constants in CALIBRATION_AGING):** zero stale 90 days or immediately on a
+  logged scope adjustment; zero thin < 5 shots; zero drifted when the centroid
+  moved > 0.5 MOA between confirmed zeros; MV stale 180 days or on lot change;
+  tracking stale 365 days; truing flagged when MV re-measured > 15 fps from the
+  trued value or zero shifted. Calibrated-to = truing far distance when trued,
+  else zero distance — and honestly null when zero was never confirmed, even if
+  a truing event exists.
+- Same file carries the browser-only `CalibrationStatusCard` renderer (solver-
+  style pure/DOM split): rollup header, four tappable rows (what/why sheet with
+  the one-line unlock, coach voice), one hint line max. Pre-migration databases
+  degrade to empty states, never errors (every event fetch catches to []).
+- **Slim rifle page (profiles.js):** the Calibration Status card replaces the
+  one-word verdict banner as the status centerpiece (Confirm zero button kept);
+  a **Loads section** (rows + "＋ Add load") now lives on the rifle page per
+  §1.5. **readiness.js** softens a confirmed-but-old zero to STALE (caution chip)
+  using the shared aging constant — fleet chips and rifle chips age with the card.
+- db.js additive CRUD for zero_events, mv_measurements, tracking_verifications,
+  truing_events. icons.js gained the seven job icons traced from the mockups.
+- CACHE_VERSION 98 → 99. Tests: **457 total, all green** (+60 calibration-status).
+- Headless Playwright verification (scratchpad harness): Home light/dark + the
+  status card render to the mockup composition.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase

@@ -62,71 +62,145 @@ var Categories = (function () {
     }
 
     var DEFS = {
-        check: {
-            key: 'check',
-            icon: 'cat-check',
-            title: 'Check & zero',
-            desc: "Photograph a target, confirm you're ready",
-            registryTools: ['checkTarget'],
+        range: {
+            key: 'range',
+            icon: 'job-range',
+            title: 'Range Session',
+            desc: 'Paper targets, chrono, document the day',
+            registryTools: ['rangeSession'],
             tools: [
                 {
                     id: 'check-target',
-                    title: 'Check a target',
-                    sub: 'Photograph a target — Proven gives the verdict',
-                    gate: function () { return toolVisible('checkTarget'); },
+                    title: 'Start a range session',
+                    sub: 'Photograph the target — Proven measures the group and your zero',
+                    gate: function () { return toolVisible('rangeSession'); },
                     launch: function (ctx) { launchSession(ctx.rifle, false); }
                 },
                 {
                     id: 'quick-mode',
                     title: 'Quick Mode',
                     sub: 'Just measure a group — no profile, nothing saved to a rifle',
-                    gate: function () { return toolVisible('checkTarget'); },
+                    gate: function () { return toolVisible('rangeSession'); },
                     launch: function () { launchSession(null, true); }
+                },
+                {
+                    id: 'import-chrono',
+                    title: 'Import chrono data',
+                    sub: 'ShotView export — auto-assigns across your whole fleet',
+                    gate: function () { return toolVisible('rangeSession') && featureOn('chronoImport'); },
+                    launch: function () { if (window.AppNav) AppNav.go('chrono'); }
                 },
                 {
                     id: 'print-target',
                     title: 'Print or share a blank target',
                     sub: 'The Proven auto-calibration target',
-                    gate: function () { return toolVisible('checkTarget'); },
+                    gate: function () { return toolVisible('rangeSession'); },
                     launch: function () { printOrShareTarget(); }
                 }
             ],
             strip: stripCheck
         },
 
-        shoot: {
-            key: 'shoot',
-            icon: 'cat-shoot',
-            title: 'Shoot',
-            desc: 'Firing solution, DOPE cards, log field shots',
-            registryTools: ['solver', 'dopeCards', 'field'],
+        steel: {
+            key: 'steel',
+            icon: 'job-steel',
+            title: 'Steel/Field Session',
+            desc: 'Log hits at distance — casual or full',
+            registryTools: ['steelSession'],
+            tools: [
+                {
+                    id: 'steel-session',
+                    title: 'Start a steel session',
+                    sub: 'Per-shot impacts, wind, holds — the data truing feeds on',
+                    gate: function () {
+                        return toolVisible('steelSession') && typeof SteelSession !== 'undefined';
+                    },
+                    launch: function (ctx) {
+                        if (window.ToolActions && ToolActions.steelSession) {
+                            ToolActions.steelSession(ctx.db, ctx.rifle ? ctx.rifle.id : null);
+                        }
+                    }
+                },
+                {
+                    id: 'field-log',
+                    title: 'Quick hit tally',
+                    sub: '"7 of 10 at 600, prone" — builds your effective range',
+                    gate: function () { return toolVisible('steelSession'); },
+                    dormantKey: 'steelSession',
+                    launch: function (ctx) {
+                        if (window.ToolActions && ToolActions.fieldLog) {
+                            ToolActions.fieldLog(ctx.db, ctx.rifle ? ctx.rifle.id : null);
+                        }
+                    }
+                }
+            ],
+            strip: stripSteel
+        },
+
+        loaddev: {
+            key: 'loaddev',
+            icon: 'job-loaddev',
+            title: 'Load Development',
+            desc: 'Ladder tests, recipes, ammo comparison',
+            registryTools: ['loadDev'],
+            // Tier-hidden in v1 (Part 0.5) — every gate rides the loadDev
+            // feature flag, so the whole job vanishes from Home until the
+            // tier ships. Loads themselves live on the rifle page.
+            tools: [
+                {
+                    id: 'ladder-test',
+                    title: 'Run a ladder test',
+                    sub: 'Find the charge your barrel likes',
+                    gate: function () { return toolVisible('loadDev'); },
+                    launch: function (ctx) {
+                        if (window.ToolActions && ToolActions.ladderInfo) ToolActions.ladderInfo(ctx.db);
+                    }
+                },
+                {
+                    id: 'dev-logbook',
+                    title: 'Development logbook',
+                    sub: 'Per-load bench notes and results',
+                    gate: function () { return toolVisible('loadDev'); },
+                    launch: function (ctx) { openLogbook(ctx); }
+                }
+            ],
+            strip: stripCheck
+        },
+
+        ballistics: {
+            key: 'ballistics',
+            icon: 'job-ballistics',
+            title: 'Ballistics',
+            desc: 'Firing solution & DOPE cards',
+            registryTools: ['ballistics'],
             tools: [
                 {
                     id: 'firing-solution',
                     title: 'Get a firing solution',
                     sub: 'Dial for any distance · conditions current',
-                    gate: function () { return toolVisible('solver'); },
+                    gate: function () { return toolVisible('ballistics'); },
                     launch: function () { if (window.AppNav) AppNav.go('solver'); }
                 },
                 {
                     id: 'dope-card',
                     title: 'Print a DOPE card',
                     sub: 'Range card for your pocket or stock',
-                    gate: function () { return toolVisible('dopeCards'); },
-                    dormantKey: 'dopeCards',
+                    gate: function () { return toolVisible('ballistics'); },
+                    dormantKey: 'ballistics',
                     launch: function (ctx) {
                         if (window.ToolActions && ToolActions.dopeCards) ToolActions.dopeCards(ctx.db);
                     }
                 },
                 {
-                    id: 'field-log',
-                    title: 'Log field shots',
-                    sub: 'Hits on steel — builds your effective range',
-                    gate: function () { return toolVisible('field'); },
-                    dormantKey: 'field',
+                    id: 'device-export',
+                    title: 'Device export',
+                    sub: 'Compensated BC + MV for your rangefinder or Kestrel',
+                    gate: function () {
+                        return toolVisible('ballistics') && typeof DeviceExport !== 'undefined';
+                    },
                     launch: function (ctx) {
-                        if (window.ToolActions && ToolActions.fieldLog) {
-                            ToolActions.fieldLog(ctx.db, ctx.rifle ? ctx.rifle.id : null);
+                        if (window.ToolActions && ToolActions.deviceExport) {
+                            ToolActions.deviceExport(ctx.db, ctx.rifle ? ctx.rifle.id : null);
                         }
                     }
                 },
@@ -141,91 +215,68 @@ var Categories = (function () {
             strip: stripShoot
         },
 
-        ammo: {
-            key: 'ammo',
-            icon: 'cat-ammo',
-            title: 'Ammo & loads',
-            desc: 'Chrono data, ladder tests, recipes, lots',
-            registryTools: ['chrono', 'bench'],
-            // The loads list renders between the tools card and the strip
+        truing: {
+            key: 'truing',
+            icon: 'job-truing',
+            title: 'Truing',
+            desc: 'Make solutions match reality',
+            registryTools: ['truing'],
             tools: [
                 {
-                    id: 'import-chrono',
-                    title: 'Import chrono data',
-                    sub: 'Auto-assigns by rifle — works across your whole fleet',
-                    gate: function () { return toolVisible('chrono'); },
-                    dormantKey: 'chrono',
-                    launch: function () { if (window.AppNav) AppNav.go('chrono'); }
-                },
-                {
-                    id: 'ladder-test',
-                    title: 'Run a ladder test',
-                    sub: 'Find the charge your barrel likes',
-                    gate: function () { return toolVisible('bench'); },
-                    dormantKey: 'bench',
+                    id: 'truing-start',
+                    title: 'True this rifle',
+                    sub: 'Quick or full — corrections your dope can bet on',
+                    gate: function () {
+                        return toolVisible('truing') && typeof TruingJob !== 'undefined';
+                    },
                     launch: function (ctx) {
-                        if (window.ToolActions && ToolActions.ladderInfo) ToolActions.ladderInfo(ctx.db);
-                    }
-                },
-                {
-                    id: 'add-load',
-                    title: 'Add load',
-                    sub: 'Recipe, factory box, or bare basics',
-                    gate: function () { return true; },
-                    launch: function (ctx) {
-                        if (ctx.rifle && _managers.profile) {
-                            if (window.AppNav) AppNav.go('profiles');
-                            _managers.profile.showLoadForm(ctx.rifle.id, null);
-                        }
-                    }
-                },
-                {
-                    id: 'scan-ammo-box',
-                    title: 'Scan ammo box',
-                    sub: 'Photograph the box — Proven reads it into a load',
-                    gate: function () { return featureOn('onboarding'); },
-                    launch: function (ctx) {
-                        // The scan button lives at the top of the load form
-                        if (ctx.rifle && _managers.profile) {
-                            if (window.AppNav) AppNav.go('profiles');
-                            _managers.profile.showLoadForm(ctx.rifle.id, null);
+                        if (window.ToolActions && ToolActions.truing) {
+                            ToolActions.truing(ctx.db, ctx.rifle ? ctx.rifle.id : null);
                         }
                     }
                 }
             ],
-            loadsList: true,
-            strip: stripAmmo
+            strip: stripTruing
         },
 
-        verify: {
-            key: 'verify',
-            icon: 'cat-verify',
-            title: 'Verify equipment',
-            desc: 'Scope tracking, suppressor shift, lot drift',
-            registryTools: ['scopeTruth', 'chrono'],
+        scopetrack: {
+            key: 'scopetrack',
+            icon: 'job-scopetrack',
+            title: 'Scope Tracking',
+            desc: 'Verify your clicks are true',
+            registryTools: ['scopeTracking'],
             tools: [
                 {
                     id: 'scope-check',
                     title: 'Verify scope tracking',
-                    sub: 'Most scopes are 2–5% off, silently',
-                    gate: function () { return toolVisible('scopeTruth'); },
-                    dormantKey: 'scopeTruth',
+                    sub: 'Most scopes are 2–5% off, silently — 10 minutes at 100',
+                    gate: function () { return toolVisible('scopeTracking'); },
+                    dormantKey: 'scopeTracking',
                     launch: function (ctx) {
                         if (typeof ScopeCheck !== 'undefined') {
-                            ScopeCheck.start(ctx.db, function () { show('verify', ctx.rifle && ctx.rifle.id); });
+                            ScopeCheck.start(ctx.db, function () { show('scopetrack', ctx.rifle && ctx.rifle.id); });
                         }
                     }
+                },
+                {
+                    id: 'tall-target-pdf',
+                    title: 'Print the tall target',
+                    sub: 'Plumb line, known spacing — the test target',
+                    gate: function () {
+                        return toolVisible('scopeTracking') && typeof TargetPDF !== 'undefined' &&
+                            !!TargetPDF.tallTarget;
+                    },
+                    launch: function () { TargetPDF.tallTarget(); }
                 }
             ],
-            configToggle: true, // Bare/Suppressed acts in place
-            strip: stripVerify
+            strip: stripScopeTrack
         },
 
         records: {
             key: 'records',
-            icon: 'cat-records',
-            title: 'Records & proof',
-            desc: 'History, reports, certificates',
+            icon: 'job-records',
+            title: 'Data & Records',
+            desc: 'History, dashboards, reports, proof',
             registryTools: [],
             tools: [
                 {
@@ -302,7 +353,10 @@ var Categories = (function () {
         }
     };
 
-    var KEYS = ['check', 'shoot', 'ammo', 'verify', 'records'];
+    // Home order per contract §1.2 (Rifles lives in the tab bar).
+    // loaddev is tier-hidden in v1; truing/steel full loggers appear as
+    // their modules land — hasActiveTools() hides empty jobs automatically.
+    var KEYS = ['range', 'steel', 'loaddev', 'ballistics', 'truing', 'scopetrack', 'records'];
 
     /* ── visibility (Home hides toolless categories) ──────── */
 
@@ -494,9 +548,6 @@ var Categories = (function () {
             name: ctx.rifle.name || 'Rifle',
             sub: chipSub.join(' · ')
         });
-        if (def.key === 'ammo') {
-            html += '<p class="cat-note">Chrono import is rifle-aware on its own — this chip only scopes the lists below.</p>';
-        }
 
         // Tools
         var tools = visibleTools(def.key);
@@ -818,46 +869,47 @@ var Categories = (function () {
         });
     }
 
-    /** AMMO: ★ Match load + lot status. */
-    function stripAmmo(el, ctx) {
-        Promise.all([
-            ctx.db.getSessionsByRifle(ctx.rifle.id).catch(function () { return []; }),
-            ctx.db.getVelocityStringsByRifle(ctx.rifle.id).catch(function () { return []; })
-        ]).then(function (res) {
-            if (!el || !el.isConnected) return;
-            var rows = [];
-            var agg = typeof aggregateRifle === 'function'
-                ? aggregateRifle({ sessions: res[0], strings: res[1], loads: ctx.loads })
-                : null;
-            if (agg && agg.recommendedLoadId) {
-                var name = '';
-                ctx.loads.forEach(function (l) { if (l.id === agg.recommendedLoadId) name = l.name; });
-                var row = null;
-                (agg.loads || []).forEach(function (r) { if (r.loadId === agg.recommendedLoadId) row = r; });
-                var bits = [];
-                if (row && row.bestGroupMOA != null) bits.push(formatFixed(row.bestGroupMOA, 2) + ' MOA');
-                if (row && row.stats && row.stats.sd != null) bits.push('SD ' + formatFixed(row.stats.sd, 1));
-                rows.push({ title: '★ Match load: ' + UI.esc(name), sub: UI.esc(bits.join(' · ') || 'Best proven load') });
-            } else {
-                rows.push({ title: '★ Match load', sub: 'Shoot groups with your loads and Proven picks the winner' });
-            }
-            var drifts = typeof lotDrift === 'function' ? lotDrift(res[1] || []) : [];
-            if (drifts.length) {
-                var a = drifts[0];
-                rows.push({
-                    title: 'Lot status',
-                    sub: 'Lot ' + UI.esc(a.newLot) + ' runs ' + Math.abs(a.deltaFps) + ' fps ' +
-                        (a.deltaFps > 0 ? 'faster' : 'slower') + ' than ' + UI.esc(a.prevLot)
-                });
-            } else {
-                rows.push({ title: 'Lot status', sub: 'No lot drift detected' });
-            }
-            el.innerHTML = stripRows(rows);
-        });
+    /** STEEL: effective range by position · wind-call insight. */
+    function stripSteel(el, ctx) {
+        ctx.db.getFieldShotsByRifle(ctx.rifle.id).catch(function () { return []; })
+            .then(function (shots) {
+                if (!el || !el.isConnected) return;
+                shots = shots || [];
+                var rows = [];
+                if (shots.length && typeof FieldCore !== 'undefined') {
+                    var eff = FieldCore.computeEffectiveRange(shots);
+                    var positions = Object.keys(eff);
+                    if (positions.length) {
+                        var bits = positions.map(function (p) {
+                            return UI.esc(p) + ' ' + Number(eff[p].yards).toLocaleString();
+                        });
+                        rows.push({ title: 'Effective range', sub: '90% on ' + FieldCore.VITALS_IN + '&Prime;: ' + bits.join(' · ') });
+                    } else {
+                        rows.push({ title: 'Effective range', sub: shots.length + ' strings logged — needs more per distance' });
+                    }
+                    var insight = FieldCore.windInsight(
+                        FieldCore.analyzeWindCalls(shots),
+                        ctx.rifle.angleUnit || undefined
+                    );
+                    if (insight) rows.push({ title: 'Wind calls', sub: UI.esc(insight) });
+                } else {
+                    rows.push({ title: 'Effective range', sub: 'Log steel strings and this fills itself' });
+                }
+                el.innerHTML = stripRows(rows);
+            });
     }
 
-    /** VERIFY: correction factor + verified date · measured config shift. */
-    function stripVerify(el, ctx) {
+    /** TRUING: the three prerequisites, from the Calibration Status card. */
+    function stripTruing(el, ctx) {
+        if (typeof CalibrationStatusCard === 'undefined' || !CalibrationStatusCard) {
+            el.innerHTML = '';
+            return;
+        }
+        CalibrationStatusCard.render(el, ctx.db, ctx.rifle);
+    }
+
+    /** SCOPE TRACKING: correction factor + verified date. */
+    function stripScopeTrack(el, ctx) {
         var rifle = ctx.rifle;
         var rows = [];
         var factor = rifle.scopeCorrectionFactor;
@@ -873,43 +925,12 @@ var Categories = (function () {
                     (when ? ' · verified ' + UI.esc(when) : '')
             });
         } else {
-            rows.push({ title: 'Scope tracking', sub: 'Never verified' });
+            rows.push({
+                title: 'Scope tracking',
+                sub: 'Never verified — a 4% turret error pollutes every dialed solution'
+            });
         }
-
-        Promise.all([
-            ctx.db.getSessionsByRifle(rifle.id).catch(function () { return []; }),
-            ctx.db.getVelocityStringsByRifle(rifle.id).catch(function () { return []; })
-        ]).then(function (res) {
-            if (!el || !el.isConnected) return;
-            if (rifle.hasConfigs) {
-                var shift = typeof configShift === 'function' ? configShift(res[0], res[1]) : null;
-                if (shift && shift.poi) {
-                    var parts = [];
-                    var e = shift.poi.elevMOA, w = shift.poi.windMOA;
-                    if (Math.abs(e) >= 0.1) parts.push(formatFixed(Math.abs(e), 1) + ' MOA ' + (e > 0 ? 'high' : 'low'));
-                    if (Math.abs(w) >= 0.1) parts.push(formatFixed(Math.abs(w), 1) + ' MOA ' + (w > 0 ? 'right' : 'left'));
-                    if (shift.velocityDelta !== null && Math.abs(shift.velocityDelta) >= 5) {
-                        parts.push(Math.abs(Math.round(shift.velocityDelta)) + ' fps ' + (shift.velocityDelta > 0 ? 'faster' : 'slower'));
-                    }
-                    rows.push({
-                        title: 'Suppressor shift',
-                        sub: parts.length ? 'Can ON: ' + UI.esc(parts.join(', ')) + ' — accounted for' : 'No meaningful shift measured'
-                    });
-                } else {
-                    rows.push({ title: 'Suppressor shift', sub: 'Shoot tagged sessions in both states to measure it' });
-                }
-            }
-            var drifts = typeof lotDrift === 'function' ? lotDrift(res[1] || []) : [];
-            if (drifts.length) {
-                var a = drifts[0];
-                rows.push({
-                    title: 'Lot drift',
-                    sub: 'Lot ' + UI.esc(a.newLot) + ' runs ' + Math.abs(a.deltaFps) + ' fps ' +
-                        (a.deltaFps > 0 ? 'faster' : 'slower') + ' — confirm zero'
-                });
-            }
-            el.innerHTML = stripRows(rows);
-        });
+        el.innerHTML = stripRows(rows);
     }
 
     /** RECORDS: rounds total/since-cleaning (editable) · best group. */

@@ -1173,3 +1173,148 @@ BallisticDB.prototype.deleteSuppressor = function (id) {
             if (res.error) throw res.error;
         });
 };
+
+// ── Calibration event CRUD (§2.10 — append-only, Part 0.6 #2) ──
+
+BallisticDB.prototype.addZeroEvent = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        loadId: data.loadId || null,
+        sessionId: data.sessionId || null,
+        date: data.date || new Date().toISOString(),
+        distanceYards: typeof data.distanceYards === 'number' ? data.distanceYards : null,
+        shotCount: typeof data.shotCount === 'number' ? data.shotCount : null,
+        groupData: data.groupData || null,
+        suppressorId: data.suppressorId || null,
+        lotNumber: data.lotNumber || null,
+        source: data.source || 'session',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('zero_events').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getZeroEventsByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('zero_events').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.addMvMeasurement = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        loadId: data.loadId || null,
+        velocityStringId: data.velocityStringId || null,
+        date: data.date || new Date().toISOString(),
+        value: data.value,
+        sd: typeof data.sd === 'number' ? data.sd : null,
+        es: typeof data.es === 'number' ? data.es : null,
+        shotCount: typeof data.shotCount === 'number' ? data.shotCount : null,
+        lotNumber: data.lotNumber || null,
+        suppressorId: data.suppressorId || null,
+        source: data.source || 'manual',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('mv_measurements').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getMvMeasurementsByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('mv_measurements').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.addTrackingVerification = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        date: data.date || new Date().toISOString(),
+        factor: data.factor,
+        clickValue: typeof data.clickValue === 'number' ? data.clickValue : null,
+        cantWarn: typeof data.cantWarn === 'boolean' ? data.cantWarn : null,
+        method: data.method || 'tall-target',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('tracking_verifications').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getTrackingVerificationsByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('tracking_verifications').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('date', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+// ── Truing event CRUD (§2.5 — append-only) ────────────────────
+
+BallisticDB.prototype.addTruingEvent = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        loadId: data.loadId || null,
+        mode: data.mode,
+        stage: data.stage,
+        close: data.close || null,
+        far: data.far || null,
+        inputs: data.inputs || null,
+        ledger: data.ledger || null,
+        supersonicPct: typeof data.supersonicPct === 'number' ? data.supersonicPct : null,
+        correctionType: data.correctionType,
+        oldValue: typeof data.oldValue === 'number' ? data.oldValue : null,
+        newValue: typeof data.newValue === 'number' ? data.newValue : null,
+        confidence: data.confidence || null,
+        appliedAt: data.appliedAt || new Date().toISOString(),
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('truing_events').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+BallisticDB.prototype.getTruingEventsByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('truing_events').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('applied_at', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
