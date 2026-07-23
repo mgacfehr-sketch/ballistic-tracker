@@ -63,6 +63,54 @@ velocity-stats 117). Service worker at CACHE_VERSION 97.
 
 ---
 
+## Step 2 — REORG-migrations.sql
+
+One additive, fully re-runnable migrations file at repo root, in the WAVES style
+(guarded policies, `IF NOT EXISTS` everywhere, per-user RLS + `(user_id, rifle_id)`
+indexes). Owner reviews externally and runs it once; everything after this step is
+built assuming it ran. Blocks:
+
+- **R0** — `updated_at` columns + a shared `set_updated_at()` trigger on every
+  table the offline queue can write (sessions, velocity_strings, field_shots,
+  dope_entries, cold_bore_shots, zero_records, scope_adjustments, cleaning_logs,
+  loads, barrels). Server-side stamp; sync conflict rule does NOT compare it
+  (client wins unconditionally) — it's audit/analytics plumbing.
+- **R1** — `suppressors` library table + nullable `suppressor_id` FK on sessions,
+  velocity_strings, zero_records, cold_bore_shots, field_shots
+  (`ON DELETE SET NULL` — deleting a can never deletes shooting records). Legacy
+  two-state config columns remain for back-compat, superseded in UI.
+- **R2** — `sessions.lot_number`. Environment provenance rides inside the existing
+  `sessions.weather` jsonb as a `source` field — documented, no new column.
+- **R3** — `steel_strings` + `steel_shots` (per-shot rows: impact offsets, sticky
+  holds, optional MV + source, gust override; string-level wind jsonb,
+  direction-of-fire + source, environment jsonb, tier, lot, suppressor).
+  **Judgment call:** new tables rather than extending `field_shots` — field_shots
+  stays as the legacy string-level hit/miss aggregate so casual logging and
+  effective-range math keep working unchanged.
+- **R4** — append-only calibration events: `zero_events`, `mv_measurements`,
+  `tracking_verifications`. Rifle/load columns become cached "current" values;
+  the status card derives from events.
+- **R5** — append-only `truing_events` (mode, stage, close/far jsonb, inputs,
+  normalization `ledger` jsonb, supersonic_pct, correction old→new, confidence).
+  **Judgment call:** derived current trued values live on **loads**
+  (`trued_bc`, `trued_mv`, `trued_event_id`, `trued_at`) because bc/mv already
+  live there and a load row IS the rifle+load pair.
+- **R6** — `certificate_transfers` (single-use token, rifle_snapshot jsonb,
+  minted/redeemed). **Clients have SELECT-only visibility of their own transfers;
+  no INSERT/UPDATE policies exist** — mint/redeem happens exclusively through the
+  server endpoint using the service role (never-trust-the-client rule). Rifles
+  gain provenance columns (`origin`, `certified_by`, `certified_at`, `transfer_id`).
+- **R7** — `ai_conversations` + `ai_usage_logs` brought into schema-as-code
+  (no-op CREATE IF NOT EXISTS on the live DB) with RLS + a `(user_id, created_at)`
+  index ready for the deferred daily-cap check. The known `estimated_cost` vs
+  `cost` column mismatch is neutralized by guarded ADD COLUMNs for both.
+- **Documented no-schema decisions:** per-rifle units reuses `rifles.angle_unit`
+  with new permitted value `'IN'`; recipe jsonb shape extended in-place with
+  CBTO/neck/trim/crimp (Tier-3 seam); new user_settings keys; crowd-capture
+  compatibility of all new tables; steel photo Storage path.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 Everything that needs Mitch, batched. Nothing in the build proceeds in Supabase
@@ -74,10 +122,12 @@ Flag anything you disagree with — the standing judgment call to note: db.js ge
 additive-only new methods (new tables' CRUD + `flushQueuedRow`), existing methods
 untouched.
 
-### 2. Review + run REORG-migrations.sql  *(pending — written at Step 2)*
-Review externally first; nothing proceeds in Supabase without that. Then run it
-once in the Supabase SQL Editor (Dashboard → SQL Editor → New query → paste →
-Run). It is additive-only and safely re-runnable.
+### 2. Review + run REORG-migrations.sql  *(READY — written at Step 2)*
+Review `REORG-migrations.sql` externally first; nothing proceeds in Supabase
+without that. Then run it once in the Supabase SQL Editor (Dashboard → SQL
+Editor → New query → paste the whole file → Run). It is additive-only and safely
+re-runnable — running it twice is harmless. The app is built assuming it ran;
+new features will show empty states (not errors) until it has.
 
 ### 3. Truing-engine review notes  *(pending — written at Step 7)*
 Key functions, test results, and judgment calls for js/truing-core.js.
