@@ -104,6 +104,36 @@ pure and immutable; the card will persist the map under a `user_settings` key
 
 ---
 
+## Step 3 — Rifle-first onboarding (§1.5)
+
+`onboarding.js`: the feature checklist is gone. The first-run wizard (def
+version 2 → 3; stale persisted state resets cleanly per WizardCore.hydrate) is
+now: (1) **Add your rifle** — name + cartridge only, "add details later";
+(2) **Your bullet & box velocity** — ammo name, bullet weight, BC + G1/G7,
+box velocity, with ammo-box OCR as an inline capture method and a "Skip for
+now" escape; (3) the unchanged suppressor question (add-a-can sheet on yes).
+On complete: rifle + load created, all doors activated by default
+(rangeSession/steelSession/ballistics; records/truing/scopeTracking are core),
+`Recents.touchRifle` points the card at the new rifle, and the user LANDS ON
+THE CARD — "Proven to 0 yards · Estimated", next-action lit. Certificate/
+transfer deep links still override first-run entirely.
+
+`FirstRifleFlow.start(db)` (global) runs the same wizard from the Home card's
+empty state — not just first run. Headless proof: both custom steps render
+(progress ticks, one question per screen).
+
+### Judgment calls (step 3)
+- Load step requires only the ammo NAME; weight/BC/velocity are validated
+  when present but optional — the next-action ladder catches gaps honestly
+  ("Add your load & box velocity" only fires when no load has a BC; rung 3
+  covers missing MV). Skip-for-now submits a sentinel and creates no load.
+- Drag model defaults to G7 (modern match bullets); OCR prefill can flip it.
+- Rifle create failure (offline first-run, no cached write path for rifles)
+  logs a console warning and still completes onboarding rather than stranding
+  the wizard — the Home card's empty state offers the same flow again.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`
