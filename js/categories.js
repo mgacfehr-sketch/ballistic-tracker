@@ -210,6 +210,18 @@ var Categories = (function () {
                     sub: 'Grade your calls, learn your bias',
                     gate: function () { return featureOn('windCall'); },
                     launch: function () { if (window.AppNav) AppNav.go('wind'); }
+                },
+                {
+                    id: 'true-rifle',
+                    title: 'True this rifle',
+                    sub: 'Make solutions match reality',
+                    utility: true, // v2.4 §1.3/§1.4: truing's door lives here as a gold utility
+                    gate: function () { return typeof TruingJob !== 'undefined'; },
+                    launch: function (ctx) {
+                        if (window.ToolActions && ToolActions.truing) {
+                            ToolActions.truing(ctx.db, ctx.rifle ? ctx.rifle.id : null);
+                        }
+                    }
                 }
             ],
             strip: stripShoot

@@ -326,13 +326,11 @@ var CalibrationStatusCard = (typeof document !== 'undefined') ? (function () {
     };
 
     /**
-     * Gather events + verdict, derive, render.
-     * opts: { onConfirmZero? } — extra affordances live with the caller.
+     * Gather events + verdict and derive the status — NO rendering.
+     * The Home rifle card (v2.4 §1.1) and this card both consume it.
+     * → Promise<{status, loads, load}>
      */
-    function render(el, db, rifle, opts) {
-        opts = opts || {};
-        if (!el || !db || !rifle) return Promise.resolve(null);
-
+    function gather(db, rifle) {
         function safe(p) { return p.catch(function () { return []; }); }
         var pVerdict = (typeof Readiness !== 'undefined')
             ? Readiness.assess(db, rifle).catch(function () { return null; })
@@ -347,7 +345,6 @@ var CalibrationStatusCard = (typeof document !== 'undefined') ? (function () {
             safe(db.getTruingEventsByRifle(rifle.id)),
             pVerdict
         ]).then(function (res) {
-            if (!el.isConnected) return null;
             var loads = res[0] || [];
             var load = null;
             loads.forEach(function (l) { if (!load && l.truedMv) load = l; });
@@ -366,10 +363,28 @@ var CalibrationStatusCard = (typeof document !== 'undefined') ? (function () {
                 trackingVerifications: res[4],
                 truingEvents: res[5]
             });
+            return { status: status, loads: loads, load: load };
+        });
+    }
 
-            el.innerHTML = _cardHtml(status);
-            _bind(el, status);
-            return status;
+    /** Status only (the common consumer shape). */
+    function getStatus(db, rifle) {
+        if (!db || !rifle) return Promise.resolve(null);
+        return gather(db, rifle).then(function (g) { return g.status; });
+    }
+
+    /**
+     * Gather events + verdict, derive, render.
+     * opts: { onConfirmZero? } — extra affordances live with the caller.
+     */
+    function render(el, db, rifle, opts) {
+        opts = opts || {};
+        if (!el || !db || !rifle) return Promise.resolve(null);
+        return gather(db, rifle).then(function (g) {
+            if (!el.isConnected) return null;
+            el.innerHTML = _cardHtml(g.status);
+            _bind(el, g.status);
+            return g.status;
         });
     }
 
@@ -422,7 +437,13 @@ var CalibrationStatusCard = (typeof document !== 'undefined') ? (function () {
         }
     }
 
-    function _openSheet(sheet, element) {
+    /**
+     * The what/why sheet. opts (all optional):
+     *   actionLabel + onAction — a gold action button above Close
+     *   (v2.4 §1.1: the card's segments deep-link into their flow).
+     */
+    function _openSheet(sheet, element, opts) {
+        opts = opts || {};
         var overlay = document.createElement('div');
         overlay.className = 'overlay';
         overlay.innerHTML =
@@ -432,13 +453,25 @@ var CalibrationStatusCard = (typeof document !== 'undefined') ? (function () {
             '<p class="overlay-text">' + UI.esc(sheet.what) + '</p>' +
             '<p class="overlay-text">' + UI.esc(sheet.why) + '</p>' +
             '<p class="overlay-text u-gold">' + UI.esc(sheet.unlock) + '</p>' +
-            '<button class="btn u-full" id="cal-sheet-close">Close</button>' +
+            (opts.actionLabel && opts.onAction
+                ? '<button class="btn-primary u-full" id="cal-sheet-action">' + UI.esc(opts.actionLabel) + '</button>'
+                : '') +
+            '<button class="btn u-full u-mt-10" id="cal-sheet-close">Close</button>' +
             '</div>';
         document.body.appendChild(overlay);
         function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
         overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
         overlay.querySelector('#cal-sheet-close').addEventListener('click', close);
+        var act = overlay.querySelector('#cal-sheet-action');
+        if (act) act.addEventListener('click', function () { close(); opts.onAction(); });
     }
 
-    return { render: render };
+    /** Public sheet entry for the Home card's segment taps. */
+    function openSheet(key, element, opts) {
+        var sheet = SHEETS[key];
+        if (!sheet || !element) return;
+        _openSheet(sheet, element, opts);
+    }
+
+    return { render: render, getStatus: getStatus, gather: gather, openSheet: openSheet };
 })() : null;

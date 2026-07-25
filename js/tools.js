@@ -34,7 +34,8 @@ var TOOLS = {
     steelSession: {
         key: 'steelSession', core: false, feature: null,
         label: 'Steel/Field Session',
-        desc: 'Log hits at distance — casual or full'
+        desc: 'Log hits at distance — casual or full',
+        defaultOn: true // v2.4 §1.5: all four doors on by default
     },
     loadDev: {
         key: 'loadDev', core: false, feature: 'loadDevelopment', // tier-hidden in v1 (Part 0.5)
@@ -44,15 +45,20 @@ var TOOLS = {
     ballistics: {
         key: 'ballistics', core: false, feature: null,
         label: 'Ballistics',
-        desc: 'Firing solution & DOPE cards'
+        desc: 'Firing solution & DOPE cards',
+        defaultOn: true // v2.4 §1.5
     },
+    // v2.4 §1.3: truing and scope tracking lose their doors. They are
+    // CORE — always available, launched contextually (next-action, the
+    // card's segments, steel-session save, the Ballistics utility) —
+    // never toggleable, never a Home door.
     truing: {
-        key: 'truing', core: false, feature: null,
+        key: 'truing', core: true, feature: null,
         label: 'Truing',
         desc: 'Make solutions match reality'
     },
     scopeTracking: {
-        key: 'scopeTracking', core: false, feature: null,
+        key: 'scopeTracking', core: true, feature: null,
         label: 'Scope Tracking',
         desc: 'Verify your clicks are true'
     },
@@ -79,9 +85,10 @@ var LEGACY_ALIASES = {
     bench: 'loadDev'
 };
 
-/** The onboarding checklist rows (order shown to the user). Data &
- *  Records is core and never asked. loadDev is tier-hidden in v1. */
-var CHECKLIST_JOBS = ['rangeSession', 'steelSession', 'ballistics', 'truing', 'scopeTracking'];
+/** The "More tools" rows (door visibility). Data & Records, Truing,
+ *  and Scope Tracking are core and never asked. loadDev is tier-hidden
+ *  in v1. All three doors default on (v2.4 §1.5). */
+var CHECKLIST_JOBS = ['rangeSession', 'steelSession', 'ballistics'];
 
 // ── Pure core ─────────────────────────────────────────────────
 

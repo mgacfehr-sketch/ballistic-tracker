@@ -55,6 +55,55 @@ pure and immutable; the card will persist the map under a `user_settings` key
 
 ---
 
+## Step 2 — Card-first Home (§1.1–§1.4 partial)
+
+`home.js` rebuilt: brand bar → THE RIFLE CARD → four compact doors → Recent.
+- **The card:** name + cartridge/load line; "PROVEN TO ___ YARDS" (68px mono,
+  gold accents) from the Calibration Status rollup (`calibratedToYd`, 0 when
+  none); confidence word under it (rollup word; "Estimated" when proven-to-0);
+  4-segment strip (Zero · MV · Trued · Tracking — filled gold when proven,
+  caution-tinted when stale/thin/flagged); THE NEXT ACTION button (title,
+  detail, gold payoff line) + quiet "Not now"; arrows + horizontal swipe +
+  dots between rifles (starts at last-used; swiping updates last-used).
+- **Segments deep-link:** tap → the existing what/why sheet, now with a gold
+  action button (Confirm zero / Import chrono data / True this rifle / Verify
+  tracking). This is Scope Tracking's and Truing's card-side front door.
+- `calibration-status.js` (additive): `gather()`/`getStatus()` extracted from
+  `render()` (derive without rendering — the card consumes it); `openSheet()`
+  exposed with optional action button. Derivation logic untouched (60 tests
+  still green).
+- **Next-action gathering:** dismissals live in `user_settings`
+  `next_action_dismissals` as `{rifleId: {suggestionId: iso}}` (no schema);
+  distance strings only queried when untrued (bounded to 5 most recent full
+  strings, ≥3 shots); prescription distance via `prescribeTruingDistances`
+  guarded try/catch.
+- **tools.js:** truing + scopeTracking → `core: true` (always available, no
+  door, never toggleable); CHECKLIST_JOBS → rangeSession/steelSession/
+  ballistics, all `defaultOn` (§1.5). test-foundation expectation for v1
+  migration updated to match the new doctrine (count unchanged).
+- **Doors:** HOME_DOOR_KEYS = range/steel/ballistics/records as compact
+  `.door` rows; "+ More tools" kept ("Your doors"). Ballistics gains a
+  "True this rifle" row (flagged `utility: true` for step 5's restyle).
+- New CSS in ui.css (`.rifle-card`, `.rc-*`, `.door`), one new token
+  `--gold-on-brand` (payoff-on-ink) in tokens.css — no hardcoded hex outside
+  tokens.
+- Headless proof: light mid-state (zero-only → "Measure your muzzle velocity
+  · Extends your proven range to ~1,075 yd"), dark all-green ("You're proven
+  to 700 — go shoot"), fresh (add-load) — all render correctly at 390×844.
+
+### Judgment calls (step 2)
+- **Recent strip now renders only when a recent session exists** — the card
+  already IS the recent rifle; repeating it without a session was noise.
+- **Swipe threshold 48px, must be 2× the vertical delta** — protects page
+  scroll on a touch device.
+- **Card's "go shoot" floor** renders as a static (non-tappable) statement,
+  not a button pretending to do something.
+- Paper sessions at distance are NOT counted as truing-ready strings (rung 4)
+  — the v2.3 truing flow consumes steel full-tier strings; offering paper data
+  it can't ingest would be a lie. Steel-at-distance is the honest trigger.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`

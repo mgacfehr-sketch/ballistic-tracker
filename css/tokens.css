@@ -65,6 +65,8 @@
    the single overlay shadow, and canvas marker conventions.
    These are the ONLY additions — everything else is verbatim. */
 :root, [data-theme="light"] {
+    /* gold legible on a brand-primary (ink) surface — the next-action payoff */
+    --gold-on-brand: #E8D9A8;
     --overlay-scrim: rgba(22, 24, 27, 0.45);
     --shadow-overlay: 0 16px 48px rgba(22, 24, 27, 0.22);
     --canvas-pill: rgba(255, 255, 255, 0.88);
@@ -72,6 +74,8 @@
     --select-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A4E54' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9.5 12 15.5 18 9.5'/></svg>");
 }
 [data-theme="dark"] {
+    /* dark brand-primary is brass — dark text carries; payoff matches */
+    --gold-on-brand: #171105;
     --overlay-scrim: rgba(0, 0, 0, 0.6);
     --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.5);
     --canvas-pill: rgba(13, 15, 18, 0.82);

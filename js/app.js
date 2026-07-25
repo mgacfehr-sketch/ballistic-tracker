@@ -290,6 +290,8 @@
                     home: homeManager
                 });
             }
+            // The rifle card's deep links (v2.4 §1.1) share the same managers
+            homeManager.managers = { profile: profileManager, history: historyManager };
 
             // Launch seams the category screens use ─────────────
             // SessionLaunch: enter the session flow against a known

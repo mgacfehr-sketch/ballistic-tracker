@@ -73,7 +73,7 @@ var v1saved = { v: 1, tools: {
 var migrated = ToolsCore.hydrate(v1saved);
 check('v1 field migrates to steelSession', ToolsCore.isActive(TOOLS.steelSession, migrated), true);
 check('v1 scopeTruth migrates to scopeTracking', ToolsCore.isActive(TOOLS.scopeTracking, migrated), true);
-check('v1 inactive entries stay off (truing untouched)', ToolsCore.isActive(TOOLS.truing, migrated), false);
+check('truing is core in v2.4 — active regardless of v1 map', ToolsCore.isActive(TOOLS.truing, migrated), true);
 check('v1 users always get rangeSession (was core)', ToolsCore.isActive(TOOLS.rangeSession, migrated), true);
 check('v1 users always get ballistics (was core)', ToolsCore.isActive(TOOLS.ballistics, migrated), true);
 check('v1 migration preserves original timestamp', migrated.steelSession.at, '2026-07-01T00:00:00Z');
