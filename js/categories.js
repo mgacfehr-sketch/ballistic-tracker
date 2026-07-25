@@ -671,7 +671,7 @@ var Categories = (function () {
                     close();
                     if (typeof SteelSession !== 'undefined') {
                         SteelSession.pairChrono(ctx.db, st, function () {
-                            showSteelHistory(ctx);
+                            showUnifiedHistory(ctx, 'steel');
                         });
                     }
                 });

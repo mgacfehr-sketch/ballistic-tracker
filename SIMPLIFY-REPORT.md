@@ -298,6 +298,22 @@ appeared in docs/mockups — see OWNER REVIEW QUEUE #1).
 
 ---
 
+## Step 8 — Polish
+
+- Fixed a stray call to the retired `showSteelHistory` in the steel-string
+  sheet's chrono-pairing callback (now returns to unified History, Steel chip).
+- Hex gate: zero hardcoded colors in ui.css outside `var()` (the one new
+  color this build, `--gold-on-brand`, lives in tokens.css).
+- Emoji gate: clean — the ★ "Match" chip glyph is the established v2.3
+  dingbat convention, not an emoji.
+- Dark theme verified on the reworked screens (Home card, Data & Records,
+  onboarding); light verified throughout the build.
+- Confirmed non-goals intact: nav tabs unchanged, no Ask yorT/crowd/Tier-3
+  changes, nothing deleted from disk or DB, dope-log module + field_shots
+  data readable.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`
