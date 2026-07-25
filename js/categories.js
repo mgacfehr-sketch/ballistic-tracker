@@ -76,13 +76,8 @@ var Categories = (function () {
                     gate: function () { return toolVisible('rangeSession'); },
                     launch: function (ctx) { launchSession(ctx.rifle, false); }
                 },
-                {
-                    id: 'quick-mode',
-                    title: 'Quick Mode',
-                    sub: 'Just measure a group — no profile, nothing saved to a rifle',
-                    gate: function () { return toolVisible('rangeSession'); },
-                    launch: function () { launchSession(null, true); }
-                },
+                // v2.4 §2.1: Quick Mode merged into Range Session — the
+                // "Just measure this group" escape lives at session entry.
                 {
                     id: 'import-chrono',
                     title: 'Import chrono data',
@@ -121,18 +116,9 @@ var Categories = (function () {
                         }
                     }
                 },
-                {
-                    id: 'field-log',
-                    title: 'Quick hit tally',
-                    sub: '"7 of 10 at 600, prone" — builds your effective range',
-                    gate: function () { return toolVisible('steelSession'); },
-                    dormantKey: 'steelSession',
-                    launch: function (ctx) {
-                        if (window.ToolActions && ToolActions.fieldLog) {
-                            ToolActions.fieldLog(ctx.db, ctx.rifle ? ctx.rifle.id : null);
-                        }
-                    }
-                }
+                // v2.4 §2.3: the legacy quick hit tally is retired — Steel
+                // casual is the one casual logger. field_shots data stays
+                // readable (effective range + history keep consuming it).
             ],
             strip: stripSteel
         },
@@ -181,12 +167,13 @@ var Categories = (function () {
                     gate: function () { return toolVisible('ballistics'); },
                     launch: function () { if (window.AppNav) AppNav.go('solver'); }
                 },
+                // §2.7: DOPE cards + Device Export grouped (not merged)
                 {
                     id: 'dope-card',
                     title: 'Print a DOPE card',
                     sub: 'Range card for your pocket or stock',
+                    section: 'Take it with you',
                     gate: function () { return toolVisible('ballistics'); },
-                    dormantKey: 'ballistics',
                     launch: function (ctx) {
                         if (window.ToolActions && ToolActions.dopeCards) ToolActions.dopeCards(ctx.db);
                     }
@@ -195,6 +182,7 @@ var Categories = (function () {
                     id: 'device-export',
                     title: 'Device export',
                     sub: 'Compensated BC + MV for your rangefinder or Kestrel',
+                    section: 'Take it with you',
                     gate: function () {
                         return toolVisible('ballistics') && typeof DeviceExport !== 'undefined';
                     },
@@ -304,55 +292,14 @@ var Categories = (function () {
             registryTools: [],
             statusCard: true, // Calibration Status card at the top (§2.7)
             tools: [
+                // v2.4 §2.5: ONE history screen with filter chips replaces
+                // the five separate lists. Entries keep their detail views.
                 {
-                    id: 'session-history',
-                    title: 'Session history',
-                    sub: 'Every group, every verdict',
+                    id: 'history',
+                    title: 'History',
+                    sub: 'Sessions · Steel · Truing · Maintenance',
                     gate: function () { return true; },
-                    launch: function (ctx) {
-                        if (_managers.history && ctx.rifle) {
-                            if (window.AppNav) AppNav.go('profiles');
-                            _managers.history.showSessionList(ctx.rifle.id);
-                        }
-                    }
-                },
-                {
-                    id: 'steel-history',
-                    title: 'Steel history',
-                    sub: 'Strings at distance — pair chrono data here',
-                    gate: function () { return typeof SteelSession !== 'undefined'; },
-                    launch: function (ctx) { showSteelHistory(ctx); }
-                },
-                {
-                    id: 'truing-history',
-                    title: 'Truing history',
-                    sub: 'Every correction, append-only — nothing erased',
-                    gate: function () { return typeof TruingJob !== 'undefined'; },
-                    launch: function (ctx) { showTruingHistory(ctx); }
-                },
-                {
-                    id: 'cleaning-log',
-                    title: 'Cleaning log',
-                    sub: 'Rounds between cleanings',
-                    gate: function () { return true; },
-                    launch: function (ctx) {
-                        if (_managers.history && ctx.rifle && ctx.activeBarrel) {
-                            if (window.AppNav) AppNav.go('profiles');
-                            _managers.history.showCleaningLog(ctx.rifle.id, ctx.activeBarrel.id);
-                        }
-                    }
-                },
-                {
-                    id: 'scope-adjustments',
-                    title: 'Scope adjustment log',
-                    sub: 'Every click you have dialed',
-                    gate: function () { return true; },
-                    launch: function (ctx) {
-                        if (_managers.history && ctx.rifle) {
-                            if (window.AppNav) AppNav.go('profiles');
-                            _managers.history.showScopeAdjustments(ctx.rifle.id);
-                        }
-                    }
+                    launch: function (ctx) { showUnifiedHistory(ctx); }
                 },
                 {
                     id: 'cold-bore-log',
@@ -368,40 +315,18 @@ var Categories = (function () {
                     gate: function () { return toolVisible('bench'); },
                     launch: function (ctx) { openLogbook(ctx); }
                 },
+                // v2.4 §2.2: Performance Report + Certificate = one entry
                 {
-                    id: 'performance-report',
-                    title: 'Performance report',
-                    sub: 'Best group, recommended load, the proof',
+                    id: 'report-certificate',
+                    title: 'Report & Certificate',
+                    sub: 'For your records, or proof to share',
                     gate: function () { return featureOn('certificate'); },
-                    launch: function (ctx) {
-                        if (_managers.report && ctx.rifle) {
-                            if (window.AppNav) AppNav.go('profiles');
-                            _managers.report.show(ctx.rifle.id);
-                        }
-                    }
-                },
-                {
-                    id: 'certificate',
-                    title: 'Certificate',
-                    sub: 'Proven by Workhorse',
-                    gate: function () { return featureOn('certificate'); },
-                    launch: function (ctx) { showCertificate(ctx); }
-                },
-                {
-                    id: 'transfer-package',
-                    title: 'Transfer package',
-                    sub: 'One-time code — the rifle arrives in the buyer\'s account knowing itself',
-                    gate: function () {
-                        return featureOn('certificate') && typeof TransferClient !== 'undefined';
-                    },
-                    launch: function (ctx) {
-                        if (ctx.rifle) TransferClient.mintSheet(ctx.db, ctx.rifle);
-                    }
+                    launch: function (ctx) { openReportCertificate(ctx); }
                 },
                 {
                     id: 'export-data',
                     title: 'Export my data',
-                    sub: 'CSV per data type, built on this device — your data is yours',
+                    sub: 'Everything, built on this device — your data is yours',
                     gate: function () { return typeof DataExport !== 'undefined'; },
                     launch: function (ctx) { DataExport.open(ctx.db); }
                 }
@@ -499,7 +424,7 @@ var Categories = (function () {
         _container.innerHTML =
             '<div class="screen">' +
             '<div class="pagehead">' +
-            '<button class="backline" id="cb-back">&lsaquo; Records &amp; proof</button>' +
+            '<button class="backline" id="cb-back">&lsaquo; Data &amp; Records</button>' +
             '<div class="pagetitle">Cold bore &middot; ' + UI.esc(ctx.rifle.name || 'Rifle') + '</div>' +
             '</div>' +
             '<div id="cb-body" class="edge"></div>' +
@@ -511,29 +436,103 @@ var Categories = (function () {
         new ColdBoreManager(_db).renderSection(document.getElementById('cb-body'), ctx.rifle.id, ctx.rifle);
     }
 
-    /** Steel history: strings at distance; chrono pairing lives here. */
-    function showSteelHistory(ctx) {
+    /* ══ v2.4 §2.5: ONE history screen, filter chips ══════════
+     * Sessions · Steel · Truing · Maintenance (cleaning + scope
+     * adjustments interleaved). Entries keep their existing detail
+     * views; the five separate lists are retired. */
+
+    var HISTORY_CHIPS = [
+        { key: 'sessions', label: 'Sessions' },
+        { key: 'steel', label: 'Steel' },
+        { key: 'truing', label: 'Truing' },
+        { key: 'maintenance', label: 'Maintenance' }
+    ];
+
+    function showUnifiedHistory(ctx, chipKey) {
         if (!ctx.rifle || !_container) return;
-        _container.setAttribute('data-screen', 'cat-records-steel');
+        chipKey = chipKey || 'sessions';
+        _container.setAttribute('data-screen', 'cat-records-history');
+
+        var chips = '<div class="segment" id="uh-chips">';
+        HISTORY_CHIPS.forEach(function (c) {
+            chips += '<button data-chip="' + c.key + '"' +
+                (c.key === chipKey ? ' class="on"' : '') + '>' + c.label + '</button>';
+        });
+        chips += '</div>';
+
         _container.innerHTML =
             '<div class="screen">' +
             '<div class="pagehead">' +
-            '<button class="backline" id="sh-back">&lsaquo; Data &amp; Records</button>' +
-            '<div class="pagetitle">Steel history &middot; ' + UI.esc(ctx.rifle.name || 'Rifle') + '</div>' +
+            '<button class="backline" id="uh-back">&lsaquo; Data &amp; Records</button>' +
+            '<div class="pagetitle">History &middot; ' + UI.esc(ctx.rifle.name || 'Rifle') + '</div>' +
             '</div>' +
-            '<div id="sh-body"><div class="card"><div class="rowlink"><div class="txt">' +
+            '<div class="card card-pad" style="margin-bottom:10px">' + chips + '</div>' +
+            '<div id="uh-body"><div class="card"><div class="rowlink"><div class="txt">' +
             '<span class="t-micro">Loading&hellip;</span></div></div></div></div>' +
             '</div>';
-        document.getElementById('sh-back').addEventListener('click', function () {
+
+        document.getElementById('uh-back').addEventListener('click', function () {
             show('records', ctx.rifle.id);
         });
+        document.getElementById('uh-chips').addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('[data-chip]') : null;
+            if (!btn) return;
+            showUnifiedHistory(ctx, btn.getAttribute('data-chip'));
+        });
+
+        var body = document.getElementById('uh-body');
+        if (chipKey === 'sessions') _uhSessions(ctx, body);
+        else if (chipKey === 'steel') _uhSteel(ctx, body);
+        else if (chipKey === 'truing') _uhTruing(ctx, body);
+        else _uhMaintenance(ctx, body);
+    }
+
+    function _uhEmpty(body, text) {
+        body.innerHTML = '<div class="empty-teach"><p>' + text + '</p></div>';
+    }
+
+    function _uhSessions(ctx, body) {
+        ctx.db.getSessionsByRifle(ctx.rifle.id).catch(function () { return []; })
+            .then(function (sessions) {
+                if (!body.isConnected) return;
+                if (!sessions.length) {
+                    _uhEmpty(body, 'Photograph a target from Range Session and it lands here, photo and all.');
+                    return;
+                }
+                sessions.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+                var rows = '';
+                sessions.forEach(function (s) {
+                    var shots = s.impacts ? s.impacts.length : 0;
+                    var moa = s.results && s.results.groupSizeMOA != null
+                        ? formatFixed(s.results.groupSizeMOA, 2) + ' MOA' : '—';
+                    rows += UI.rowlink({
+                        button: true,
+                        title: shots + ' shots · ' + formatNum(s.distanceYards, 0) + ' yd',
+                        sub: (s.date ? new Date(s.date).toLocaleDateString() : '') + ' · ' + moa,
+                        subMono: true,
+                        chev: true,
+                        data: { session: s.id }
+                    });
+                });
+                body.innerHTML = UI.card(rows);
+                var items = body.querySelectorAll('[data-session]');
+                for (var i = 0; i < items.length; i++) {
+                    items[i].addEventListener('click', function () {
+                        if (_managers.history) {
+                            if (window.AppNav) AppNav.go('profiles');
+                            _managers.history.showSessionDetail(this.getAttribute('data-session'), ctx.rifle.id);
+                        }
+                    });
+                }
+            });
+    }
+
+    function _uhSteel(ctx, body) {
         ctx.db.getSteelStringsByRifle(ctx.rifle.id).catch(function () { return []; })
             .then(function (strings) {
-                var body = document.getElementById('sh-body');
-                if (!body || !body.isConnected) return;
+                if (!body.isConnected) return;
                 if (!strings.length) {
-                    body.innerHTML = '<div class="empty-teach"><p>No steel strings yet — ' +
-                        'log one from the Steel/Field Session job.</p></div>';
+                    _uhEmpty(body, 'No steel strings yet — log one from the Steel/Field Session door.');
                     return;
                 }
                 var rows = '';
@@ -562,6 +561,87 @@ var Categories = (function () {
                     });
                 }
             });
+    }
+
+    function _uhTruing(ctx, body) {
+        ctx.db.getTruingEventsByRifle(ctx.rifle.id).catch(function () { return []; })
+            .then(function (events) {
+                if (!body.isConnected) return;
+                if (!events.length) {
+                    _uhEmpty(body, 'Untrued so far — true this rifle and every correction lives here forever.');
+                    return;
+                }
+                var rows = '';
+                events.forEach(function (e) {
+                    var when = e.appliedAt ? new Date(e.appliedAt).toLocaleDateString() : '';
+                    var what = e.correctionType === 'bc'
+                        ? 'BC ' + Number(e.oldValue).toFixed(3) + ' → ' + Number(e.newValue).toFixed(3)
+                        : 'MV ' + Math.round(e.oldValue) + ' → ' + Math.round(e.newValue) + ' fps';
+                    var far = e.far && e.far.rangeYds ? e.far.rangeYds + ' yd' : '';
+                    rows += UI.rowlink({
+                        title: what,
+                        subHtml: '<span class="mono">' + UI.esc([when, e.mode, far,
+                            e.confidence ? 'confidence ' + e.confidence : null]
+                            .filter(Boolean).join(' · ')) + '</span>'
+                    });
+                });
+                body.innerHTML = UI.card(rows);
+            });
+    }
+
+    /** Cleaning + scope adjustments, interleaved by date (§2.5). */
+    function _uhMaintenance(ctx, body) {
+        var pClean = ctx.activeBarrel
+            ? ctx.db.getCleaningLogsByBarrel(ctx.activeBarrel.id).catch(function () { return []; })
+            : Promise.resolve([]);
+        Promise.all([
+            pClean,
+            ctx.db.getScopeAdjustmentsByRifle(ctx.rifle.id).catch(function () { return []; })
+        ]).then(function (res) {
+            if (!body.isConnected) return;
+            var entries = [];
+            (res[0] || []).forEach(function (l) {
+                entries.push({
+                    date: l.date || '',
+                    title: 'Cleaned at ' + Number(l.roundCountAtCleaning || 0).toLocaleString() + ' rounds',
+                    sub: (l.date ? new Date(l.date).toLocaleDateString() : '') +
+                        (l.notes ? ' — ' + l.notes : '')
+                });
+            });
+            (res[1] || []).forEach(function (a) {
+                var elevDir = a.elevationChange >= 0 ? 'UP' : 'DOWN';
+                var windDir = a.windageChange >= 0 ? 'RIGHT' : 'LEFT';
+                entries.push({
+                    date: a.date || '',
+                    title: 'Scope: ' + formatFixed(Math.abs(a.elevationChange || 0), 2) + ' ' + elevDir +
+                        ' · ' + formatFixed(Math.abs(a.windageChange || 0), 2) + ' ' + windDir,
+                    sub: (a.date ? new Date(a.date).toLocaleDateString() : '') +
+                        (a.reason ? ' — ' + a.reason : '')
+                });
+            });
+            entries.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+
+            var html = '';
+            if (!entries.length) {
+                html = '<div class="empty-teach"><p>Cleanings and scope adjustments will interleave here.</p></div>';
+            } else {
+                var rows = '';
+                entries.forEach(function (en) {
+                    rows += UI.rowlink({ title: en.title, sub: en.sub, subMono: true });
+                });
+                html = UI.card(rows);
+            }
+            html += '<button class="action u-full u-mt-10" id="uh-add-adj">Log a scope adjustment</button>';
+            body.innerHTML = html;
+
+            var addBtn = document.getElementById('uh-add-adj');
+            if (addBtn) addBtn.addEventListener('click', function () {
+                if (_managers.history) {
+                    if (window.AppNav) AppNav.go('profiles');
+                    _managers.history.showScopeAdjustmentForm(ctx.rifle.id);
+                }
+            });
+        });
     }
 
     function _steelStringSheet(ctx, st) {
@@ -604,47 +684,63 @@ var Categories = (function () {
             });
     }
 
-    /** Truing history: the append-only event log (§2.5/§2.7). */
-    function showTruingHistory(ctx) {
-        if (!ctx.rifle || !_container) return;
-        _container.setAttribute('data-screen', 'cat-records-truing');
-        _container.innerHTML =
-            '<div class="screen">' +
-            '<div class="pagehead">' +
-            '<button class="backline" id="th-back">&lsaquo; Data &amp; Records</button>' +
-            '<div class="pagetitle">Truing history &middot; ' + UI.esc(ctx.rifle.name || 'Rifle') + '</div>' +
-            '</div>' +
-            '<div id="th-body"><div class="card"><div class="rowlink"><div class="txt">' +
-            '<span class="t-micro">Loading&hellip;</span></div></div></div></div>' +
+    /* ══ v2.4 §2.2: Report & Certificate — one entry, first choice ══ */
+
+    function openReportCertificate(ctx) {
+        if (!ctx.rifle) return;
+        var overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.innerHTML =
+            '<div class="overlay-card">' +
+            '<div class="overlay-title">Report &amp; Certificate</div>' +
+            '<button class="option-row" id="rc-records"><span>For your records' +
+            '<span class="choice-desc">The performance report — best group, recommended load</span></span></button>' +
+            '<button class="option-row" id="rc-proof"><span>Proof to share or transfer' +
+            '<span class="choice-desc">Certificate with QR, or a one-time transfer code</span></span></button>' +
             '</div>';
-        document.getElementById('th-back').addEventListener('click', function () {
-            show('records', ctx.rifle.id);
+        document.body.appendChild(overlay);
+        function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        overlay.querySelector('#rc-records').addEventListener('click', function () {
+            close();
+            if (_managers.report) {
+                if (window.AppNav) AppNav.go('profiles');
+                _managers.report.show(ctx.rifle.id);
+            }
         });
-        ctx.db.getTruingEventsByRifle(ctx.rifle.id).catch(function () { return []; })
-            .then(function (events) {
-                var body = document.getElementById('th-body');
-                if (!body || !body.isConnected) return;
-                if (!events.length) {
-                    body.innerHTML = '<div class="empty-teach"><p>Untrued so far — ' +
-                        'true this rifle and every correction lives here forever.</p></div>';
-                    return;
-                }
-                var rows = '';
-                events.forEach(function (e) {
-                    var when = e.appliedAt ? new Date(e.appliedAt).toLocaleDateString() : '';
-                    var what = e.correctionType === 'bc'
-                        ? 'BC ' + Number(e.oldValue).toFixed(3) + ' → ' + Number(e.newValue).toFixed(3)
-                        : 'MV ' + Math.round(e.oldValue) + ' → ' + Math.round(e.newValue) + ' fps';
-                    var far = e.far && e.far.rangeYds ? e.far.rangeYds + ' yd' : '';
-                    rows += UI.rowlink({
-                        title: what,
-                        subHtml: '<span class="mono">' + UI.esc([when, e.mode, far,
-                            e.confidence ? 'confidence ' + e.confidence : null]
-                            .filter(Boolean).join(' · ')) + '</span>'
-                    });
-                });
-                body.innerHTML = UI.card(rows);
-            });
+        overlay.querySelector('#rc-proof').addEventListener('click', function () {
+            close();
+            _openProofSheet(ctx);
+        });
+    }
+
+    /** Certificate + transfer, unchanged mechanics (§2.2). */
+    function _openProofSheet(ctx) {
+        var hasTransfer = typeof TransferClient !== 'undefined';
+        var overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.innerHTML =
+            '<div class="overlay-card">' +
+            '<div class="overlay-title">Proof to share or transfer</div>' +
+            '<button class="option-row" id="pf-cert"><span>Certificate' +
+            '<span class="choice-desc">Proven by Workhorse — PDF with the rifle\'s QR</span></span></button>' +
+            (hasTransfer
+                ? '<button class="option-row" id="pf-transfer"><span>Transfer package' +
+                  '<span class="choice-desc">One-time code — the rifle arrives in the buyer\'s account knowing itself</span></span></button>'
+                : '') +
+            '</div>';
+        document.body.appendChild(overlay);
+        function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        overlay.querySelector('#pf-cert').addEventListener('click', function () {
+            close();
+            showCertificate(ctx);
+        });
+        var tr = overlay.querySelector('#pf-transfer');
+        if (tr) tr.addEventListener('click', function () {
+            close();
+            if (ctx.rifle) TransferClient.mintSheet(ctx.db, ctx.rifle);
+        });
     }
 
     function openLogbook(ctx) {
@@ -756,24 +852,37 @@ var Categories = (function () {
             html += '<div id="cat-status-card" class="u-mt-14"></div>';
         }
 
-        // Tools
+        // Tools — grouped by section (§2.7: "Take it with you" etc.);
+        // unsectioned tools render first under "Tools".
         var tools = visibleTools(def.key);
         var dormant = dormantTools(def.key);
         if (tools.length || dormant.length) {
-            html += UI.sectionHead('Tools');
-            var rows = '';
+            var sections = [];        // ordered section names
+            var bySection = {};
             tools.forEach(function (t) {
-                rows += UI.rowlink({ button: true, title: t.title, sub: t.sub, chev: true, data: { tool: t.id } });
+                var sec = t.section || 'Tools';
+                if (!bySection[sec]) { bySection[sec] = []; sections.push(sec); }
+                bySection[sec].push(t);
             });
-            dormant.forEach(function (t) {
-                rows += UI.rowlink({
-                    button: true,
-                    titleHtml: '<span class="u-gold">＋ ' + UI.esc(t.title) + '</span>',
-                    sub: 'Tap to add this tool',
-                    data: { activate: t.dormantKey }
+            if (!bySection.Tools && dormant.length) { bySection.Tools = []; sections.unshift('Tools'); }
+            sections.forEach(function (sec) {
+                html += UI.sectionHead(sec);
+                var rows = '';
+                bySection[sec].forEach(function (t) {
+                    rows += UI.rowlink({ button: true, title: t.title, sub: t.sub, chev: true, data: { tool: t.id } });
                 });
+                if (sec === 'Tools') {
+                    dormant.forEach(function (t) {
+                        rows += UI.rowlink({
+                            button: true,
+                            titleHtml: '<span class="u-gold">＋ ' + UI.esc(t.title) + '</span>',
+                            sub: 'Tap to add this tool',
+                            data: { activate: t.dormantKey }
+                        });
+                    });
+                }
+                html += UI.card(rows, { 'data-cat-tools': sec });
             });
-            html += UI.card(rows, { id: 'cat-tools' });
         }
 
         // Config toggle (verify) — acts in place, tags all new data
@@ -850,7 +959,7 @@ var Categories = (function () {
     }
 
     function bindTools(def, ctx) {
-        var card = document.getElementById('cat-tools');
+        var card = _container; // tools may span several section cards
         if (!card) return;
         var rows = card.querySelectorAll('[data-tool]');
         for (var i = 0; i < rows.length; i++) {
@@ -1073,7 +1182,7 @@ var Categories = (function () {
                     rows.push({ title: 'Effective range', sub: shots.length + ' strings logged — needs more per distance' });
                 }
             } else {
-                rows.push({ title: 'Effective range', sub: 'Log field shots and this fills itself' });
+                rows.push({ title: 'Effective range', sub: 'Log steel strings at distance and this fills itself' });
             }
             if (cb) rows.push({ title: 'Cold bore', sub: UI.esc(cb) });
             el.innerHTML = stripRows(rows);
@@ -1212,15 +1321,21 @@ var Categories = (function () {
                 }
             }
 
+            // v2.4 §2.6: THE BARREL CARD — rounds, since-cleaning,
+            // log-cleaning inline; the drift monitors speak above it.
             var html = monitorRows ? UI.card(monitorRows) : '';
             html += '<div class="card' + (monitorRows ? ' u-mt-10' : '') + '">';
             if (barrel) {
+                html += '<div class="rowlink" style="min-height:auto;padding-top:14px;padding-bottom:0">' +
+                    '<div class="txt"><b>Barrel</b></div></div>';
                 html += UI.statStrip([
                     { value: Number(total).toLocaleString(), label: 'Rounds' },
                     { value: Number(since).toLocaleString(), label: 'Since cleaning' },
                     { value: agg && agg.bestGroup ? formatFixed(agg.bestGroup.moa, 2) : '—', label: 'Best MOA' }
                 ]);
                 html += '<div style="border-top:1px solid var(--border-default)">' +
+                    '<button class="rowlink" id="cat-log-cleaning"><div class="txt">' +
+                    '<b>Log a cleaning</b></div><span class="chev">&rsaquo;</span></button>' +
                     '<button class="rowlink" id="cat-edit-rounds"><div class="txt">' +
                     '<b>Edit round count</b></div><span class="chev">&rsaquo;</span></button></div>';
             } else if (agg && agg.bestGroup) {
@@ -1245,6 +1360,52 @@ var Categories = (function () {
                     }
                 });
             }
+            var logClean = document.getElementById('cat-log-cleaning');
+            if (logClean && barrel) {
+                logClean.addEventListener('click', function () {
+                    _logCleaningSheet(ctx, barrel, total);
+                });
+            }
+        });
+    }
+
+    /** Inline log-cleaning (§2.6) — round count prefilled, one tap. */
+    function _logCleaningSheet(ctx, barrel, total) {
+        var overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.innerHTML =
+            '<div class="overlay-card">' +
+            '<div class="overlay-title">Log a cleaning</div>' +
+            '<div class="field"><label class="field-label" for="lc-rounds">Round count at cleaning</label>' +
+            '<input type="number" id="lc-rounds" min="1" step="1" inputmode="numeric" value="' + total + '"></div>' +
+            '<p class="field-error" id="lc-error"></p>' +
+            '<button class="btn-primary u-full" id="lc-save">Save cleaning</button>' +
+            '<button class="btn u-full u-mt-10" id="lc-cancel">Cancel</button>' +
+            '</div>';
+        document.body.appendChild(overlay);
+        function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        overlay.querySelector('#lc-cancel').addEventListener('click', close);
+        overlay.querySelector('#lc-save').addEventListener('click', function () {
+            var rounds = parseInt(document.getElementById('lc-rounds').value, 10);
+            if (!isFinite(rounds) || rounds <= 0) {
+                document.getElementById('lc-error').textContent =
+                    'Enter the barrel round count at cleaning (must be above 0).';
+                return;
+            }
+            ctx.db.addCleaningLog({
+                rifleId: ctx.rifle.id,
+                barrelId: barrel.id,
+                date: new Date().toISOString(),
+                roundCountAtCleaning: rounds,
+                notes: ''
+            }).then(function () {
+                close();
+                show('records', ctx.rifle.id);
+            }).catch(function () {
+                document.getElementById('lc-error').textContent =
+                    'Could not save — check your connection and try again.';
+            });
         });
     }
 

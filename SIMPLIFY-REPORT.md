@@ -134,6 +134,59 @@ empty state — not just first run. Headless proof: both custom steps render
 
 ---
 
+## Step 4 — Merges & retirements (§2.1–§2.8, §2.10)
+
+- **2.1 Quick mode → Range Session.** The separate "Quick Mode" tool row is
+  gone; the entry-screen escape is now labeled **"Just measure this group"**
+  (same `_selectQuickMode` path: skips to capture, saves minimally). The v2.3
+  suppressor/lot one-sheet with backdrop-accept was already in place —
+  verified, unchanged. Quick sessions history stays readable ("Misc sessions"
+  on the Rifles tab).
+- **2.2 Report & Certificate.** One Data & Records entry; first choice
+  "For your records" (performance report) | "Proof to share or transfer"
+  (→ Certificate, or Transfer package — mechanics unchanged).
+- **2.3 Quick hit tally retired.** Steel category row removed; the rifle-page
+  effective-range card's empty-state button now launches the Steel session
+  (casual tier is the one casual logger). `field.js` module + `field_shots`
+  data untouched — effective range and history keep consuming them.
+- **2.4 dope-log BC-sweep UI retired.** The beta rifle-page card registration
+  removed (was already dark via the all-off beta gate); `dope-log.js` and its
+  data stay on disk.
+- **2.5 One History screen.** Data & Records → History with filter chips
+  (Sessions · Steel · Truing · Maintenance). Sessions tap through to the
+  existing session detail; steel strings keep their sheet (incl. chrono
+  pairing); truing rows unchanged; Maintenance interleaves cleanings + scope
+  adjustments by date with an inline "Log a scope adjustment". The five
+  separate list rows are retired.
+- **2.6 Barrel card.** Data & Records strip: monitors (incl. the lot-drift
+  velocity note) speak above a titled Barrel card — total / since-cleaning /
+  best MOA + inline **Log a cleaning** (round count prefilled, one tap) +
+  Edit round count.
+- **2.7 "Take it with you."** DOPE card + Device export grouped under their
+  own section head inside Ballistics (renderScreen now supports per-tool
+  `section`). Ballistics also gains the **"True this rifle"** entry (truing's
+  §1.3 door), marked for step 5's utility restyle.
+- **2.8 verified.** Ammo-box OCR appears exactly twice, both as capture
+  methods inside Add Load surfaces (profiles load form, onboarding load step).
+- **2.10 vocabulary.** Session verdict (ZERO CONFIRMED / ADJUST) ↔ card
+  segments (confirmed/stale/thin/drifted · measured/estimated ·
+  trued/untrued) already speak the same words; fixed the stray "Records &
+  proof" back label and "Log field shots" strip copy.
+- Headless proof: Data & Records (Barrel card + new rows), unified History
+  (Maintenance chip interleaving), Ballistics ("Take it with you" group).
+  All suites green (698).
+
+### Judgment calls (step 4)
+- Maintenance chip is read-only rows + "Log a scope adjustment" (the existing
+  form); cleaning logging lives on the Barrel card per §2.6. Old per-list
+  delete affordances remain in the rifle-page HistoryManager screens, which
+  still exist for detail views — nothing lost.
+- `showCertificate`/transfer kept as separate second-level choices under
+  "Proof to share or transfer" rather than auto-picking — minting a transfer
+  is consequential and deserves its own tap.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`

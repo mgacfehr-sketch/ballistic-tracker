@@ -508,19 +508,9 @@ RifleCards.register({
     }
 });
 
-// ── progress: DOPE log (beta-gated, delegates) ─────────────────
-RifleCards.register({
-    id: 'dope-log',
-    slot: 'progress',
-    tool: null,
-    isVisible: function () {
-        return typeof isBetaEnabled === 'function' && isBetaEnabled('dopeLog') &&
-            typeof DopeLogManager !== 'undefined';
-    },
-    render: function (el, ctx) {
-        new DopeLogManager(ctx.db).renderSection(el, ctx.rifle.id, ctx.loads);
-    }
-});
+// v2.4 §2.4: the beta DOPE-log BC-sweep truing card is RETIRED — one
+// way to true: the v2.3 truing engine. dope-log.js and its data stay
+// on disk, readable; only this UI entry is removed.
 
 // ── truth: ammo lot drift (silent unless a lot differs) ───────
 RifleCards.register({
@@ -562,12 +552,14 @@ RifleCards.register({
         el.innerHTML = '<div class="plate" id="eff-range-body"></div>';
         var body = el.querySelector('#eff-range-body');
 
+        // v2.4 §2.3: Steel casual is the one casual logger — the quick
+        // hit tally entry is retired; existing field_shots stay counted.
         function bindLog() {
             var logBtn = body.querySelector('#eff-range-log');
             if (logBtn) {
                 logBtn.addEventListener('click', function () {
-                    if (window.ToolActions && window.ToolActions.fieldLog) {
-                        window.ToolActions.fieldLog(ctx.db);
+                    if (window.ToolActions && window.ToolActions.steelSession) {
+                        window.ToolActions.steelSession(ctx.db, ctx.rifle ? ctx.rifle.id : null);
                     }
                 });
             }
@@ -577,8 +569,8 @@ RifleCards.register({
             if (!shots || !shots.length) {
                 body.innerHTML =
                     '<div class="empty-teach">' +
-                    '<p>Log field shots and this card fills itself &mdash; your honest &ldquo;should I shoot?&rdquo; number.</p>' +
-                    '<button class="action" id="eff-range-log">Log field shots</button>' +
+                    '<p>Log steel strings at distance and this card fills itself &mdash; your honest &ldquo;should I shoot?&rdquo; number.</p>' +
+                    '<button class="action" id="eff-range-log">Log a steel string</button>' +
                     '</div>';
                 bindLog();
                 return;

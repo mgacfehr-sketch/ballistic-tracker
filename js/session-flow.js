@@ -329,7 +329,7 @@ SessionFlow.prototype._loadProfilePicker = function () {
         if (rifles.length === 0) {
             picker.innerHTML =
                 '<div class="empty-teach">' +
-                '<p>Pick a rifle so this target lands on its record &mdash; or use Quick Mode below for a one-off measurement.</p>' +
+                '<p>Pick a rifle so this target lands on its record &mdash; or tap &ldquo;Just measure this group&rdquo; below for a one-off measurement.</p>' +
                 '<button class="action" id="btn-go-profiles">Set up a rifle</button>' +
                 '</div>';
             var goBtn = document.getElementById('btn-go-profiles');
