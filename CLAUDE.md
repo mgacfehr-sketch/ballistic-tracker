@@ -57,7 +57,9 @@ pixelsPerInch (manual fallback) = pixelDistanceBetweenCalibrationPoints / 1.0
 
 ## ArUco Auto-Calibration
 - Dictionary: `ARUCO_MIP_36h12` (js-aruco2 CDN, pinned commit SHA)
-- Target geometry: 6.0" grid, 0.6" markers, `MARKER_OFFSET = 0.8"` (measured from printed target)
+- Target geometry (v2.4): 6.0" aim field, 0.6" markers in the SIDE MARGINS —
+  centers 7.00" × 4.00" apart. THE law lives in `js/target-geometry.js`;
+  `aruco-calibration.js` and `target-pdf.js` both derive from it (never drift)
 - Corner assignment is **position-based** (outermost by diagonal projection: min/max of x+y and x−y). **Never use hard-coded marker IDs** — they decode differently across devices
 - Sanity guard: detected bounding box must span ≥30% of image in both axes
 - On success, image is warped flat via 4-point homography; `pixelsPerInch = 120` (fixed)

@@ -779,17 +779,26 @@ SessionFlow.prototype._bindUI = function () {
         });
     }
 
-    // Print Target — open PDF in hidden iframe and trigger print at actual size
+    // Print/Share Target — the branded Proven Data Target (v2.4 §2.9);
+    // the classic canvas target remains only as the no-jsPDF fallback.
     if (this.els.btnPrintTarget) {
         this.els.btnPrintTarget.addEventListener('click', function () {
-            self._printBlankTarget();
+            if (typeof TargetPDF !== 'undefined' && TargetPDF.paperTarget &&
+                window.jspdf && window.jspdf.jsPDF) {
+                TargetPDF.paperTarget('letter');
+            } else {
+                self._printBlankTarget();
+            }
         });
     }
-
-    // Share Blank Target — Web Share API, fall back to download
     if (this.els.btnShareTarget) {
         this.els.btnShareTarget.addEventListener('click', function () {
-            self._shareBlankTarget();
+            if (typeof TargetPDF !== 'undefined' && TargetPDF.paperTarget &&
+                window.jspdf && window.jspdf.jsPDF) {
+                TargetPDF.paperTarget('letter'); // _sharePdf uses the share sheet when available
+            } else {
+                self._shareBlankTarget();
+            }
         });
     }
 };

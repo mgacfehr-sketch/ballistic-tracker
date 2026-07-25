@@ -387,37 +387,28 @@ var Categories = (function () {
     }
 
     function printOrShareTarget() {
-        // The §2.1 generated target (Letter/A4, tear-safe fiducials +
-        // scale bar) plus the classic printable as fallback.
+        // v2.4 §2.9: the classic blank target is RETIRED — the branded
+        // Proven Data Target passed its detector verification gate.
+        // Classic print/share code stays on disk as the no-jsPDF fallback.
         var hasGen = typeof TargetPDF !== 'undefined' && TargetPDF.paperTarget;
+        if (!hasGen) {
+            if (window.TargetSheet && TargetSheet.print) TargetSheet.print();
+            return;
+        }
         var overlay = document.createElement('div');
         overlay.className = 'overlay';
         overlay.innerHTML =
             '<div class="overlay-card">' +
-            '<div class="overlay-title">Blank target</div>' +
-            '<p class="overlay-text">The Proven auto-calibration target — aim at the diamond; the corner marks set scale by themselves.</p>' +
-            (hasGen
-                ? '<button class="btn-primary u-full" id="target-letter">Target PDF — Letter</button>' +
-                  '<button class="btn u-full u-mt-10" id="target-a4">Target PDF — A4</button>'
-                : '') +
-            '<button class="btn u-full u-mt-10" id="target-print">Print classic target</button>' +
-            '<button class="btn u-full u-mt-10" id="target-share">Share classic target</button>' +
+            '<div class="overlay-title">Print target</div>' +
+            '<p class="overlay-text">The Proven Data Target — aim at a diamond; the four CAL plates set the scale by themselves. Print at 100%.</p>' +
+            '<button class="btn-primary u-full" id="target-letter">Letter PDF</button>' +
+            '<button class="btn u-full u-mt-10" id="target-a4">A4 PDF</button>' +
             '</div>';
         document.body.appendChild(overlay);
         function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
         overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-        var btnL = overlay.querySelector('#target-letter');
-        if (btnL) btnL.addEventListener('click', function () { close(); TargetPDF.paperTarget('letter'); });
-        var btnA = overlay.querySelector('#target-a4');
-        if (btnA) btnA.addEventListener('click', function () { close(); TargetPDF.paperTarget('a4'); });
-        overlay.querySelector('#target-print').addEventListener('click', function () {
-            close();
-            if (window.TargetSheet && TargetSheet.print) TargetSheet.print();
-        });
-        overlay.querySelector('#target-share').addEventListener('click', function () {
-            close();
-            if (window.TargetSheet && TargetSheet.share) TargetSheet.share();
-        });
+        overlay.querySelector('#target-letter').addEventListener('click', function () { close(); TargetPDF.paperTarget('letter'); });
+        overlay.querySelector('#target-a4').addEventListener('click', function () { close(); TargetPDF.paperTarget('a4'); });
     }
 
     /** Cold bore log: a records sub-screen wrapping ColdBoreManager. */

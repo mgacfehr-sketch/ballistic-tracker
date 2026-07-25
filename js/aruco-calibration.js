@@ -1,14 +1,12 @@
 /**
  * aruco-calibration.js — Automatic target scaling using ArUco markers.
  *
- * The yorT target specification (DICT_4X4_50):
- *   marker id 0 = top-left
- *   marker id 1 = top-right
- *   marker id 2 = bottom-left
- *   marker id 3 = bottom-right
- *   each marker is 0.6" square
- *   measurement grid between markers is exactly 6.0" x 6.0"
- *   marker outer corners sit 0.18" outside grid corners
+ * The Proven target specification (v2.4 — see js/target-geometry.js,
+ * THE single source of truth this file derives from):
+ *   four ARUCO_MIP_36h12 markers, 0.6" square, in the side margins
+ *   (centers 7.00" apart horizontally, 4.00" vertically)
+ *   central aim field is exactly 6.0" x 6.0"
+ *   corner assignment is position-based — never by marker id
  *
  * If all 4 markers detect, the photo is warped flat and pixelsPerInch
  * is derived from the known geometry. Otherwise the caller falls back
@@ -21,18 +19,21 @@
 (function (global) {
     'use strict';
 
-    // ── Target geometry constants ─────────────────────────────────
-    var GRID_INCHES = 6.0;          // 6" x 6" measurement grid
-    var MARKER_SIZE = 0.6;          // 0.6" square markers
-    var MARKER_OFFSET = 0.8;        // outer corner 0.8" outside grid corner (measured from printed target)
+    // ── Target geometry — derived from THE shared law (v2.4 Part 3) ──
+    // js/target-geometry.js is loaded before this file; the printed
+    // artwork (target-pdf.js) derives from the same object, so print
+    // and detection can never drift.
+    var G = (typeof TARGET_GEOMETRY !== 'undefined') ? TARGET_GEOMETRY
+        : (typeof global.TARGET_GEOMETRY !== 'undefined' ? global.TARGET_GEOMETRY : null);
+    if (!G) throw new Error('target-geometry.js must load before aruco-calibration.js');
 
-    // Marker centers in grid-inch coords (grid origin = top-left at 0,0):
-    //   outer corner of marker is at (-OFFSET, -OFFSET) etc., marker is OFFSET in,
-    //   so center = outer corner + MARKER_SIZE/2 in toward grid center.
-    var TL_CENTER = { x: -MARKER_OFFSET + MARKER_SIZE / 2, y: -MARKER_OFFSET + MARKER_SIZE / 2 };
-    var TR_CENTER = { x: GRID_INCHES + MARKER_OFFSET - MARKER_SIZE / 2, y: -MARKER_OFFSET + MARKER_SIZE / 2 };
-    var BL_CENTER = { x: -MARKER_OFFSET + MARKER_SIZE / 2, y: GRID_INCHES + MARKER_OFFSET - MARKER_SIZE / 2 };
-    var BR_CENTER = { x: GRID_INCHES + MARKER_OFFSET - MARKER_SIZE / 2, y: GRID_INCHES + MARKER_OFFSET - MARKER_SIZE / 2 };
+    var GRID_INCHES = G.GRID_INCHES;
+    var MARKER_SIZE = G.MARKER_SIZE;
+
+    var TL_CENTER = G.MARKER_CENTERS.TL;
+    var TR_CENTER = G.MARKER_CENTERS.TR;
+    var BL_CENTER = G.MARKER_CENTERS.BL;
+    var BR_CENTER = G.MARKER_CENTERS.BR;
 
     // ── Public API ────────────────────────────────────────────────
 
@@ -91,7 +92,8 @@
 
         // Build a list of ALL detected marker centers, ignoring marker ID entirely.
         // ID decoding varies by device/firmware; position is reliable.
-        var centers = [];
+        // Carry quad AREA so near-duplicates can be resolved by size.
+        var quads = [];
         for (var i = 0; i < detected.length; i++) {
             var m = detected[i];
             var cx = 0, cy = 0;
@@ -100,9 +102,30 @@
                 cy += m.corners[k].y;
             }
             cx /= 4; cy /= 4;
+            // Shoelace area of the quad (detection-scale pixels)
+            var area = 0;
+            for (var s = 0; s < 4; s++) {
+                var p = m.corners[s], q = m.corners[(s + 1) % 4];
+                area += p.x * q.y - q.x * p.y;
+            }
+            area = Math.abs(area) / 2;
             // Scale back to source image coords
-            centers.push({ x: cx / detectScale, y: cy / detectScale });
+            quads.push({ x: cx / detectScale, y: cy / detectScale, area: area / (detectScale * detectScale) });
         }
+
+        // A marker's INNER pattern can decode as a second, smaller quad
+        // at some rasterizations. Merge near-duplicates: largest quad of
+        // any cluster whose centers sit within ~75% of its side length.
+        quads.sort(function (a, b) { return b.area - a.area; });
+        var centers = [];
+        quads.forEach(function (q) {
+            var dup = false;
+            for (var c = 0; c < centers.length; c++) {
+                var dx = centers[c].x - q.x, dy = centers[c].y - q.y;
+                if (Math.sqrt(dx * dx + dy * dy) < 0.75 * Math.sqrt(centers[c].area)) { dup = true; break; }
+            }
+            if (!dup) centers.push(q);
+        });
 
         if (centers.length < 4) {
             return { success: false, message: 'Found only ' + centers.length + ' of 4 markers' };
@@ -146,14 +169,14 @@
      * @param {Object} markers - {0:{x,y}, 1:{x,y}, 2:{x,y}, 3:{x,y}} in source pixels
      * @param {number} ppi - desired pixels-per-inch for the output
      * @returns {{ canvas: HTMLCanvasElement, pixelsPerInch: number, originInches: {x,y} }}
-     *   The output canvas spans from (-MARKER_OFFSET - MARKER_SIZE) to (GRID + MARKER_OFFSET + MARKER_SIZE)
-     *   so all four markers + the full grid are visible.
+     *   The output canvas pads beyond the outermost marker edges so all
+     *   four markers + the full grid are visible.
      */
     ArucoCalibration.prototype.warpFlat = function (image, markers, ppi) {
         ppi = ppi || 120;
 
         // Output canvas covers a little beyond the markers for context
-        var pad = MARKER_OFFSET + MARKER_SIZE + 0.4;
+        var pad = Math.max(-TL_CENTER.x, TR_CENTER.x - GRID_INCHES) + MARKER_SIZE / 2 + 0.4;
         var minInch = -pad;
         var maxInch = GRID_INCHES + pad;
         var spanInch = maxInch - minInch;
@@ -281,7 +304,7 @@
     // Expose constants for callers that want to draw the grid overlay later.
     ArucoCalibration.GRID_INCHES = GRID_INCHES;
     ArucoCalibration.MARKER_SIZE = MARKER_SIZE;
-    ArucoCalibration.MARKER_OFFSET = MARKER_OFFSET;
+    ArucoCalibration.MARKER_CENTERS = G.MARKER_CENTERS;
 
     global.ArucoCalibration = ArucoCalibration;
 })(typeof window !== 'undefined' ? window : this);

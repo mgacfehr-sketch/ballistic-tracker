@@ -213,9 +213,70 @@ at a glance.
 
 ---
 
+## Step 6 — The branded target (Part 3) + verification gate
+
+Built from the contract's written spec (`proven-target-concept.html` never
+appeared in docs/mockups — see OWNER REVIEW QUEUE #1).
+
+- **New `js/target-geometry.js`** — THE geometry law. `aruco-calibration.js`
+  (homography) and `target-pdf.js` (artwork) both derive from this one object;
+  they can never drift. New 35-test suite locks the constants, paper fit, and
+  staple-tear safety on Letter + A4.
+- **Marker relocation:** centers at (-0.5, 1.0) / (6.5, 1.0) / (-0.5, 5.0) /
+  (6.5, 5.0) in aim-field coords → **7.00" × 4.00" spacing**, fully outside
+  the field in the side margins, every marker ≥1" from the paper corners.
+  Marker patterns + printed 0.6" size unchanged. `warpFlat` pad and the
+  position-based corner assignment work unchanged with the rectangle.
+- **The artwork (owner's v2 design):** all writing at the top (W-dial +
+  "PROVEN. DATA TARGET", "Get all shooting to math · by Workhorse", two
+  instruction lines, 1.00" tap-dot scale bar); 0.25"-minor/1.00"-major grid
+  edge to edge; bold 6" aim-field outline; five ORANGE diamonds with orange
+  center dots (center large, satellites at ±2"); markers on solid-white
+  quiet-zone panels with thin gold machined-plate brackets + CAL·A–D labels
+  outside the quiet zone; ONE small footer line; no bottom ruler.
+- **Detector hardening (found by the gate):** at some rasterizations a
+  marker's inner pattern decodes as a second, smaller offset quad, which the
+  outermost-by-diagonal pick preferred — 4.7% scale error. `detect()` now
+  merges near-duplicate quads (largest wins within 75% of its side length).
+  This protects real range photos, not just the generated artwork.
+- **VERIFICATION GATE — PASSED:** real js-aruco2 detector against the
+  generated artwork at the new geometry: Letter 150ppi 0.067% · Letter 96ppi
+  0.000% · A4 150ppi 0.033% · A4 200ppi 0.047% — 4/4 markers everywhere,
+  all ≤0.1%.
+- **§2.9 classic target retired** (gate passed): the print/share sheet and
+  session-entry buttons now serve only the Proven Data Target; the classic
+  canvas target remains on disk strictly as the no-jsPDF fallback.
+- **Tall target:** same top-branding dress (W-dial, tagline, instructions up
+  top); plumb-line geometry and the 6.00" A–B spacing untouched; one small
+  footer line. `drawTallToCanvas` added for visual QA.
+- CLAUDE.md's ArUco section updated to the new law.
+
+### Judgment calls (step 6)
+- **Marker-move interpretation:** "down/up 1.0, out 0.5" was measured from
+  the aim-field CORNERS (giving x ±0.5" outside the field). Reading it from
+  the old marker centers instead would put plates off the paper edge on
+  Letter/A4 — physically impossible, so corners must be the datum.
+  → OWNER REVIEW QUEUE.
+- Orange = RGB(232, 90, 26) — prints as honest mid-gray (~50%) in grayscale.
+- Bracket arms are thin (0.014") and pushed 0.1" beyond the quiet zone so any
+  quad they suggest is concentric with the marker (an offset quad is what
+  fools the detector; a concentric one merges harmlessly).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`
-   when the build started. The branded target was built from the contract's
-   Part 3 text. If the mockup differs, drop it in and say the word; artwork is
-   isolated in `target-pdf.js` and cheap to revise.
+   when the build started (re-checked at step 6). The branded target was built
+   from the contract's Part 3 text. If the mockup differs, drop it in and say
+   the word; artwork is isolated in `target-pdf.js` and cheap to revise.
+2. **Marker-move datum** — the relocation was interpreted from the aim-field
+   corners (centers 7.00" × 4.00" apart; see step 6 judgment call). The
+   alternative reading physically doesn't fit the paper. Confirm the printed
+   sheet looks like what you sketched.
+3. **REAL-PRINT PHOTO TEST (required before trusting field calibration):**
+   print the new target at 100% on Letter, photograph it with your phone from
+   a realistic range-bench angle, and run a session through calibration. The
+   headless gate proves the artwork/detector agree; only a real print + phone
+   photo proves the whole chain (printer scaling, paper white, camera).
+   Verify the reported scale by measuring one grid square = 1.00".
