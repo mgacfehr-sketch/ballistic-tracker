@@ -433,7 +433,7 @@ var DopeCards = (function () {
                 (canvases.length > 1 ? ', one per altitude.' : '.') + '</p>' +
                 '<img class="plate-img" alt="DOPE card preview" src="' + canvases[0].toDataURL('image/png') + '">' +
                 '<p class="t-micro u-mt-10">Print at 100% scale and cut on the gray marks.</p>' +
-                '<button class="action-primary u-mt-14" id="dope-export">Export PDF</button>';
+                '<button class="btn-utility u-mt-14" id="dope-export">Print or share PDF</button>';
             box.querySelector('#dope-export').addEventListener('click', function () {
                 exportPdf(canvases, fmt, rifle);
             });

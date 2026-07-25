@@ -1825,3 +1825,33 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 .door b { flex: 1; font: var(--type-body-strong); font-size: 17px; }
 .door .chev { color: var(--text-secondary); font-size: 22px; }
+
+
+/* ============================================================
+   v2.4 §1.4 — TWO-CLASS VISUAL GRAMMAR
+   Cards/rows go somewhere (chevron, noun-titled).
+   Gold utilities DO something (verb-first, no chevron, instant).
+   ============================================================ */
+.btn-utility {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: var(--tap-min);
+    padding: 8px 18px;
+    background: none;
+    border: 1.5px solid var(--brand-gold);
+    color: var(--brand-gold-strong);
+    border-radius: var(--radius-md);
+    font: var(--type-label);
+    font-size: 16px;
+}
+.btn-utility:active { background: var(--brand-subtle); }
+.btn-utility:disabled { opacity: 0.4; }
+.utility-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0 var(--edge);
+    margin: var(--space-sm) 0 var(--space-md);
+}

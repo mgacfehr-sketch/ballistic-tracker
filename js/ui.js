@@ -194,6 +194,21 @@
             '</button>';
     }
 
+    /* ── utility button (v2.4 §1.4: gold, verb-first, instant) ── */
+
+    /** opts: { label, id?, data?: {k:v} } */
+    function utilityBtn(opts) {
+        var o = opts || {};
+        var html = '<button class="btn-utility"' + (o.id ? ' id="' + esc(o.id) + '"' : '');
+        if (o.data) {
+            for (var k in o.data) {
+                if (o.data.hasOwnProperty(k)) html += ' data-' + k + '="' + esc(o.data[k]) + '"';
+            }
+        }
+        html += '>' + esc(o.label || '') + '</button>';
+        return html;
+    }
+
     /* ── Home category row ────────────────────────────────── */
 
     /** opts: { icon (Icon name), title, desc, data: {k:v} } */
@@ -226,6 +241,7 @@
         statStrip: statStrip,
         gauge: gauge,
         rifleChip: rifleChip,
+        utilityBtn: utilityBtn,
         catRow: catRow
     };
 })();

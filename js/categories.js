@@ -87,8 +87,9 @@ var Categories = (function () {
                 },
                 {
                     id: 'print-target',
-                    title: 'Print or share a blank target',
+                    title: 'Print target',
                     sub: 'The Proven auto-calibration target',
+                    utility: true, // §1.4: gold utility — does something, instantly
                     gate: function () { return toolVisible('rangeSession'); },
                     launch: function () { printOrShareTarget(); }
                 }
@@ -260,8 +261,9 @@ var Categories = (function () {
                 },
                 {
                     id: 'tall-target-pdf',
-                    title: 'Print the tall target',
+                    title: 'Print tall target',
                     sub: 'Plumb line, known spacing — the test target',
+                    utility: true, // §1.4
                     gate: function () {
                         return toolVisible('scopeTracking') && typeof TargetPDF !== 'undefined' &&
                             !!TargetPDF.tallTarget;
@@ -325,8 +327,9 @@ var Categories = (function () {
                 },
                 {
                     id: 'export-data',
-                    title: 'Export my data',
+                    title: 'Export data',
                     sub: 'Everything, built on this device — your data is yours',
+                    utility: true, // §1.4
                     gate: function () { return typeof DataExport !== 'undefined'; },
                     launch: function (ctx) { DataExport.open(ctx.db); }
                 }
@@ -853,13 +856,17 @@ var Categories = (function () {
         }
 
         // Tools — grouped by section (§2.7: "Take it with you" etc.);
-        // unsectioned tools render first under "Tools".
+        // unsectioned tools render first under "Tools". Utilities (§1.4)
+        // render as gold verb-first buttons below the flow rows —
+        // cards go somewhere, gold buttons do something.
         var tools = visibleTools(def.key);
         var dormant = dormantTools(def.key);
-        if (tools.length || dormant.length) {
+        var utilities = tools.filter(function (t) { return t.utility; });
+        var rowTools = tools.filter(function (t) { return !t.utility; });
+        if (rowTools.length || dormant.length) {
             var sections = [];        // ordered section names
             var bySection = {};
-            tools.forEach(function (t) {
+            rowTools.forEach(function (t) {
                 var sec = t.section || 'Tools';
                 if (!bySection[sec]) { bySection[sec] = []; sections.push(sec); }
                 bySection[sec].push(t);
@@ -883,6 +890,13 @@ var Categories = (function () {
                 }
                 html += UI.card(rows, { 'data-cat-tools': sec });
             });
+        }
+        if (utilities.length) {
+            html += '<div class="utility-row">';
+            utilities.forEach(function (t) {
+                html += UI.utilityBtn({ label: t.title, data: { tool: t.id } });
+            });
+            html += '</div>';
         }
 
         // Config toggle (verify) — acts in place, tags all new data

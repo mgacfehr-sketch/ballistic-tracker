@@ -187,6 +187,32 @@ empty state — not just first run. Headless proof: both custom steps render
 
 ---
 
+## Step 5 — Two-class visual grammar (§1.4)
+
+New `.btn-utility` (gold outline, verb-first, no chevron, ≥52px) +
+`.utility-row`; `UI.utilityBtn()` helper. Category tools marked
+`utility: true` now render as gold buttons below the flow rows:
+- Range Session → **Print target** (print/share sheet)
+- Scope Tracking → **Print tall target**
+- Ballistics → **True this rifle** (truing's §1.3 utility door)
+- Data & Records → **Export data**
+Also restyled: the session-entry Print/Share target buttons, and the DOPE
+card's final action → **Print or share PDF**. Headless proof: Ballistics
+shows rows-with-chevrons above a gold outlined utility — different species
+at a glance.
+
+### Judgment calls (step 5)
+- **"Report & Certificate" stays a ROW, not a utility.** §1.4's example list
+  includes "Generate report", but §2.2 explicitly makes it "one entry" with a
+  first choice — a door that goes somewhere. The chooser-then-flow shape is a
+  flow, not an instant action. Flagged for owner (easy to flip).
+- Certificate/report screens' internal terminal buttons (Generate
+  certificate, etc.) keep their primary styling — the grammar governs entry
+  surfaces, not in-flow confirm controls (which carry the wrong-rifle
+  protection wording).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`
