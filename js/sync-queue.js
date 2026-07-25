@@ -41,7 +41,8 @@ var SyncQueueCore = {
     FN_TABLE: {
         addSession: 'sessions',
         addFieldShot: 'field_shots',
-        addDopeEntry: 'dope_entries',
+        // v2.4 §4.3: addDopeEntry removed — no dope_entries table exists
+        // in the live DB; a queued write would jam the FIFO flush forever.
         addScopeAdjustment: 'scope_adjustments',
         addColdBoreShot: 'cold_bore_shots',
         addCleaningLog: 'cleaning_logs',
@@ -60,7 +61,6 @@ var SyncQueueCore = {
         getSessionsByRifle: { table: 'sessions', filter: 'rifleId' },
         getAllSessions: { table: 'sessions', filter: null },
         getFieldShotsByRifle: { table: 'field_shots', filter: 'rifleId' },
-        getDopeEntries: { table: 'dope_entries', filter: 'rifleId' },
         getScopeAdjustmentsByRifle: { table: 'scope_adjustments', filter: 'rifleId' },
         getColdBoreShots: { table: 'cold_bore_shots', filter: 'rifleId' },
         getVelocityStringsByRifle: { table: 'velocity_strings', filter: 'rifleId' },

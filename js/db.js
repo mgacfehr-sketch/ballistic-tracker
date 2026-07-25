@@ -181,7 +181,9 @@ BallisticDB.prototype.deleteRifle = function (id) {
             self.supabase.from('zero_records').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('scope_adjustments').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('cleaning_logs').delete().eq('rifle_id', id).eq('user_id', self.userId),
-            self.supabase.from('dope_entries').delete().eq('rifle_id', id).eq('user_id', self.userId),
+            // v2.4 §4.3: no dope_entries table exists in the live DB (its
+            // migration line was removed at owner review) — deleting from
+            // it here made EVERY rifle deletion throw 42P01.
             self.supabase.from('cold_bore_shots').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('velocity_strings').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('field_shots').delete().eq('rifle_id', id).eq('user_id', self.userId)

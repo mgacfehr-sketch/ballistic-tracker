@@ -68,6 +68,43 @@ var DataExport = (function () {
         });
     }
 
+    /** v2.4 §4.2: one workbook, one worksheet per data type, same
+     *  columns as the CSVs. SheetJS is already pinned for chrono
+     *  import — zero added bundle cost. */
+    function _exportWorkbook(db, statusEl) {
+        var wb = XLSX.utils.book_new();
+        var chain = Promise.resolve();
+        TYPES.forEach(function (t) {
+            chain = chain.then(function () {
+                if (statusEl) statusEl.textContent = 'Building ' + t.label + '…';
+                return t.fetch(db).catch(function () { return []; }).then(function (data) {
+                    // objects → JSON strings, matching csvEncode's cells
+                    var rows = (data || []).map(function (r) {
+                        var out = {};
+                        for (var k in r) {
+                            if (!r.hasOwnProperty(k)) continue;
+                            var v = r[k];
+                            out[k] = (v !== null && typeof v === 'object') ? JSON.stringify(v) : v;
+                        }
+                        return out;
+                    });
+                    var ws = XLSX.utils.json_to_sheet(rows);
+                    XLSX.utils.book_append_sheet(wb, ws, t.key.slice(0, 31));
+                });
+            });
+        });
+        return chain.then(function () {
+            var array = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            var blob = new Blob([array], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            _deliverBlob('proven-everything.xlsx', blob);
+            if (statusEl) statusEl.textContent = 'Workbook sent — one sheet per data type.';
+        }).catch(function (e) {
+            if (statusEl) statusEl.textContent = 'Failed: ' + e.message;
+        });
+    }
+
     function open(db) {
         var overlay = document.createElement('div');
         overlay.className = 'overlay';
@@ -78,9 +115,14 @@ var DataExport = (function () {
                 data: { export: t.key }
             });
         });
+        var hasXlsx = typeof XLSX !== 'undefined' && XLSX.utils;
         overlay.innerHTML = '<div class="overlay-card">' +
             '<div class="overlay-title">Export my data</div>' +
             '<p class="overlay-text">Your data is yours. Each export is built on this device — nothing goes anywhere you don\'t send it.</p>' +
+            (hasXlsx
+                ? '<button class="btn-utility u-full u-mb-12" id="dx-everything">Export everything (.xlsx)</button>' +
+                  '<p class="t-micro" id="dx-everything-status" style="margin-bottom:10px"></p>'
+                : '') +
             '<div class="card" style="margin:0;max-height:50vh;overflow-y:auto">' + rows + '</div>' +
             '<button class="btn u-full u-mt-10" id="dx-close">Done</button>' +
             '</div>';
@@ -88,6 +130,14 @@ var DataExport = (function () {
         function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
         overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
         overlay.querySelector('#dx-close').addEventListener('click', close);
+
+        var everything = overlay.querySelector('#dx-everything');
+        if (everything) everything.addEventListener('click', function () {
+            everything.disabled = true;
+            _exportWorkbook(db, overlay.querySelector('#dx-everything-status')).then(function () {
+                everything.disabled = false;
+            });
+        });
 
         var btns = overlay.querySelectorAll('[data-export]');
         for (var i = 0; i < btns.length; i++) {
@@ -109,9 +159,12 @@ var DataExport = (function () {
     }
 
     function _deliver(name, text) {
-        var blob = new Blob([text], { type: 'text/csv' });
+        _deliverBlob(name, new Blob([text], { type: 'text/csv' }));
+    }
+
+    function _deliverBlob(name, blob) {
         if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
-            var file = new File([blob], name, { type: 'text/csv' });
+            var file = new File([blob], name, { type: blob.type });
             if (navigator.canShare({ files: [file] })) {
                 navigator.share({ files: [file], title: name }).catch(function () {
                     _download(name, blob);

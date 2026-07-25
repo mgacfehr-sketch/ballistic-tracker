@@ -133,6 +133,11 @@ img { max-width: 100%; }
     align-items: center;
     justify-content: space-between;
     padding: var(--space-xs) var(--edge);
+    /* v2.4 §4.1: iOS standalone — keep the header controls out from
+       under the status bar (viewport-fit=cover exposes the notch) */
+    padding-top: calc(var(--space-xs) + env(safe-area-inset-top, 0px));
+    padding-left: calc(var(--edge) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--edge) + env(safe-area-inset-right, 0px));
 }
 .shell-brand { display: flex; align-items: center; gap: 8px; }
 .shell-brand .mark { width: 26px; height: 26px; color: var(--brand-gold); }

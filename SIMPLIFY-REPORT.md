@@ -264,6 +264,40 @@ appeared in docs/mockups — see OWNER REVIEW QUEUE #1).
 
 ---
 
+## Step 7 — Fixes (§4.1–§4.3)
+
+- **4.1 iOS safe area.** `viewport-fit=cover` was already in the meta tag;
+  the missing half was the header: `.shell-header` now pads by
+  `env(safe-area-inset-top/left/right)` (falls back to 0 in browsers), so the
+  theme toggle and controls sit below the iOS status bar in standalone mode.
+  The bottom nav already had `env(safe-area-inset-bottom)`. → Owner device
+  check queued.
+- **4.2 Export everything (.xlsx).** SheetJS was ALREADY pinned in
+  index.html for chrono import — zero added bundle cost, no new dependency.
+  "Export my data" gains a gold utility button that builds one workbook with
+  one worksheet per data type (same 14 types, same columns as the CSVs;
+  object cells JSON-stringified to match `csvEncode`), delivered via the
+  share sheet / download like the CSVs. Hidden if SheetJS failed to load —
+  per-type CSVs remain.
+- **4.3 dope_entries reality alignment.** The live DB has no such table.
+  Found and fixed:
+  - `db.js deleteRifle` cascaded into `dope_entries` and THREW on its 42P01
+    error — **every rifle deletion in the live app was failing**. Line
+    removed (explicitly authorized by §4.3; db.js otherwise untouched).
+  - `sync-queue.js` whitelists: `addDopeEntry` / `getDopeEntries` removed — a
+    queued write to a missing table would jam the FIFO flush forever.
+  - `db.js` addDopeEntry/getDopeEntries/deleteDopeEntry methods remain (only
+    the retired dope-log UI ever called them; module stays on disk per §2.4).
+  - **Live SQL is also broken:** `delete_my_account` (MORNING/FOUNDATION era)
+    deletes from `dope_entries` → account deletion currently throws.
+    `SIMPLIFY-migrations.sql` (owner-run, additive, re-runnable) replaces the
+    function without that line; an optional commented block fixes
+    `admin_export_all` the same way for those who ran CROWD step 5.
+    DOPE persistence lives where it actually lives today: solver settings +
+    trued values on loads; nothing writes dope_entries.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`
@@ -274,7 +308,14 @@ appeared in docs/mockups — see OWNER REVIEW QUEUE #1).
    corners (centers 7.00" × 4.00" apart; see step 6 judgment call). The
    alternative reading physically doesn't fit the paper. Confirm the printed
    sheet looks like what you sketched.
-3. **REAL-PRINT PHOTO TEST (required before trusting field calibration):**
+3. **RUN `SIMPLIFY-migrations.sql`** in the Supabase SQL Editor — it only
+   replaces `delete_my_account` so account deletion stops referencing the
+   nonexistent `dope_entries` table (statement 2 is optional/commented; read
+   its note). Without this, account deletion throws in the live app.
+4. **iOS safe-area device check** — install/update the PWA on your iPhone and
+   confirm the header (theme toggle) now clears the status bar in standalone
+   mode. The fix is CSS `env(safe-area-inset-*)`; only a real device proves it.
+5. **REAL-PRINT PHOTO TEST (required before trusting field calibration):**
    print the new target at 100% on Letter, photograph it with your phone from
    a realistic range-bench angle, and run a session through calibration. The
    headless gate proves the artwork/detector agree; only a real print + phone
