@@ -30,7 +30,6 @@ $$;
 ALTER TABLE public.sessions          ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ALTER TABLE public.velocity_strings  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ALTER TABLE public.field_shots       ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
-ALTER TABLE public.dope_entries      ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ALTER TABLE public.cold_bore_shots   ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ALTER TABLE public.zero_records      ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ALTER TABLE public.scope_adjustments ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
@@ -44,8 +43,6 @@ DROP TRIGGER IF EXISTS trg_velocity_strings_updated_at  ON public.velocity_strin
 CREATE TRIGGER trg_velocity_strings_updated_at  BEFORE UPDATE ON public.velocity_strings  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 DROP TRIGGER IF EXISTS trg_field_shots_updated_at       ON public.field_shots;
 CREATE TRIGGER trg_field_shots_updated_at       BEFORE UPDATE ON public.field_shots       FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-DROP TRIGGER IF EXISTS trg_dope_entries_updated_at      ON public.dope_entries;
-CREATE TRIGGER trg_dope_entries_updated_at      BEFORE UPDATE ON public.dope_entries      FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 DROP TRIGGER IF EXISTS trg_cold_bore_shots_updated_at   ON public.cold_bore_shots;
 CREATE TRIGGER trg_cold_bore_shots_updated_at   BEFORE UPDATE ON public.cold_bore_shots   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 DROP TRIGGER IF EXISTS trg_zero_records_updated_at      ON public.zero_records;
