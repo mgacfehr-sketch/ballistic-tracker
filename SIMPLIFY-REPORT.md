@@ -28,6 +28,33 @@ xlsx export, dope_entries reality alignment.
 
 ---
 
+## Step 1 — next-action.js (pure engine + 46 tests)
+
+`js/next-action.js`: `deriveNextAction(input)` — the priority ladder, first unmet
+rung wins; dismissed rungs ("Not now", 7 days) fall through to the next; the floor
+("You're proven to X — go shoot") is never dismissible. Pure: consumes the already-
+derived `deriveCalibrationStatus()` output plus precomputed candidates
+(`mvTrueYd` from `prescribeTruingDistances`, usable `distanceStrings`,
+`roundsSinceCleaning`) rather than re-deriving — one source of truth for state
+words. Dismissal helpers (`nextActionDismissed`, `withNextActionDismissal`) are
+pure and immutable; the card will persist the map under a `user_settings` key
+(no schema).
+
+### Judgment calls (step 1)
+- **`thin` zero does not interrupt** the ladder (rung 2 fires on
+  never/adjust/stale/drifted only). Thin is a quality note, not absence — the
+  segment sheet and calibration hint already coach it. A thin-zero user is
+  proven at 100 and should be pulled toward distance, not held at the bench.
+- **Rung-7 rotation implemented as ladder order** (re-true when flagged →
+  cleaning note at ≥400 rounds, overridable) — deterministic, no random
+  rotation, per "never invent a nag".
+- **`re-true` rung added** for flagged truings (numbers underneath changed).
+  The contract's rung list implies it via the calibration hint; without it a
+  flagged rifle would read "go shoot" while its DOPE is quietly wrong.
+- Suite: **46 tests** → running total 698.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`
