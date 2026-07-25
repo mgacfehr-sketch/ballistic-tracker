@@ -314,6 +314,48 @@ appeared in docs/mockups — see OWNER REVIEW QUEUE #1).
 
 ---
 
+## Step 9 — QA gates
+
+- **Suites: 733 tests green** (652 baseline + 46 next-action + 35
+  target-geometry; one foundation expectation updated to the v2.4 truing-core
+  doctrine, count unchanged).
+- **Headless screenshots** (390×844, dpr 2): card Home light (mid state,
+  payoff "~1,075 yd" from the real solver) + dark (all green, "You're proven
+  to 700 — go shoot") + fresh + no-rifle invite; onboarding steps 1–2 both
+  themes; Data & Records light+dark; unified History (Maintenance chip);
+  Ballistics with "Take it with you" + gold utility; new Data Target
+  (Letter + A4) and dressed tall target.
+- **Detector gate:** 4/4 markers, ≤0.1% scale error at Letter 96/150ppi and
+  A4 150/200ppi (worst 0.067%).
+- **Tap-target audit:** every new interactive element ≥52px (`.rc-arrow`,
+  `.rc-strip button`, `.rc-action` 58px, `.rc-notnow`, `.door`,
+  `.btn-utility`, history `.segment button`).
+- **Airplane-mode smoke:** with every event/read query failing, the card
+  renders honestly from what it has (meter from cached verdict/zero range,
+  next-action falls to the correct rung, doors render, zero console
+  crashes).
+- **iOS safe-area:** CSS verified with env() fallback (no layout change in
+  normal browsers); real-device confirmation queued for owner.
+
+### Feature walk — old door → new home
+| Was (v2.3) | Is (v2.4) |
+|---|---|
+| Seven job rows on Home | THE RIFLE CARD + four compact doors (Range · Steel/Field · Ballistics · Data & Records) + More tools |
+| Quick Mode row (Range Session) | "Just measure this group" at session entry (same skip-to-capture path) |
+| Quick hit tally (Steel) | Retired — Steel casual is the one casual logger; effective-range card's button launches it |
+| Truing door | Next-action button · card's Trued segment sheet · steel-session save "Send to Truing" · gold "True this rifle" on Ballistics · rifle-page shortcut |
+| Scope Tracking door | Card's Tracking segment sheet · truing prerequisites · rifle-page shortcut (tall target = gold utility there) |
+| Session/Steel/Truing history + Cleaning log + Scope adjustment log (5 rows) | ONE History screen with chips (Sessions · Steel · Truing · Maintenance) in Data & Records |
+| Cleaning logging (own list screen) | Barrel card → "Log a cleaning" (inline, prefilled) |
+| Scope-adjustment logging | History → Maintenance → "Log a scope adjustment" |
+| Performance report · Certificate · Transfer package (3 rows) | "Report & Certificate" → For your records \| Proof to share or transfer |
+| Print/share classic blank target | "Print target" gold utility → Proven Data Target PDF (classic code = no-jsPDF fallback only) |
+| Export my data (CSV rows) | "Export data" utility + "Export everything (.xlsx)" workbook |
+| First-run feature checklist | Rifle-first wizard: rifle → bullet & box velocity → suppressor → LAND ON THE CARD |
+| dope-log BC-sweep card (beta, dark) | Retired — one way to true (v2.3 engine) |
+
+---
+
 ## OWNER REVIEW QUEUE
 
 1. **Missing mockup** — `proven-target-concept.html` was not in `docs/mockups/`
@@ -337,3 +379,10 @@ appeared in docs/mockups — see OWNER REVIEW QUEUE #1).
    headless gate proves the artwork/detector agree; only a real print + phone
    photo proves the whole chain (printer scaling, paper white, camera).
    Verify the reported scale by measuring one grid square = 1.00".
+6. **Walk the feature-walk table** (step 9) on your phone — every moved or
+   merged item, old muscle memory → new home.
+7. **"Report & Certificate" stays a row** (step 5 judgment call) — say the
+   word if you want it as a gold "Generate report" utility instead.
+8. **Old printed targets are obsolete** — the marker geometry moved, so
+   photos of v2.3 sheets will fail auto-calibration (manual 2-tap still
+   works). Recycle old printouts and hand out the new PDF.
