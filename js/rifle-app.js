@@ -25,6 +25,17 @@ function RifleApp(db) {
 
 RifleApp.prototype.init = function () {
     this.container = document.getElementById('view-home');
+    // v3.0 §3.3: sync visibility must survive the rebuild — the old
+    // "N saves waiting to sync" banner only ever rendered inside the
+    // now-unreached Categories screens. One listener for the app's
+    // lifetime (not per-render, else swiping between rifles would pile
+    // up listeners); it just repaints whatever #rf-sync currently is.
+    if (typeof SyncQueue !== 'undefined' && SyncQueue && SyncQueue.onChange) {
+        SyncQueue.onChange(function () {
+            var el = document.getElementById('rf-sync');
+            if (el) SyncQueue.renderStatus(el);
+        });
+    }
 };
 
 /** THE RIFLE — the only resting screen. */
@@ -93,6 +104,7 @@ RifleApp.prototype._renderRifle = function () {
         });
         html += '</button>';
     }
+    html += '<div id="rf-sync" style="padding:0 var(--edge)"></div>';
     html += '<button class="v3-numberbox" id="rf-number"><div class="lbl">PROVEN TO</div>' +
         '<div class="num" id="rf-num-val">&mdash;<em>yd</em></div><div class="conf" id="rf-conf">&nbsp;</div></button>';
     html += '<div class="v3-chart tap" id="rf-chart"><div class="cttl"><span>DROP CHART</span>' +
@@ -103,6 +115,10 @@ RifleApp.prototype._renderRifle = function () {
         '<div class="v3-fitem-empty">Loading&hellip;</div></div></div>';
     html += '</div>';
     this.container.innerHTML = html;
+
+    if (typeof SyncQueue !== 'undefined' && SyncQueue && SyncQueue.renderStatus) {
+        SyncQueue.renderStatus(document.getElementById('rf-sync'));
+    }
 
     this._bindRifleNav();
 

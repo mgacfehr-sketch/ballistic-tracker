@@ -355,12 +355,19 @@ BallisticDB.prototype.updateLoad = function (load) {
 
 BallisticDB.prototype.getLoad = function (id) {
     var self = this;
+    if (typeof OfflineCache !== 'undefined' && !OfflineCache.isOnline()) {
+        return OfflineCache.getCachedLoad(id);
+    }
     return self.supabase.from('loads').select()
         .eq('id', id).eq('user_id', self.userId)
         .maybeSingle()
         .then(function (res) {
             if (res.error) throw res.error;
             return _rowToJs(res.data);
+        })
+        .catch(function (err) {
+            console.warn('[DB] getLoad failed, trying cache:', err);
+            return OfflineCache.getCachedLoad(id);
         });
 };
 

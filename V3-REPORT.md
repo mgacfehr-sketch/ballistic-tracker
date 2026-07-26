@@ -563,6 +563,80 @@ screen instead of returning to the rifle.
 
 ---
 
+---
+
+## Step 10 — Offline pickers (§3.1) + sync visibility (§3.3)
+
+- **§3.1, root cause found and fixed: `db.js`'s `getLoad(id)` had NO
+  offline-cache fallback at all** — unlike `getRifle`, `getAllRifles`,
+  `getLoadsByRifle`, and `getBarrelsByRifle`, which all check
+  `OfflineCache.isOnline()` and fall back to IndexedDB on failure.
+  `SessionFlow.prototype._selectProfile` (the code that turns "tap
+  Paper on this rifle" into a rifle+load+barrel bundle and advances
+  the wizard) calls `getLoad(loadId)` inside a bare `Promise.all` with
+  no catch — offline, that promise rejected and `_selectProfile` simply
+  never called `_nextStep()`. Starting a paper session offline would
+  silently strand Roy on the picker step with no error and no visible
+  cause. Added `OfflineCache.getCachedLoad(id)` (a straight primary-key
+  `.get()` on the existing `loads` IDB store — no schema change) and
+  wired `getLoad` to the same isOnline-check-then-catch-fallback shape
+  every other cache-backed read already uses.
+- **A second, shallower §3.1 gap**: `window.SessionLaunch.start` (the
+  seam every Add→Paper button calls) bundles `getLoadsByRifle` (cache-
+  safe) with `getSessionsByRifle` (never cached — sessions aren't a
+  cache store) in one `Promise.all`, no catch. Offline, the sessions
+  fetch rejected and sank the auto-select entirely — even after fixing
+  `getLoad`, Roy would have landed on the raw profile picker instead of
+  going straight to image capture, since the auto-selection itself
+  never got to run. Added `.catch(() => [])` to that one call — losing
+  "which load was last used" recall offline is an acceptable trade
+  (it just falls back to the load's own default), losing the whole
+  auto-select is not.
+- **§3.3, sync visibility didn't survive the rebuild.**
+  `SyncQueue.renderStatus(el)` — the "N saves waiting to sync · Sync
+  now" banner (§3.2, pre-existing, pure) — was previously called only
+  from `categories.js` (the Universal Home header, and per-category
+  headers). Neither is reachable from the new resting screen, so a
+  user who saved offline had **no aggregate indication anything was
+  queued** — only the per-item "waiting to sync" label already present
+  on individual feed rows (via `feed-core.js`'s `pending` flag), which
+  doesn't surface parked/errored ops or offer a manual retry. Added a
+  `#rf-sync` slot to `rifle-app.js`'s resting screen (between the
+  rifle name/dots and the PROVEN TO number — first thing seen, and
+  zero-height when the queue is empty) and wired it two ways: painted
+  once per `_renderRifle()` for the initial state, and repainted by a
+  single `SyncQueue.onChange` listener registered once in `init()`
+  (not per-render, so swiping between rifles or opening/closing
+  sub-screens never piles up duplicate listeners).
+- **Verification**: two scratchpad harnesses. `harness-v3-sync.html`
+  drove the real `SyncQueue`/IndexedDB stack — forced the browser
+  context offline, queued a real `addSteelString` write, confirmed the
+  resting screen showed both the aggregate banner ("1 save waiting to
+  sync · Sync now") AND the matching feed item ("Steel at 600 ·
+  waiting to sync"), then simulated reconnect + successful flush and
+  confirmed the banner cleared. `harness-v3-offline-load.html` seeded
+  the real IndexedDB `loads` store the way `cacheAll()` would, forced
+  `OfflineCache.isOnline()` false, and called the real
+  `BallisticDB.prototype.getLoad` directly — confirmed it resolves the
+  cached, correctly-camelCased row instead of hanging/rejecting.
+- **821 tests green**, no regressions.
+
+### Judgment calls (step 10)
+- Did not attempt the third Part-3 §3.1 scenario literally ("STARTING
+  a session offline" from a stone-cold app launch with zero prior
+  online visit, i.e. an empty IndexedDB cache) — that's not fixable at
+  this layer; there is nothing to fall back to if the device has never
+  synced. Existing behavior (rifle/load picker shows empty, same as
+  before this step) is correct and unchanged. Step 12's airplane-mode
+  walk should confirm this is understood as expected, not a bug.
+- Left `SyncQueue`'s per-category `renderStatus` call sites in
+  `categories.js` in place rather than removing them — those screens
+  still render when reached via Paperwork's "Everything else"
+  shortcuts (step 8's flagged item), so their own sync banners are
+  still occasionally relevant until step 11 decides their fate.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

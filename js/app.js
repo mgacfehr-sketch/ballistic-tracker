@@ -311,9 +311,15 @@
                         return;
                     }
                     if (!opts.rifleId) return;
+                    // v3.0 §3.1: loads are cache-safe offline; sessions
+                    // aren't cached at all, so a failed fetch here must
+                    // not sink the whole auto-select — offline, Roy still
+                    // gets dropped straight into capture on his one cached
+                    // load instead of staring at a picker that already
+                    // knows which rifle he tapped.
                     Promise.all([
                         db.getLoadsByRifle(opts.rifleId),
-                        db.getSessionsByRifle(opts.rifleId)
+                        db.getSessionsByRifle(opts.rifleId).catch(function () { return []; })
                     ]).then(function (res) {
                         var loads = res[0] || [];
                         if (!loads.length || sessionFlow.currentStep !== 0) return;

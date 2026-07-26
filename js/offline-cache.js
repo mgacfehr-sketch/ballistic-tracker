@@ -164,6 +164,20 @@ var OfflineCache = {
     },
 
     /**
+     * Get a single cached load by ID (primary key — no rifleId needed).
+     */
+    getCachedLoad: function (id) {
+        return OfflineCache._openDB().then(function (idb) {
+            return new Promise(function (resolve, reject) {
+                var tx = idb.transaction('loads', 'readonly');
+                var req = tx.objectStore('loads').get(id);
+                req.onsuccess = function () { resolve(req.result || null); };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).catch(function () { return null; });
+    },
+
+    /**
      * Get cached loads for a rifle (via rifleId index).
      */
     getCachedLoads: function (rifleId) {
