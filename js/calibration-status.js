@@ -317,7 +317,7 @@ var CalibrationStatusCard = (typeof document !== 'undefined') ? (function () {
             title: 'Muzzle velocity',
             what: 'Measured MV comes from your chronograph; estimated MV is the box number.',
             why: 'Box numbers routinely run 50+ fps off — that is inches at distance. Lot changes move it again.',
-            unlock: 'Import a chrono string and this flips to measured, with SD.'
+            unlock: 'Type in an average — or import a chrono file — and this flips to measured.'
         },
         trued: {
             title: 'Trued',

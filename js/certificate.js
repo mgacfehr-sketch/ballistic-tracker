@@ -51,7 +51,10 @@ CertificateManager.prototype.showPreflight = function (rifleId) {
         this.db.getSessionsByRifle(rifleId),
         this.db.getVelocityStringsByRifle(rifleId),
         this.db.getLoadsByRifle(rifleId),
-        this.db.getBarrelsByRifle(rifleId)
+        this.db.getBarrelsByRifle(rifleId),
+        this.db.getMvMeasurementsByRifle
+            ? this.db.getMvMeasurementsByRifle(rifleId).catch(function () { return []; })
+            : Promise.resolve([])
     ]).then(function (res) {
         var rifle = res[0];
         if (!rifle) { self.profileManager.showRifleList(); return; }
@@ -68,6 +71,7 @@ CertificateManager.prototype.showPreflight = function (rifleId) {
             sessions: res[1] || [],
             strings: res[2] || [],
             loads: res[3] || [],
+            mvMeasurements: res[5] || [],
             agg: aggregateRifle({ sessions: res[1] || [], strings: res[2] || [], loads: res[3] || [] })
         };
         self._renderPreflight();
@@ -109,8 +113,19 @@ CertificateManager.prototype._renderPreflight = function () {
     if (!eligible.length) {
         blockers.push('No eligible target group yet (needs a saved session with 3+ marked shots).');
     }
-    if (!confirmedCount) {
-        blockers.push('No confirmed velocity strings yet — import chrono data and confirm the load.');
+    // v2.5 §2.5: a typed (manual, shot-counted) measurement satisfies
+    // the velocity requirement — never import-gated. Provenance prints.
+    var manualByLoad = {};
+    (c.mvMeasurements || []).forEach(function (m) {
+        if (!m || !m.loadId || typeof m.value !== 'number' || !m.shotCount) return;
+        if (!manualByLoad[m.loadId] || String(m.date) > String(manualByLoad[m.loadId].date)) {
+            manualByLoad[m.loadId] = m;
+        }
+    });
+    this._manualByLoad = manualByLoad;
+    var hasManual = Object.keys(manualByLoad).length > 0;
+    if (!confirmedCount && !hasManual) {
+        blockers.push('No velocity data yet — type in your bullet speed (rifle page) or import chrono data.');
     }
 
     if (blockers.length) {
@@ -153,13 +168,23 @@ CertificateManager.prototype._renderPreflight = function () {
     html += '</select></div>';
 
     html += '<div class="field"><label class="field-label" for="cert-load">Load to certify</label><select id="cert-load">';
-    var loadsWithStrings = agg.loads.filter(function (r) { return r.stringCount > 0; });
-    for (var l = 0; l < loadsWithStrings.length; l++) {
-        var r = loadsWithStrings[l];
+    var loadsEligible = agg.loads.filter(function (r) {
+        return r.stringCount > 0 || manualByLoad[r.loadId];
+    });
+    for (var l = 0; l < loadsEligible.length; l++) {
+        var r = loadsEligible[l];
+        var optText;
+        if (r.stringCount > 0) {
+            optText = escapeHtml(r.load.name) + ' — avg ' + formatNum(r.stats.avg, 1) + ', SD ' +
+                formatNum(r.stats.sd, 1) + ', ES ' + formatNum(r.stats.es, 1) + ' (' + r.stats.n + ' shots)';
+        } else {
+            var m = manualByLoad[r.loadId];
+            optText = escapeHtml(r.load.name) + ' — avg ' + formatNum(m.value, 0) +
+                (typeof m.sd === 'number' ? ', SD ' + formatNum(m.sd, 1) : '') +
+                ' (' + m.shotCount + ' shots, typed)';
+        }
         html += '<option value="' + escapeAttr(r.loadId) + '"' +
-            (r.loadId === agg.recommendedLoadId ? ' selected' : '') + '>' +
-            escapeHtml(r.load.name) + ' — avg ' + formatNum(r.stats.avg, 1) + ', SD ' +
-            formatNum(r.stats.sd, 1) + ', ES ' + formatNum(r.stats.es, 1) + ' (' + r.stats.n + ' shots)' +
+            (r.loadId === agg.recommendedLoadId ? ' selected' : '') + '>' + optText +
             (r.loadId === agg.recommendedLoadId ? ' (recommended)' : '') + '</option>';
     }
     html += '</select></div>';
@@ -191,8 +216,19 @@ CertificateManager.prototype._onGenerate = function () {
 
     var session = c.sessions.filter(function (s) { return s.id === sessionId; })[0];
     var loadRow = c.agg.loads.filter(function (r) { return r.loadId === loadId; })[0];
+    // v2.5 §2.5: a typed measurement substitutes for chrono strings,
+    // clearly stamped as typed on the printed certificate
+    if (loadRow && !loadRow.stats.n && this._manualByLoad && this._manualByLoad[loadId]) {
+        var m = this._manualByLoad[loadId];
+        loadRow = {
+            loadId: loadRow.loadId,
+            load: loadRow.load,
+            stringCount: 0,
+            stats: { avg: m.value, sd: typeof m.sd === 'number' ? m.sd : null, es: null, n: m.shotCount, manual: true }
+        };
+    }
     if (!session || !loadRow || !loadRow.stats.n) {
-        status.textContent = 'Pick a group and a load with confirmed chrono data.';
+        status.textContent = 'Pick a group and a load with velocity data (typed or chrono).';
         return;
     }
 
@@ -357,11 +393,12 @@ CertificateManager.prototype._renderCertificate = function (session, loadRow, ta
     ctx.fillText('VELOCITY — ' + loadRow.load.name.toUpperCase(), M, vy);
 
     var stats = loadRow.stats;
+    // v2.5 §2.5: typed measurements print with honest provenance
     var cols = [
-        ['AVERAGE', formatNum(stats.avg, 1) + ' fps'],
-        ['SD', formatNum(stats.sd, 1) + ' fps'],
-        ['ES', formatNum(stats.es, 1) + ' fps'],
-        ['SHOTS', String(stats.n)],
+        ['AVERAGE', formatNum(stats.avg, stats.manual ? 0 : 1) + ' fps'],
+        ['SD', stats.sd !== null && stats.sd !== undefined ? formatNum(stats.sd, 1) + ' fps' : '—'],
+        ['ES', stats.es !== null && stats.es !== undefined ? formatNum(stats.es, 1) + ' fps' : '—'],
+        ['SHOTS', String(stats.n) + (stats.manual ? ' (typed)' : '')],
         ['ROUNDS AT TEST', dash(this._roundCountAtTest(loadRow.loadId))]
     ];
     var colW = (CERT_W - 2 * M) / cols.length;

@@ -180,6 +180,30 @@ observation (quick mode already builds exactly one), so the one-observation
 
 ---
 
+## Step 5 — Manual bullet speed + import-gate audit (§2.5)
+
+- **`js/mv-entry.js`** — the "Add bullet speed" sheet, everywhere velocity is
+  asked: PRIMARY "Type it in" (average + roughly-how-many-shots chips 3/5/10/20
+  + optional SD behind a fold); secondary "Import a chronograph file" (gold
+  utility). Wired from the card's MV segment sheet and the next-action
+  deep link (`_launch('chrono')` now opens the sheet first).
+- **Honest provenance:** a counted average writes `mv_measurements` with
+  `source: 'manual'` (via SyncQueue — works offline); "just a guess" updates
+  the load's box velocity instead — the state honestly stays *estimated*.
+  Verified (not rebuilt): `addMvMeasurement` already defaults source
+  'manual', `deriveCalibrationStatus` treats any counted measurement as
+  measured, and `truingConfidence` keys off measured-MV independently.
+- **Import-gate audit — one real gate found and opened:** the certificate
+  preflight hard-blocked on confirmed chrono strings. Now a typed,
+  shot-counted measurement satisfies it: blocker message updated, the load
+  picker accepts typed-velocity loads ("avg 2950 (10 shots, typed)"), and
+  the printed certificate stamps provenance — SHOTS "10 (typed)", SD/ES
+  print "—" when unknown. Chrono strings still take precedence when present.
+  Everything else checked (steel per-shot MV numeric pad, truing "true
+  rough" path, onboarding manual entry, load form) already had manual paths.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

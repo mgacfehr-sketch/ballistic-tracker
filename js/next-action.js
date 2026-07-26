@@ -114,7 +114,7 @@ function deriveNextAction(input) {
         ladder.push({
             id: 'measure-mv',
             title: mv.state === 'stale' ? 'Re-measure your muzzle velocity' : 'Measure your muzzle velocity',
-            detail: 'Import a chrono file or type 10 shots.',
+            detail: 'Type in an average, or import a chrono file.',
             payoff: input.mvTrueYd
                 ? 'Extends your proven range to ~' + Number(input.mvTrueYd).toLocaleString() + ' yd.'
                 : 'Measured velocity beats the box number.',

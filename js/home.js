@@ -308,7 +308,7 @@ HomeManager.prototype._openSegmentSheet = function (key, rifle, status) {
     var self = this;
     var ACTIONS = {
         zero: { label: 'Confirm zero', type: 'rangeSession' },
-        mv: { label: 'Import chrono data', type: 'chrono' },
+        mv: { label: 'Add bullet speed', type: 'chrono' },
         trued: { label: 'True this rifle', type: 'truing' },
         tracking: { label: 'Verify tracking', type: 'scopeCheck' }
     };
@@ -452,7 +452,10 @@ HomeManager.prototype._launch = function (type, rifle, ctx) {
             else if (window.AppNav) AppNav.go('session');
             break;
         case 'chrono':
-            if (window.AppNav) AppNav.go('chrono');
+            // v2.5 §2.5: never import-gated — type it in is the primary
+            if (typeof MvEntry !== 'undefined') {
+                MvEntry.open(this.db, rifle, { onDone: function (saved) { if (saved) self.show(); } });
+            } else if (window.AppNav) AppNav.go('chrono');
             break;
         case 'truing':
             if (window.ToolActions && ToolActions.truing) ToolActions.truing(this.db, rifle.id);
