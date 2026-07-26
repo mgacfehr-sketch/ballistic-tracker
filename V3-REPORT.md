@@ -456,6 +456,61 @@ screen instead of returning to the rifle.
 
 ---
 
+---
+
+## Step 8 — View 8 (Paperwork) drill-down
+
+- **The rifle name is now always the tap target for THE RIFLE'S
+  PAPERWORK**, reusing `ProfileManager.showRifleDetail()` via
+  `AppNav.openRifle(rifle.id)` — no new screen built; per the contract,
+  view 8 is explicitly "reuses the existing pipeline," and that screen
+  (rifle bio, loads, stats, "Everything else" utility shortcuts) is
+  already mature.
+- **Judgment call — the switcher moved off the name.** Before this
+  step, tapping the name with >1 rifle opened the "Which rifle?" plain
+  list (`_openRifleList`); with exactly 1 rifle the name wasn't tappable
+  at all. Since the contract is explicit that the name opens Paperwork,
+  the switcher trigger moved to the dots row instead (now a real
+  `<button id="rf-dots">`, padded to a 44px tap target per CLAUDE.md's
+  touch-target rule — the dots themselves stay visually 6px). Swipe
+  between rifles still works exactly as before; this only changes the
+  *tap* target. Screenshotted both paths (`rname` → opens Paperwork
+  with the correct rifle id; `dots` → opens the switcher overlay) —
+  both fire correctly, no runtime errors.
+- **Found and fixed a real dead-end**: with the bottom tab bar gone
+  (step 1), `ProfileManager`'s top-level "Rifles" list
+  (`_renderRifleList` — reached via Paperwork's own back button, and
+  itself hosting Add rifle / Misc sessions / Account deletion) had NO
+  way back to Home at all — it was built assuming the tab bar handled
+  that. Added a `‹ Home` backline wired to `AppNav.go('home')`. This
+  closes the loop: Home → tap name → Paperwork → back → Rifles list →
+  back → Home. Without this fix, Paperwork would have been a one-way
+  door the moment it became reachable from the resting screen.
+- **821 tests green**, no regressions (nav-wiring + one CSS button-reset
+  change only, no new pure logic this step).
+
+### Judgment calls (step 8)
+- Left Paperwork's "Everything else" shortcut list (`Categories.KEYS`:
+  range/steel/loaddev/ballistics/truing/scopetrack/records) untouched.
+  These route into the OLD category screens — the same pattern Part 2
+  kills as *primary* navigation — but several of them (cleaning log,
+  wind call, DOPE log, scope-adjustment history, records/export) have
+  no v3 equivalent yet and need *some* entry point. Pruning/replacing
+  this list is exactly what step 11's "retire old surfaces + mapping
+  table" is for, so it's flagged there rather than decided here as a
+  side effect of just wiring the back-button. **Owner-relevant**: this
+  list is now more reachable than before (Paperwork previously had no
+  path back to it either), so it's worth a look before step 11 finalizes
+  what stays.
+- Did not attempt to fix `js/device-export.js`, `js/home.js`,
+  `js/rifle-simple.js`'s stale `Categories.show(...)` references found
+  during this step's grep sweep — none of them are reachable from any
+  currently-rendered screen (they belong to the retired-pending
+  HomeManager/Lanes stack), so fixing them now would be dead-code
+  churn ahead of step 11's actual retirement pass.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

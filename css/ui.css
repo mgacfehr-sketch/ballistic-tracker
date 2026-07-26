@@ -1884,7 +1884,10 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 .v3-rname h1 { font: var(--type-title); }
 .v3-rname .load { color: var(--text-secondary); font: var(--type-body); }
-.v3-dots { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
+.v3-dots {
+    display: flex; gap: 6px; justify-content: center; align-items: center;
+    margin: 0 auto; background: none; border: none; padding: 14px; min-height: var(--tap-min);
+}
 .v3-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border-default); display: inline-block; }
 .v3-dots i.on { background: var(--brand-gold); }
 

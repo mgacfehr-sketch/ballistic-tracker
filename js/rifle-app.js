@@ -80,17 +80,18 @@ RifleApp.prototype._renderRifle = function () {
     var many = this._rifles.length > 1;
 
     var html = '<div class="screen" style="padding-top:var(--space-lg)">';
-    html += many
-        ? '<button class="v3-rname v3-rname-tap" id="rf-rname"><h1>' + UI.esc(rifle.name || 'Rifle') + '</h1>' +
-          (rifle.caliber ? '<span class="load">' + UI.esc(rifle.caliber) + '</span>' : '') + '</button>'
-        : '<div class="v3-rname"><h1>' + UI.esc(rifle.name || 'Rifle') + '</h1>' +
-          (rifle.caliber ? '<span class="load">' + UI.esc(rifle.caliber) + '</span>' : '') + '</div>';
+    // v3.0 step 8: the name is always the tap target for THE RIFLE'S
+    // PAPERWORK (view 8, reusing ProfileManager.showRifleDetail via
+    // AppNav.openRifle) — with >1 rifle, the dots row below becomes the
+    // switcher tap target instead (swipe still works either way).
+    html += '<button class="v3-rname v3-rname-tap" id="rf-rname"><h1>' + UI.esc(rifle.name || 'Rifle') + '</h1>' +
+        (rifle.caliber ? '<span class="load">' + UI.esc(rifle.caliber) + '</span>' : '') + '</button>';
     if (many) {
-        html += '<div class="v3-dots" id="rf-dots">';
+        html += '<button class="v3-dots" id="rf-dots">';
         this._rifles.forEach(function (r, i) {
             html += '<i' + (i === self._cardIndex ? ' class="on"' : '') + '></i>';
         });
-        html += '</div>';
+        html += '</button>';
     }
     html += '<button class="v3-numberbox" id="rf-number"><div class="lbl">PROVEN TO</div>' +
         '<div class="num" id="rf-num-val">&mdash;<em>yd</em></div><div class="conf" id="rf-conf">&nbsp;</div></button>';
@@ -119,6 +120,10 @@ RifleApp.prototype._renderRifle = function () {
     });
     var rnameBtn = document.getElementById('rf-rname');
     if (rnameBtn) rnameBtn.addEventListener('click', function () {
+        if (window.AppNav) AppNav.openRifle(rifle.id);
+    });
+    var dotsBtn = document.getElementById('rf-dots');
+    if (dotsBtn) dotsBtn.addEventListener('click', function () {
         self._openRifleList();
     });
 

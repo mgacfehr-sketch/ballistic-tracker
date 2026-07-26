@@ -43,7 +43,8 @@ ProfileManager.prototype.showRifleList = function () {
 ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed) {
     var self = this;
     var html = '<div class="screen">';
-    html += '<div class="pagehead"><div class="pagetitle">Rifles</div></div>';
+    html += '<div class="pagehead"><button class="backline" id="btn-rifles-back">&lsaquo; Home</button>' +
+        '<div class="pagetitle">Rifles</div></div>';
 
     // Fleet summary chips line ("4 ready · 2 need adjustment · 1 not checked")
     if (rifles.length > 1) {
@@ -152,6 +153,10 @@ ProfileManager.prototype._fillFleetReadiness = function (rifles) {
 
 ProfileManager.prototype._bindRifleListEvents = function () {
     var self = this;
+    var backBtn = document.getElementById('btn-rifles-back');
+    if (backBtn) backBtn.addEventListener('click', function () {
+        if (window.AppNav) AppNav.go('home');
+    });
     var addBtn = document.getElementById('btn-add-rifle');
     if (addBtn) {
         addBtn.addEventListener('click', function () {
