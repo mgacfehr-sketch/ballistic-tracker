@@ -66,7 +66,10 @@ HistoryManager.prototype._sessionRowsHtml = function (sessions) {
         html += '<img class="thumb" data-session-id="' + escapeAttr(s.id) + '" alt="">';
         html += '<div class="row-main">';
         html += '<div class="row-title">' + shotCount + ' shots &middot; ' + formatNum(s.distanceYards, 0) + ' yd</div>';
-        html += '<div class="row-sub">' + escapeHtml(dateStr) + '</div>';
+        // v2.5 §3.2: an offline save is VISIBLE immediately, marked
+        html += '<div class="row-sub">' + escapeHtml(dateStr) +
+            (s._pending ? ' &middot; <span style="color:var(--status-caution);font-weight:600">waiting to sync</span>' : '') +
+            '</div>';
         html += '</div>';
         html += '<div class="row-aside">' + groupStr + '</div>';
         html += '</button>';

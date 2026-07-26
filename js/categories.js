@@ -460,10 +460,16 @@ var Categories = (function () {
             '<button class="backline" id="uh-back">&lsaquo; Data &amp; Records</button>' +
             '<div class="pagetitle">History &middot; ' + UI.esc(ctx.rifle.name || 'Rifle') + '</div>' +
             '</div>' +
+            '<div id="uh-sync"></div>' +
             '<div class="card card-pad" style="margin-bottom:10px">' + chips + '</div>' +
             '<div id="uh-body"><div class="card"><div class="rowlink"><div class="txt">' +
             '<span class="t-micro">Loading&hellip;</span></div></div></div></div>' +
             '</div>';
+
+        // §3.2: the visible sync state — never invisible data
+        if (typeof SyncQueue !== 'undefined' && SyncQueue && SyncQueue.renderStatus) {
+            SyncQueue.renderStatus(document.getElementById('uh-sync'));
+        }
 
         document.getElementById('uh-back').addEventListener('click', function () {
             show('records', ctx.rifle.id);
@@ -502,7 +508,8 @@ var Categories = (function () {
                     rows += UI.rowlink({
                         button: true,
                         title: shots + ' shots · ' + formatNum(s.distanceYards, 0) + ' yd',
-                        sub: (s.date ? new Date(s.date).toLocaleDateString() : '') + ' · ' + moa,
+                        sub: (s.date ? new Date(s.date).toLocaleDateString() : '') + ' · ' + moa +
+                            (s._pending ? ' · waiting to sync' : ''),
                         subMono: true,
                         chev: true,
                         data: { session: s.id }
@@ -843,6 +850,7 @@ var Categories = (function () {
 
         // Calibration Status card at the top (§2.7 — Data & Records)
         if (def.statusCard) {
+            html += '<div id="cat-sync-status"></div>';
             html += '<div id="cat-status-card" class="u-mt-14"></div>';
         }
 
@@ -926,6 +934,9 @@ var Categories = (function () {
         if (def.statusCard && typeof CalibrationStatusCard !== 'undefined' && CalibrationStatusCard) {
             var scEl = document.getElementById('cat-status-card');
             if (scEl) CalibrationStatusCard.render(scEl, _db, ctx.rifle);
+        }
+        if (def.statusCard && typeof SyncQueue !== 'undefined' && SyncQueue && SyncQueue.renderStatus) {
+            SyncQueue.renderStatus(document.getElementById('cat-sync-status'));
         }
 
         // chip readiness word + load line (".264 · Federal 143 ELD-X · READY")

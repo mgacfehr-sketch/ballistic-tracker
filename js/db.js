@@ -416,6 +416,17 @@ BallisticDB.prototype.addSession = function (data) {
         config: data.config || null,
         sessionType: data.sessionType || null,
         ladder: data.ladder || null,
+        // v2.5 §3.2 fix: these were silently DROPPED by this whitelist —
+        // session-flow sends them and the columns exist (REORG/CROWD
+        // migrations reference them). Losing the suppressor/lot tags
+        // also silenced the per-can shift monitor for paper sessions.
+        suppressorId: data.suppressorId || null,
+        lotNumber: data.lotNumber || null,
+        rifleName: data.rifleName || null,
+        rifleCaliber: data.rifleCaliber || null,
+        loadName: data.loadName || null,
+        loadBulletName: data.loadBulletName || null,
+        loadBulletWeight: data.loadBulletWeight || null,
         createdAt: new Date().toISOString()
     };
     var row = _jsToRow(session, self.userId);

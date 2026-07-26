@@ -115,6 +115,46 @@ var SyncQueueCore = {
     filterPending: function (rows, filterField, filterValue) {
         if (!filterField || filterValue === undefined) return rows || [];
         return (rows || []).filter(function (r) { return r && r[filterField] === filterValue; });
+    },
+
+    /** Single-row reads (v2.5 §3.2): the queued copy wins by id. */
+    READ_SINGLE: {
+        getSession: { table: 'sessions' }
+    },
+
+    /** The queued row for an id, flagged _pending — or null. */
+    findPending: function (pendingRows, id) {
+        var hit = null;
+        (pendingRows || []).forEach(function (r) { if (!hit && r && r.id === id) hit = r; });
+        if (!hit) return null;
+        var out = {};
+        for (var k in hit) { if (hit.hasOwnProperty(k)) out[k] = hit[k]; }
+        out._pending = true;
+        return out;
+    },
+
+    /** {pending, errored} counts for the visible sync state. */
+    opsSummary: function (ops) {
+        var pending = 0, errored = 0;
+        (ops || []).forEach(function (o) {
+            if (!o) return;
+            if (o.status === 'pending') pending++;
+            else if (o.status === 'error') errored++;
+        });
+        return { pending: pending, errored: errored };
+    },
+
+    /** New ops array with error ops reset for another flush round.
+     *  Immutable — attempts restart so MAX_ATTEMPTS applies afresh. */
+    resetErrors: function (ops) {
+        return (ops || []).map(function (o) {
+            if (!o || o.status !== 'error') return o;
+            var out = {};
+            for (var k in o) { if (o.hasOwnProperty(k)) out[k] = o[k]; }
+            out.status = 'pending';
+            out.attempts = 0;
+            return out;
+        });
     }
 };
 
@@ -383,6 +423,22 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                 });
             };
         });
+
+        // v2.5 §3.2: single-row reads — a queued session was INVISIBLE
+        // to db.getSession (Home's Recent strip showed nothing)
+        Object.keys(SyncQueueCore.READ_SINGLE).forEach(function (method) {
+            if (typeof db[method] !== 'function') return;
+            var spec = SyncQueueCore.READ_SINGLE[method];
+            var orig = db[method].bind(db);
+            db[method] = function (id) {
+                var args = arguments;
+                return getPending(spec.table).then(function (pendingAll) {
+                    var hit = SyncQueueCore.findPending(pendingAll, id);
+                    if (hit) return hit; // client is source of truth
+                    return orig.apply(null, args);
+                });
+            };
+        });
     }
 
     /* ── lifecycle ────────────────────────────────────────── */
@@ -393,7 +449,11 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
             _idb = idb;
             _wrapReads(db);
             if (typeof window !== 'undefined') {
+                // v2.5 §3.2: iOS standalone fires `online` unreliably —
+                // belt AND suspenders: online, visibility, pageshow, focus
                 window.addEventListener('online', function () { flush(); });
+                window.addEventListener('pageshow', function () { if (_online()) flush(); });
+                window.addEventListener('focus', function () { if (_online()) flush(); });
                 document.addEventListener('visibilitychange', function () {
                     if (document.visibilityState === 'visible' && _online()) flush();
                 });
@@ -412,6 +472,59 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
         });
     }
 
+    /** {pending, errored} for the visible sync state (§3.2). */
+    function summary() {
+        return _getAllOps().then(SyncQueueCore.opsSummary)
+            .catch(function () { return { pending: 0, errored: 0 }; });
+    }
+
+    /** Reset parked error ops and flush again — the user's Retry. */
+    function retryErrors() {
+        return _getAllOps().then(function (ops) {
+            var reset = SyncQueueCore.resetErrors(ops).filter(function (o, i) {
+                return ops[i] && ops[i].status === 'error';
+            });
+            var chain = Promise.resolve();
+            reset.forEach(function (op) {
+                chain = chain.then(function () {
+                    return _tx('ops', 'readwrite', function (store) { store.put(op); });
+                });
+            });
+            return chain;
+        }).then(function () {
+            _notify();
+            return flush();
+        });
+    }
+
+    /**
+     * §3.2: the visible sync state. Renders a banner into `el` when
+     * saves are waiting or parked — with a working "Sync now" — and
+     * clears it when the queue is empty. Data must never be invisible.
+     */
+    function renderStatus(el) {
+        if (!el) return Promise.resolve();
+        return summary().then(function (s) {
+            if (!el.isConnected) return;
+            if (!s.pending && !s.errored) { el.innerHTML = ''; return; }
+            var bits = [];
+            if (s.pending) bits.push(s.pending + ' save' + (s.pending === 1 ? '' : 's') + ' waiting to sync');
+            if (s.errored) bits.push(s.errored + ' failed');
+            el.innerHTML = UI.banner('caution',
+                '<span class="t-label" style="line-height:1.5">' + UI.esc(bits.join(' · ')) +
+                '</span> <button class="btn-utility" id="sync-now-btn" style="min-height:44px;padding:4px 14px;margin-left:8px">Sync now</button>',
+                true);
+            var btn = el.querySelector('#sync-now-btn');
+            if (btn) btn.addEventListener('click', function () {
+                btn.disabled = true;
+                btn.textContent = 'Syncing…';
+                (s.errored ? retryErrors() : flush()).then(function () {
+                    renderStatus(el);
+                });
+            });
+        });
+    }
+
     function onChange(fn) { _listeners.push(fn); }
 
     return {
@@ -421,6 +534,9 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
         flush: flush,
         getPending: getPending,
         pendingCount: pendingCount,
+        summary: summary,
+        retryErrors: retryErrors,
+        renderStatus: renderStatus,
         onChange: onChange
     };
 })() : null;

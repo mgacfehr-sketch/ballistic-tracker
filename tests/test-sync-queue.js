@@ -64,5 +64,43 @@ check('undefined value with a filter field → all rows (getAll*)', S.filterPend
 check('no match → empty', S.filterPending(rows, 'rifleId', 'r9').length, 0);
 
 console.log('\n' + '═'.repeat(40));
+console.log('\nv2.5 §3.2 REGRESSION — the reconnect path, end to end:');
+// t0: OFFLINE — the session queues; merged reads must show it, marked
+var queuedRow = { id: 'sess-offline', rifleId: 'r1', date: '2026-07-25T10:00:00Z', results: { groupSizeMOA: 0.9 } };
+var opsOffline = [{ seq: 1, table: 'sessions', status: 'pending', row: queuedRow }];
+var pendingRows = opsOffline.filter(function (o) { return o.status !== 'done'; }).map(function (o) { return o.row; });
+var mergedOffline = S.mergePending([], S.filterPending(pendingRows, 'rifleId', 'r1'));
+check('offline: the save is visible in history immediately', mergedOffline.length, 1);
+check('offline: marked pending', mergedOffline[0]._pending, true);
+check('offline: single-row read finds it too (Recent strip)',
+    S.findPending(pendingRows, 'sess-offline').id, 'sess-offline');
+check('offline: single-row copy is flagged', S.findPending(pendingRows, 'sess-offline')._pending, true);
+check('offline: summary counts it', S.opsSummary(opsOffline).pending, 1);
+
+// t1: RECONNECT — flush lands the row on the server, op deleted
+var serverAfter = [queuedRow];
+var opsAfter = [];
+var mergedAfter = S.mergePending(serverAfter, S.filterPending([], 'rifleId', 'r1'));
+check('after sync: the session appears normally', mergedAfter.length, 1);
+check('after sync: no longer marked pending', mergedAfter[0]._pending, undefined);
+check('after sync: single-row read falls through to the server', S.findPending([], 'sess-offline'), null);
+check('after sync: summary is clean', S.opsSummary(opsAfter).pending + S.opsSummary(opsAfter).errored, 0);
+
+// t2: FLUSH FAILS — parked as error; still visible + retryable
+var opsErr = [{ seq: 2, table: 'sessions', status: 'error', attempts: 5, row: queuedRow }];
+var stillPendingRows = opsErr.filter(function (o) { return o.status !== 'done'; }).map(function (o) { return o.row; });
+check('failed flush: the save is STILL visible (never invisible)',
+    S.mergePending([], S.filterPending(stillPendingRows, 'rifleId', 'r1')).length, 1);
+check('failed flush: summary shows the error state', S.opsSummary(opsErr).errored, 1);
+var retried = S.resetErrors(opsErr);
+check('retry resets to pending', retried[0].status, 'pending');
+check('retry restarts the attempt budget', retried[0].attempts, 0);
+check('retry is immutable (original untouched)', opsErr[0].status, 'error');
+check('non-error ops pass through resetErrors unchanged', S.resetErrors(opsOffline)[0], opsOffline[0]);
+
+console.log('\ngetSession decoration map:');
+check('getSession is single-row decorated', S.READ_SINGLE.getSession.table, 'sessions');
+check('findPending misses cleanly', S.findPending(pendingRows, 'nope'), null);
+
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

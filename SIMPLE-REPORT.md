@@ -235,6 +235,40 @@ observation (quick mode already builds exactly one), so the one-observation
 
 ---
 
+## Step 7 — Offline sync visibility (§3.2) + regression tests
+
+Fixes for every hole from the step-0 diagnosis:
+- **`db.getSession` decorated** (new READ_SINGLE map): a queued session is
+  now visible to single-row reads — Home's Recent strip showed NOTHING for
+  a pending save. Queued copy wins by id, flagged `_pending`.
+- **Visible pending state:** history rows (rifle history + unified History)
+  now mark pending saves — "waiting to sync" in caution color.
+- **Visible retry state:** `SyncQueue.summary()` / `retryErrors()` /
+  `renderStatus(el)` — a caution banner ("2 saves waiting to sync · 1
+  failed — Sync now") renders at the top of unified History and Data &
+  Records whenever ops are pending or parked; Sync now resets errored ops
+  (fresh attempt budget) and flushes. Data is never invisible.
+- **Reconnect triggers hardened:** iOS standalone fires `online`
+  unreliably — added `pageshow` and `focus` listeners alongside
+  `online`/`visibilitychange`; plus the always-there manual Sync now.
+- **`db.addSession` whitelist fixed** (the step-0 bonus find): it silently
+  dropped `suppressorId`, `lotNumber`, and the rifle/load snapshot names
+  that session-flow sends — columns that exist in the live schema. Online
+  paper saves were losing their suppressor/lot tags (which also silenced
+  the per-can shift monitor for paper sessions). All seven fields now map.
+- **17 new regression tests** (sync-queue suite, 49 total) reproducing the
+  contract path: offline save visible+pending → reconnect flush → visible
+  normally → flush failure still visible + retryable (immutable resetErrors,
+  fresh attempt budget).
+
+### Judgment calls (step 7)
+- The likeliest owner scenario: the save was fine but `online` never fired
+  on iOS AND the Recent strip (getSession) couldn't see the pending row —
+  it looked vanished while sitting safely in the queue. Every leg of that
+  chain now has a fix + a visible state.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)
