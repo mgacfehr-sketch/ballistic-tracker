@@ -711,6 +711,128 @@ dead screen by accident later.
 
 ---
 
+---
+
+## Step 12 — QA gate: all 8 views, Roy walk, the 925-yard string, airplane walk
+
+### The Roy walk (925-yard string, the owner's own test case)
+
+Built a single scripted walk (`harness-v3-roywalk.html` +
+`inspect-v3-roywalk.js`) through all eight views in sequence, at both
+390px and 320px viewport widths (iPhone SE-class, the narrowest phone
+worth caring about):
+
+1. **View 1** (resting) → **2** (Add chooser) → **3b** (Steel) — picked
+   the **925** distance chip, dialed to the profile's real computed
+   come-up (22.0 MOA — checked against `computeTrajectory` directly:
+   21.87 MOA true value for this rifle/load), missed a plausible 2"
+   low, Done.
+2. **View 4** (Payoff) — rendered correctly: *"Got it. Your 925-yard
+   dial changes from 21.9 to 22.2. Everything past ~600 just got more
+   accurate. One more shot at 925 makes it solid."* Confidence
+   correctly Thin (one observation) — the honesty guard accepted this
+   one (my first attempt used unrealistic test inputs — 15 MOA dialed,
+   6" miss — which the guard correctly REFUSED as "bigger than a
+   speed or drag problem can explain," proving the refusal path works
+   too, not just the happy path). Kept.
+3. **View 1 again** — PROVEN TO now reads **925**, drop chart shows
+   600/700/800/900 (the correct `pickDropRows(925)` output), feed leads
+   with "Steel at 925 · Today · dial corrected 21.9 → 22.2".
+4. **View 5** (Why), **6** (Full Chart), **7** (Record — showing the
+   925-yard steel record with Edit/Delete and its BC correction "0.315
+   → 0.305 (kept)", MV having already been measured so doctrine
+   correctly routed to BC), **8** (Paperwork — confirmed `AppNav.
+   openRifle('r1')` fires on name-tap).
+- **Zero horizontal overflow at any stop, either viewport width**
+  (`document.documentElement.scrollWidth` measured equal to
+  `window.innerWidth` at all 16 checkpoints: 8 views × 2 widths).
+- **Zero console/page errors** across the entire walk.
+
+### Airplane-mode walk
+
+Built `harness-v3-airplane.html` + `inspect-v3-airplane.js`: seeded the
+IndexedDB caches the way a prior online visit would (rifle, load,
+barrel), then went fully offline (`context.setOffline(true)`) and did
+a **cold app launch** — `RifleApp.init()`/`.show()` from scratch,
+network never touched. The fake Supabase client deliberately mimics a
+*real* dropped connection (every query is a thenable that rejects
+asynchronously after a tick), not a null client — a null client tests
+a different, less realistic failure shape (a sync throw instead of an
+async rejection) and would have hidden exactly the class of bug step
+10 fixed.
+- Resting screen rendered correctly from cache alone: rifle name,
+  drop chart (computed client-side from the cached load, no network
+  needed), correct "not started" coach line, empty feed with the
+  right empty-state copy. No errors.
+- Tapped **Add → Steel while still offline**: the picker (loads via
+  cache) and the full steel entry screen (dial stepper, hit stepper,
+  Done button) rendered correctly — this is the literal "STARTING a
+  session offline" the contract calls for. No errors.
+- Combined with step 10's own `harness-v3-sync.html` (already covered
+  the write-queues-and-later-flushes half of this walk with the real
+  `SyncQueue`/IndexedDB stack), the two harnesses together prove the
+  full offline lifecycle: cold launch → start a session → (queue,
+  proven in step 10) → reconnect → flush → banner clears.
+
+### Tap-target and layout audit
+
+- Every interactive `.v3-*` class carries `min-height: var(--tap-min)`
+  (52px, above CLAUDE.md's 44px floor) or a naturally larger box
+  (`.v3-bigchoice` 96px, `.v3-stepper` buttons 60px, the number/chart
+  boxes sized by their own generous content+padding). No violations
+  found.
+- Grepped all currently-reachable JS for fixed pixel widths that could
+  overflow a 320px screen inside the v3- component block — none found;
+  every width is `calc(100% - 2 * var(--edge))` or unset.
+
+### Language/color spot-check (dark theme)
+
+Re-screenshotted views 1/5/6 in dark theme after all ten prior steps'
+cumulative CSS changes (the step 8 dots-button rework, step 10's sync
+banner slot) — no regressions, no errors, the dots row and sync-banner
+slot both sit cleanly with zero layout disruption when the banner is
+empty (zero-height, as designed).
+
+### Housekeeping: a test-count correction
+
+Steps 7 through 11's reports all cite **821** tests green — that
+number was a manual-addition error on my part, made once at step 7
+and carried forward without re-adding. The actual, verified total
+(re-summed from every `tests/test-*.js` file's own printed count,
+right now) is **846** — unchanged since step 6, because steps 7–11
+added no new pure/tested module (only additive `db.js`/`feed-core.js`
+methods already covered by existing suites, plus UI wiring). All
+846 pass, 0 failures, confirmed fresh for this report. No test
+actually regressed at any point — only my arithmetic did.
+
+### Overall verdict
+
+All eight views match the mockup's structure and the app's existing
+visual language; the owner's specific 925-yard scenario works
+end-to-end including the honesty-guard refusal path; the app is fully
+usable — cold launch through logging a shot — with zero connectivity.
+The v3.0 contract's build order (steps 0–12) is complete.
+
+---
+
 ## OWNER REVIEW QUEUE
 
-- (accumulates during the run)
+- **The `Categories`/paperwork "Everything else" shortcut list** (step
+  8/11): still routes into the pre-v3 category screens for cleaning
+  log, wind call, DOPE log, scope-adjustment history, and records/
+  export — these have no v3 view yet and something has to host them.
+  Worth a look before any future pass decides what (if anything) gets
+  a dedicated v3 view versus staying a utility drawer.
+- **A shared render race** (step 11): `AppNav.openRifle`, `openReport`,
+  `openSession`, and `Categories.show`'s internal home-redirect all
+  fire two async renders into the same container back-to-back, relying
+  on the second one finishing last. Pre-existing pattern (not new to
+  this run for the first two), and empirically reliable, but
+  `openSession` (added in step 7) is the closest to a genuine coin-flip
+  timing-wise. Flagged, not fixed — see step 11's notes for the full
+  reasoning on why a proper fix was judged bigger than this run's scope.
+- **Dormant files kept on disk per the no-deletion rule**: `home.js`,
+  `log-shooting.js`, `mv-entry.js`, `rifle-simple.js` are fully
+  unreferenced now (step 11). Whenever the owner is ready to actually
+  delete rather than just stop shipping them, these four are confirmed
+  safe to remove.
