@@ -136,6 +136,50 @@ observation (quick mode already builds exactly one), so the one-observation
 
 ---
 
+## Step 4 — Log shooting (§2.2) + steel-end order (§3.4) + casual escape (§3.3)
+
+- **`js/log-shooting.js`** — the simple lane's one flow. "Paper or steel?"
+  (two big rows). PAPER → the existing photo capture; STEEL → one screen:
+  distance chips (300–1000 + custom) · "I dialed" big steppers in the
+  rifle's units (wind-dialed behind a fold) · primary "I shot — where did
+  it hit? ›". Quiet escapes: "Just photograph the plate" (casual) and a
+  "more" fold opening the detailed logger. No wind/holds/per-shot-MV/DOF/
+  tier anywhere in the simple path.
+- **The steel entry saves REAL data first (§3.4):** a steel string (tier
+  full, honest provenance: `wind: null`, holds 0/0, note 'simple') + one
+  shot converted from the inch stepper into the rifle's units — same tables
+  as the detailed logger, so full-true can tie these strings in later.
+  Keep/Undo governs only the correction; the string stays either way.
+- **§3.4 detailed lane:** "Send string to Truing" is no longer a peer of
+  Save — Save is the single primary; the saved screen offers a gold
+  "True this rifle now ›" follow-on (hands the string to Full true).
+- **§3.3:** `SteelSession.open(db, rifleId, 'casual')` +
+  `ToolActions.steelCasual` — the photograph-the-plate escape is one tap
+  from the simple steel screen (it existed but was buried inside full setup).
+- **§2.2 paper defaults:** in the simple lane the suppressor/lot sheet no
+  longer interrupts — last-time defaults apply silently and a quiet
+  "Details: <can> · Lot <n> — change" link on the data step reopens the
+  sheet. Detailed lane keeps the sheet (and clears the link).
+- **Card follow-through (§2.3):** `deriveCalibrationStatus` now surfaces
+  the latest truing event's confidence; next-action gains rung 5.5 — a
+  Thin (rough) truing suggests "One more shot at 600 firms it up" (4 new
+  ladder tests, 50 total).
+- **Headless proof:** steel screen → "Where did it hit?" (big ON/± inch
+  steppers, folds for left-right + bullet speed) → THE PAYOFF: "Got it.
+  Your 600-yard dial changes from 10.9 to 11.6. Everything past ~400 just
+  got more accurate." [Keep it][Undo]. Bonus: the first harness run dialed
+  an absurd 4 MOA at 600 and the honesty guard correctly refused it —
+  the guard works in the real flow, not just unit tests.
+
+### Judgment calls (step 4)
+- Simple steel strings save as tier 'full' (they carry the complete truing
+  equation) with `wind: null` — provenance stays honest and the full-true
+  checklist correctly shows "wind ✗" if they're tied in later.
+- If no load with a BC exists, the steel path stops at an honest "One thing
+  first — add bullet & speed" screen instead of a payoff that can't compute.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

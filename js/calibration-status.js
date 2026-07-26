@@ -227,6 +227,7 @@ function deriveCalibrationStatus(input) {
             var pct = typeof te.supersonicPct === 'number' ? Math.round(te.supersonicPct * 100) : null;
             trued = {
                 state: 'drag', stage: 'drag', toYd: toYd, flagged: flagged,
+                confidence: te.confidence || null,
                 line: 'Drag-trued' + (toYd ? ' at ' + toYd + ' yd' : '') +
                     (pct !== null ? ' (' + pct + '% of supersonic)' : '') +
                     (flagged ? ' — ' + flagWhy : '')
@@ -234,6 +235,7 @@ function deriveCalibrationStatus(input) {
         } else {
             trued = {
                 state: 'mv', stage: 'mv', toYd: toYd, flagged: flagged,
+                confidence: te.confidence || null,
                 line: 'MV-verified' + (toYd ? ' to ' + toYd + ' yd' : '') +
                     (flagged ? ' — ' + flagWhy : '')
             };

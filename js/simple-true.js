@@ -249,10 +249,20 @@ var SimpleTrue = (typeof document !== 'undefined') ? (function () {
             if (ctx.onDone) ctx.onDone(false);
         });
         document.getElementById('sh-go').addEventListener('click', function () {
+            var btn = this;
             var mvEl = document.getElementById('sh-mv');
             var mv = mvEl ? parseFloat(mvEl.value) : NaN;
             S.mv = isFinite(mv) && mv >= 500 && mv <= 5000 ? mv : null;
-            _computeAndShow(ctx, S);
+            // §3.4: the caller's save always happens FIRST (steel string
+            // + shot land regardless of Keep/Undo on the correction)
+            var before = ctx.beforeCompute ? ctx.beforeCompute(S) : Promise.resolve();
+            btn.disabled = true;
+            before.then(function () {
+                _computeAndShow(ctx, S);
+            }).catch(function (err) {
+                btn.disabled = false;
+                alert('Save failed: ' + err.message + '\n\nStill on screen — try again.');
+            });
         });
     }
 

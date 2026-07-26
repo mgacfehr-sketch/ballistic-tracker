@@ -484,6 +484,33 @@ SessionFlow.prototype._selectProfile = function (rifleId, loadId) {
     });
 };
 
+/**
+ * v2.5 §2.2: the quiet "details" link on the data step (simple lane).
+ * Shows the silently-applied suppressor + lot; tapping reopens the
+ * session-questions sheet to change them.
+ */
+SessionFlow.prototype._renderSessionDetailsLink = function (rifle, load, cans) {
+    var self = this;
+    var host = document.getElementById('step-data');
+    if (!host) return;
+    var el = document.getElementById('sq-details-link');
+    if (!el) {
+        el = document.createElement('button');
+        el.id = 'sq-details-link';
+        el.className = 'action u-full u-mt-10';
+        host.appendChild(el);
+        el.addEventListener('click', function () {
+            self._askSessionQuestions(self.selectedRifle, self.selectedLoad, true).then(function () {
+                self._renderSessionDetailsLink(self.selectedRifle, self.selectedLoad, cans);
+            });
+        });
+    }
+    var canName = 'Bare';
+    (cans || []).forEach(function (c) { if (c.id === self.suppressorId) canName = c.name; });
+    el.textContent = 'Details: ' + canName +
+        (self.lotNumber ? ' · Lot ' + self.lotNumber : ' · no lot') + ' — change';
+};
+
 SessionFlow.prototype._selectQuickMode = function () {
     this.rifleId = null;
     this.loadId = null;
@@ -502,7 +529,7 @@ SessionFlow.prototype._selectQuickMode = function () {
  * prior lots listed, New lot… entry). Backdrop tap accepts the
  * current selection — never a gate.
  */
-SessionFlow.prototype._askSessionQuestions = function (rifle, load) {
+SessionFlow.prototype._askSessionQuestions = function (rifle, load, force) {
     var self = this;
     self.suppressorId = null;
     self.lotNumber = load ? (load.lotNumber || null) : null;
@@ -524,6 +551,28 @@ SessionFlow.prototype._askSessionQuestions = function (rifle, load) {
         var cans = res[2] || [];
         var sessions = res[3] || [];
         var strings = res[4] || [];
+
+        // v2.5 §2.2 SIMPLE lane: apply last-time defaults SILENTLY;
+        // a quiet "details" link on the data step reopens this sheet.
+        if (!force && typeof Lanes !== 'undefined' && !Lanes.isDetailed()) {
+            self.suppressorId = (lastCan && cans.some(function (c) { return c.id === lastCan; }))
+                ? lastCan : null;
+            var lastLot = null;
+            sessions.slice().sort(function (a, b) {
+                return String(b.date || '').localeCompare(String(a.date || ''));
+            }).some(function (s) {
+                if (load && s.loadId === load.id && s.lotNumber) { lastLot = s.lotNumber; return true; }
+                return false;
+            });
+            self.lotNumber = lastLot || (load ? (load.lotNumber || null) : null);
+            self._renderSessionDetailsLink(rifle, load, cans);
+            return null;
+        }
+        if (!force) {
+            // detailed lane: the sheet asks — no stale simple-lane link
+            var staleLink = document.getElementById('sq-details-link');
+            if (staleLink && staleLink.parentNode) staleLink.parentNode.removeChild(staleLink);
+        }
 
         // Prior lots for THIS load, most recent first, plus the load's own
         var lots = [];

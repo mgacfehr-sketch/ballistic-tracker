@@ -106,6 +106,20 @@ check('shoot-distance launches steel',
 check('bad string entries ignored',
     derive({ status: untrued, distanceStrings: [{ distanceYd: 0 }, null, {}] }).id, 'shoot-distance');
 
+console.log('\nRung 5.5 — rough truing wants one more shot (v2.5 §2.3):');
+check('Thin truing → confirm-true',
+    derive({ status: greenStatus({ trued: { state: 'mv', toYd: 600, flagged: false, confidence: 'Thin' } }) }).id,
+    'confirm-true');
+check('confirm-true names the distance',
+    derive({ status: greenStatus({ trued: { state: 'mv', toYd: 600, flagged: false, confidence: 'Thin' } }) }).title,
+    'One more shot at 600 firms it up');
+check('solid truing does not nag',
+    derive({ status: greenStatus({ trued: { state: 'mv', toYd: 600, flagged: false, confidence: 'Good' } }) }).id,
+    'go-shoot');
+check('flagged truing outranks confirm-true (re-true rung)',
+    derive({ status: greenStatus({ trued: { state: 'mv', toYd: 600, flagged: true, confidence: 'Thin' } }) }).id,
+    're-true');
+
 console.log('\nRung 6 — tracking caps confidence:');
 check('trued + tracking never → verify-tracking',
     derive({ status: greenStatus({ tracking: { state: 'never' } }) }).id, 'verify-tracking');

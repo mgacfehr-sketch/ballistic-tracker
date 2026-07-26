@@ -47,7 +47,9 @@ var SteelSession = (function () {
 
     /* ── entry ────────────────────────────────────────────── */
 
-    function open(db, rifleId) {
+    /** mode: undefined → full setup · 'casual' → straight to the
+     *  photograph-the-plate escape (v2.5 §3.3). */
+    function open(db, rifleId, mode) {
         _db = db;
         _container = document.getElementById('view-home');
         if (!_container) return;
@@ -91,7 +93,8 @@ var SteelSession = (function () {
                 shots: [],
                 gust: null // pending wind override for the NEXT logged shot
             };
-            renderSetup();
+            if (mode === 'casual') renderCasual();
+            else renderSetup();
         });
     }
 
@@ -450,10 +453,8 @@ var SteelSession = (function () {
                 UI.esc(steelDescribeShot(sum.meanElevOff, sum.meanWindOff, S.units)) +
                 ' &middot; ' + sum.mvCount + '/' + sum.n + ' with MV</span></div></div>';
             html += UI.card(rows);
-            if (typeof TruingJob !== 'undefined') {
-                html += '<button class="btn btn-edge u-mt-10" id="st-to-truing" ' +
-                    'style="color:var(--brand-gold);border-color:var(--brand-gold)">Send string to Truing &rsaquo;</button>';
-            }
+            // v2.5 §3.4: Save is the SINGLE primary and always happens;
+            // "True this rifle now ›" is offered AFTER save, never as a peer.
             html += '<button class="btn-primary btn-edge u-mt-10" id="st-save">Save to ' +
                 UI.esc(S.rifle.name || 'rifle') + '</button>';
         }
@@ -516,10 +517,6 @@ var SteelSession = (function () {
             renderLogger();
         });
 
-        var toTruing = document.getElementById('st-to-truing');
-        if (toTruing) toTruing.addEventListener('click', function () {
-            _saveString(true);
-        });
         var save = document.getElementById('st-save');
         if (save) save.addEventListener('click', function () {
             _saveString(false);
@@ -702,10 +699,19 @@ var SteelSession = (function () {
             '<div class="pagesub mono">' + S.distanceYd + ' yd &middot; ' + sum.n + ' shots &middot; mean ' +
             UI.esc(steelDescribeShot(sum.meanElevOff, sum.meanWindOff, S.units)) + '</div></div>';
         html += UI.banner('ready', 'Saved to ' + UI.esc(S.rifle.name || 'rifle') + '.', true);
+        // v2.5 §3.4: the follow-on, after the save has already happened
+        if (S.shots.length && typeof TruingJob !== 'undefined') {
+            html += '<button class="btn-utility btn-edge u-full u-mt-14" id="st-true-now">True this rifle now &rsaquo;</button>';
+        }
         html += '<button class="btn-primary btn-edge u-mt-14" id="st-another">Log another string</button>';
         html += '<button class="btn btn-edge u-mt-10" id="st-done">Done</button>';
         html += '</div>';
         _container.innerHTML = html;
+        var trueNow = document.getElementById('st-true-now');
+        if (trueNow) trueNow.addEventListener('click', function () {
+            try { sessionStorage.setItem('yort_truing_string', stringId); } catch (e) { /* */ }
+            if (window.ToolActions && ToolActions.truing) ToolActions.truing(_db, S.rifle.id);
+        });
         document.getElementById('st-another').addEventListener('click', function () {
             S.shots = [];
             S._elev = 0; S._wind = 0;
@@ -916,5 +922,10 @@ if (typeof window !== 'undefined') {
         } else if (typeof Categories !== 'undefined') {
             Categories.show('steel');
         }
+    };
+    // v2.5 §3.3: the casual escape — photograph the plate, minimal save
+    window.ToolActions.steelCasual = function (db, rifleId) {
+        if (rifleId) SteelSession.open(db, rifleId, 'casual');
+        else if (typeof Categories !== 'undefined') Categories.show('steel');
     };
 }

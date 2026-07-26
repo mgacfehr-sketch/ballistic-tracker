@@ -148,6 +148,19 @@ function deriveNextAction(input) {
         }
     }
 
+    /* 5.5 — trued from one rough observation: one more shot firms it */
+    if (trued && trued.state !== 'untrued' && !trued.flagged &&
+        trued.confidence === 'Thin' && trued.toYd) {
+        ladder.push({
+            id: 'confirm-true',
+            title: 'One more shot at ' + Number(trued.toYd).toLocaleString() + ' firms it up',
+            detail: 'Your number is rough — a second hit makes it trustworthy.',
+            payoff: 'Proven to ' + Number(trued.toYd).toLocaleString() + ', solidly.',
+            action: { type: 'steelSession' },
+            dismissible: true
+        });
+    }
+
     /* 6 — trued but confidence capped by unverified tracking */
     if (trued && trued.state !== 'untrued' && tracking &&
         (tracking.state === 'never' || tracking.state === 'stale')) {
