@@ -567,11 +567,20 @@ HomeManager.prototype._openMoreTools = function () {
         return html;
     }
 
+    // v2.5 §1.1: THE lane switch lives here
+    var detailedOn = typeof Lanes !== 'undefined' && Lanes.isDetailed();
+    var laneRow =
+        '<button class="option-row' + (detailedOn ? ' on' : '') + '" id="more-tools-lane">' +
+        '<span>Detailed mode' +
+        '<span class="choice-desc">Per-shot logging, wind, full truing controls</span></span>' +
+        '</button>';
+
     overlay.innerHTML =
         '<div class="overlay-card">' +
         '<div class="overlay-title">Your doors</div>' +
         '<p class="overlay-text">Checked doors show on Home. Turning one off hides it — all its data stays.</p>' +
         '<div id="more-tools-rows">' + rowsHtml() + '</div>' +
+        laneRow +
         '<button class="btn u-full u-mt-10" id="more-tools-done">Done</button>' +
         '</div>';
     document.body.appendChild(overlay);
@@ -579,6 +588,14 @@ HomeManager.prototype._openMoreTools = function () {
     function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
     overlay.querySelector('#more-tools-done').addEventListener('click', close);
+
+    var laneBtn = overlay.querySelector('#more-tools-lane');
+    if (laneBtn) laneBtn.addEventListener('click', function () {
+        var next = !laneBtn.classList.contains('on');
+        laneBtn.classList.toggle('on', next);
+        if (typeof Lanes !== 'undefined') Lanes.setDetailed(next);
+        // Home re-renders via Lanes.onChange
+    });
 
     overlay.querySelector('#more-tools-rows').addEventListener('click', function (e) {
         var row = e.target.closest ? e.target.closest('[data-more-job]') : null;

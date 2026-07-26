@@ -241,7 +241,8 @@
             homeManager.init();
             homeManager.show(); // Home is the default view — render core actions immediately
             if (typeof ToolRegistry !== 'undefined') {
-                ToolRegistry.init(db).then(function () {
+                var pLane = (typeof Lanes !== 'undefined') ? Lanes.init(db) : Promise.resolve();
+                Promise.all([ToolRegistry.init(db), pLane]).then(function () {
                     // Re-render if the user is already looking at Home
                     var homeView = document.getElementById('view-home');
                     if (homeView && homeView.classList.contains('active')) {
@@ -253,6 +254,15 @@
                         Onboarding.maybeRunFirstRun(db);
                     }
                 });
+                if (typeof Lanes !== 'undefined') {
+                    Lanes.onChange(function () {
+                        var homeView = document.getElementById('view-home');
+                        if (homeView && homeView.classList.contains('active') &&
+                            homeView.getAttribute('data-screen') === 'home') {
+                            homeManager.show();
+                        }
+                    });
+                }
             }
 
             // ── AppNav facade ──────────────────────────────────

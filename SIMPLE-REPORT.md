@@ -53,6 +53,25 @@ observation (quick mode already builds exactly one), so the one-observation
 
 ---
 
+## Step 1 — Lane setting + copy map (Part 1)
+
+`js/lanes.js` (pure `LanesCore` + thin `Lanes` wrapper + `Copy.t()`), 20 tests:
+- `detailed_mode` user_settings key `{v:1, detailed, source:'user'|'inferred'}`
+  — no schema. Default OFF (Simple is the front door).
+- **One-time inference:** when no setting exists, an account with any FULL
+  steel string gets Detailed defaulted ON (persisted as `source:'inferred'`,
+  so it runs exactly once and flips freely afterward).
+- **THE COPY MAP** (`LANE_COPY`): one place both vocabularies live — bullet
+  speed/muzzle velocity, drop chart/DOPE card, where did it hit?/impact
+  offset, your rifle's numbers/ballistic profile, checked/verified. Screens
+  call `Copy.t(key)`; the vocabularies cannot drift per-screen. Later steps
+  route copy through it as they touch each screen.
+- The switch lives in Home's More tools sheet ("Detailed mode — per-shot
+  logging, wind, full truing controls"); Home re-renders on change via
+  `Lanes.onChange`.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)
