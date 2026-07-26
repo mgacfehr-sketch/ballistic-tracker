@@ -100,6 +100,42 @@ observation (quick mode already builds exactly one), so the one-observation
 
 ---
 
+## Step 3 — "Where did it hit?" (§2.3, the crown jewel)
+
+`js/simple-true.js` (pure top + DOM bottom, 25 tests):
+- **Pure:** `simpleTrueObservation()` — one observed hit → the existing
+  engine (`solveTruing`) in one-observation mode; doctrine routes silently
+  (`result.recommended`, no fork); one-shot confidence via the existing
+  `truingConfidence` (engine word Thin → shown as "rough"); payoff computed
+  as the dial at the observed range before vs after (rifle units, 0.1).
+  `simpleTruePayoffCopy()` produces the exact contract sentence.
+- **THE ROUND-TRIP TEST (contract-specified):** a planted 15 fps error is
+  recovered from ONE 600-yd observation to within 5 fps (got 2944 vs true
+  2945); routed to MV; confidence ≤2 segments; a rich 8-shot/2-group input
+  scores higher (accumulation raises it honestly).
+- **Simple-lane honesty guards** (found by the tests): the engine will
+  happily "solve" a zero-band hit or pin a huge miss at its bracket edge
+  (600-yd 60-inch miss → MV 2516, capped). Roy never sees those: zero-band
+  or capped → an honest "Couldn't use that one" screen with the reason
+  (too close to zero / miss too big to be speed-or-drag — check your zero).
+  Dead-center hits get "your dial barely moves — numbers were already close."
+- **DOM flow:** `SimpleTrue.askHit(ctx)` — big 64px glove steppers in
+  INCHES (high/low primary; left/right and "add bullet speed" behind quiet
+  folds), then THE PAYOFF immediately: "Got it." banner + [Keep it] [Undo].
+  Keep writes the append-only truing event (mode 'simple', same shape as
+  the detailed Apply — one engine, one ledger) + trued values via SyncQueue;
+  Undo writes nothing.
+
+### Judgment calls (step 3)
+- Hit offsets are captured in INCHES regardless of rifle units — Roy speaks
+  inches on steel; conversion happens at the observed range. The payoff
+  speaks the rifle's dial units.
+- Typed bullet speed feeds the shot normalization (`shotMV`) only — it is a
+  reading on ONE shot, not an MV measurement event (§2.5's manual entry is
+  the honest place for that).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)
