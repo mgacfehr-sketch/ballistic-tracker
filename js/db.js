@@ -392,6 +392,22 @@ BallisticDB.prototype.deleteLoad = function (id) {
 
 // ── Session CRUD ───────────────────────────────────────────────
 
+// v2.5 §3.2 field audit: suppressor_id + lot_number are real columns
+// (REORG-migrations.sql). rifle_name/rifle_caliber/load_name/
+// load_bullet_name/load_bullet_weight are NOT — they were only ever
+// referenced in a COALESCE fallback in the separate crowd-data branch's
+// admin export query (written for a future state, never an ADD COLUMN
+// here). SIMPLE-migrations.sql adds them for real; until the owner runs
+// it, _addSessionRow degrades gracefully instead of hard-failing.
+var SESSION_SNAPSHOT_FIELDS = ['rifleName', 'rifleCaliber', 'loadName', 'loadBulletName', 'loadBulletWeight'];
+
+/** PostgREST "column not found in schema cache" — the ADD COLUMN migration hasn't run yet. */
+function _isMissingColumnError(err) {
+    if (!err) return false;
+    if (err.code === 'PGRST204') return true;
+    return /could not find.*column.*schema cache/i.test(String(err.message || ''));
+}
+
 BallisticDB.prototype.addSession = function (data) {
     var self = this;
     var session = {
@@ -416,12 +432,11 @@ BallisticDB.prototype.addSession = function (data) {
         config: data.config || null,
         sessionType: data.sessionType || null,
         ladder: data.ladder || null,
-        // v2.5 §3.2 fix: these were silently DROPPED by this whitelist —
-        // session-flow sends them and the columns exist (REORG/CROWD
-        // migrations reference them). Losing the suppressor/lot tags
-        // also silenced the per-can shift monitor for paper sessions.
+        // real columns (REORG-migrations.sql) — always safe to send
         suppressorId: data.suppressorId || null,
         lotNumber: data.lotNumber || null,
+        // snapshot columns (SIMPLE-migrations.sql, may not exist yet —
+        // see _isMissingColumnError fallback below)
         rifleName: data.rifleName || null,
         rifleCaliber: data.rifleCaliber || null,
         loadName: data.loadName || null,
@@ -429,10 +444,34 @@ BallisticDB.prototype.addSession = function (data) {
         loadBulletWeight: data.loadBulletWeight || null,
         createdAt: new Date().toISOString()
     };
+    return self._insertSessionGraceful(session, true);
+};
+
+/**
+ * Insert a session row; if the DB rejects it for a missing snapshot
+ * column (the migration hasn't run yet), strip those fields and retry
+ * ONCE rather than failing the whole save. Snapshot data is a nice-to-
+ * have enrichment, not a save-blocking requirement.
+ */
+BallisticDB.prototype._insertSessionGraceful = function (session, allowRetry) {
+    var self = this;
     var row = _jsToRow(session, self.userId);
     return self.supabase.from('sessions').insert(row).select().single()
         .then(function (res) {
-            if (res.error) throw res.error;
+            if (res.error) {
+                if (allowRetry && _isMissingColumnError(res.error)) {
+                    console.warn('[db] sessions is missing snapshot columns — ' +
+                        'run SIMPLE-migrations.sql. Saving without them for now:', res.error.message);
+                    var stripped = {};
+                    for (var k in session) {
+                        if (session.hasOwnProperty(k) && SESSION_SNAPSHOT_FIELDS.indexOf(k) === -1) {
+                            stripped[k] = session[k];
+                        }
+                    }
+                    return self._insertSessionGraceful(stripped, false);
+                }
+                throw res.error;
+            }
             return _rowToJs(res.data);
         });
 };
@@ -1345,7 +1384,27 @@ BallisticDB.prototype.flushQueuedRow = function (table, record) {
     return self.supabase.from(table).upsert(row, { onConflict: 'id' })
         .select().single()
         .then(function (res) {
-            if (res.error) throw res.error;
+            if (res.error) {
+                // An offline-queued session bypasses addSession's whitelist
+                // (it upserts the raw queued payload) — apply the same
+                // missing-snapshot-column grace on reconnect (v2.5 §3.2).
+                if (table === 'sessions' && _isMissingColumnError(res.error)) {
+                    console.warn('[db] queued session missing snapshot columns — ' +
+                        'run SIMPLE-migrations.sql. Flushing without them for now:', res.error.message);
+                    var snapshotCols = SESSION_SNAPSHOT_FIELDS.map(_toSnake);
+                    var stripped = {};
+                    for (var k in row) {
+                        if (row.hasOwnProperty(k) && snapshotCols.indexOf(k) === -1) stripped[k] = row[k];
+                    }
+                    return self.supabase.from(table).upsert(stripped, { onConflict: 'id' })
+                        .select().single()
+                        .then(function (res2) {
+                            if (res2.error) throw res2.error;
+                            return _rowToJs(res2.data);
+                        });
+                }
+                throw res.error;
+            }
             return _rowToJs(res.data);
         });
 };

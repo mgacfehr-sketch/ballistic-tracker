@@ -338,6 +338,53 @@ Fixes for every hole from the step-0 diagnosis:
 
 ---
 
+## Post-QA device fix — paper session save was hard-failing (2026-07-26)
+
+Device testing (thank you for catching this) surfaced: saving a paper
+session threw **"Could not find the 'load_bullet_name' column of 'sessions'
+in the schema cache."** Root cause: step 7's `addSession` field audit was
+half-right. I confirmed `suppressor_id` and `lot_number` are real columns
+(REORG-migrations.sql adds them) — correct. But I mistook a reference to
+`s.rifle_caliber` / `s.load_name` / `s.load_bullet_name` / `s.load_bullet_weight`
+inside `CROWD-DATA-migrations.sql`'s admin export query for proof those
+columns exist. They don't — that query was written for a future state on a
+separate branch and never shipped an `ADD COLUMN` here. Sending those five
+fields to a real INSERT threw immediately; every paper-session save failed.
+
+Fix, per the data principle (snapshot, not references — CLAUDE.md rule 7):
+- **`SIMPLE-migrations.sql`** (new, additive, re-runnable) — `ADD COLUMN IF
+  NOT EXISTS` for the five real gaps: `rifle_name`, `rifle_caliber`,
+  `load_name`, `load_bullet_name` (text), `load_bullet_weight` (numeric,
+  matches the load form's 0.1 step). **Please run this in the Supabase SQL
+  Editor** — it's the correct long-term fix (a session should keep its
+  rifle/load's name and specs even after the rifle or load is later renamed
+  or deleted).
+- **Graceful until then:** `db.js` now detects the PostgREST
+  "column ... in the schema cache" rejection (`_isMissingColumnError`,
+  checks both `err.code === 'PGRST204'` and the message text) and retries
+  ONCE with the five snapshot fields stripped — the save succeeds either
+  way; only the enrichment is deferred. Fixed in **both** paths that reach
+  the `sessions` table: `addSession` (the online path) and
+  `flushQueuedRow` (the offline reconnect path, which bypasses
+  `addSession`'s whitelist entirely and needed its own fallback).
+- Verified with a mock Supabase client reproducing the exact error: online
+  save degrades and succeeds without the 5 fields; the same save succeeds
+  WITH all 5 fields once the columns are "present"; the offline-flush path
+  degrades the same way on reconnect. All real fields (rifleId,
+  suppressorId, roundsFired, etc.) survive the retry untouched in every case.
+- Caught and fixed a regex bug in my own fix during verification (the
+  "column ... of ... in the schema cache" pattern didn't match the real
+  PostgREST message shape — corrected to `could not find.*column.*schema
+  cache` and re-verified against the exact reported error string).
+
+No test suite exists for db.js (it's a thin browser-only Supabase wrapper
+with no Node exports, consistent with the rest of the codebase — pure
+engines get suites, this doesn't). Verified via a standalone mock-client
+harness instead; not added as a permanent test file since there's no
+established pattern for one.
+
+---
+
 ## OWNER REVIEW QUEUE (do these on your phone)
 
 1. **THE ROY WALK (the contract's acceptance test):** fresh account →
@@ -368,5 +415,6 @@ Fixes for every hole from the step-0 diagnosis:
 6. **iOS safe-area + scroll:** confirm the header clears the status bar on
    every screen (incl. the first-run wizard) and the rifle page no longer
    drifts sideways.
-7. Reminder from v2.4 still open: run `SIMPLIFY-migrations.sql` if you
-   haven't (account deletion), and the real-print target photo test.
+7. **Run `SIMPLE-migrations.sql`** — fixes the paper-session save failure you
+   just hit on device. Also still open from v2.4: `SIMPLIFY-migrations.sql`
+   (account deletion) if you haven't, and the real-print target photo test.
