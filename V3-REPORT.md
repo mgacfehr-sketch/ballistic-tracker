@@ -218,6 +218,78 @@ full logger, which view 5 (advanced inline reveal) re-renders as-is.
 
 ---
 
+## Steps 3+4 — Add flow (views 2/3a/3b/3c) + Payoff (view 4), combined
+
+**Judgment call: merged into one commit.** Steel's "Done" button and the
+payoff screen are one continuous user action — building the steel screen
+without a working Done (step 3 alone) would mean either a dead button or
+throwaway placeholder code immediately replaced by step 4. Splitting them
+would have cost real work for no verification benefit; the contract itself
+says "choose the smaller change when uncertain." Both are still their own
+files, independently reviewable, and the QA gate (screenshots + a full
+data-write inspection) covers the whole flow as one unit.
+
+- **New `js/rifle-add.js`** — view 2 (three big buttons, exact mockup
+  copy) · view 3a hands off to the existing `SessionLaunch.start()`
+  (untouched capture pipeline) · view 3b (Steel) puts HOW FAR (chips +
+  custom) / I DIALED / IT HIT on ONE screen exactly per the mockup —
+  a real compositional change from v2.5's two-screen `log-shooting.js` +
+  `simple-true.js` flow. "advanced" routes to the existing
+  `steel-session.js` full logger (step 5's call, made now since it's a
+  one-line wire); "add bullet speed" reveals an inline field. Suppressor/
+  lot apply silently from last-used (`Suppressors.getLastUsed`, the
+  load's `lotNumber`) — no visible question, matching the contract's
+  steel spec (no suppressor UI mentioned at all for view 3b). Done ALWAYS
+  saves the string + shot first (Part 2 §3.4), then hands off to
+  `RiflePayoff.run()`. View 3c (Chronograph) — type-in primary (average
+  stepper + shot-count chips including "just a guess" → honest estimated
+  fallback, same provenance rule as v2.5's `mv-entry.js`), "import a file
+  instead" routes to the existing chrono-import screen.
+- **New `js/rifle-payoff.js`** — runs `simpleTrueObservation()`
+  (unchanged, already-tested pure engine) and renders the mockup's exact
+  payoff copy, byte-for-byte: "Got it. Your 600-yard dial changes from
+  10.9 to 11.6." with strikethrough-old/green-new, the two-line sub, gold
+  Keep it, text Undo. The honesty guards (zero-band / bracket-capped)
+  render "Couldn't use that one" with the plain reason — the string
+  still stands, exactly as Part 1 requires.
+- **`simple-true.js`'s `_keep()` exposed publicly** (`SimpleTrue.keep`)
+  so `rifle-payoff.js` shares the exact same append-only truing-event
+  write path as the old `askHit` flow, instead of a second copy of that
+  logic. Caught and fixed a real bug while wiring the caller: `_keep`
+  reads `ctx.dialed`/`ctx.env`/`ctx.mvMeasured`, which my first draft of
+  `rifle-payoff.js`'s `ctx` object omitted — would have silently stored
+  `dialed: 0` and the wrong env source on every kept correction. Fixed
+  before it shipped by re-reading `_keep`'s actual field reads against my
+  call site, not just trusting the function signature.
+- **Two real layout bugs found by screenshot comparison, not code review:**
+  (1) `.v3-back` was `position:absolute` with no positioned ancestor in
+  the real DOM — pinned to the viewport instead of the screen, colliding
+  with headings. Replaced everywhere with the app's existing in-flow
+  `.pagehead`/`.backline`/`.pagetitle` pattern (already used by dozens of
+  screens) rather than fixing the custom class — removed `.v3-back`
+  entirely so it can't be reused broken. (2) Per-screen `.v3-brand`
+  duplicated the persistent `#app-header`'s brand lockup, which is
+  already visible above every view in the real app (invisible in my
+  isolated scratchpad harnesses, which don't include that header) —
+  removed the redundant rendering from view 1 rather than hiding the
+  real header. Both bugs are exactly why the contract insists on
+  screenshot verification each step, not just "looks right in the code."
+- **Verified end-to-end, not just visually**: a scripted click-through
+  (dial 11.0 MOA at 600, hit 4" low, Done, Keep) was inspected at the
+  data layer — the real steel string, real shot (correct sign), and real
+  truing event all landed with correct values; the doctrine correctly
+  routed to BC (not MV) because MV was already measured in the test
+  fixture, exactly matching engine doctrine ("MV is measured — the
+  honest fix is BC... at 40% of supersonic range... extrapolated");
+  the load's `truedBc` updated. No fork was shown to Roy at any point.
+- Headless proof: views 2/3b/4 screenshot-verified against the mockup
+  (light + dark) after both bug fixes — pixel-close composition, correct
+  copy, correct color law.
+- **846 tests green** (unchanged — this step is UI wiring over
+  already-tested engines; no new pure logic).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

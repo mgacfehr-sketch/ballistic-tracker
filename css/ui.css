@@ -1876,8 +1876,6 @@ button.rowlink:active { background: var(--brand-subtle); }
    paper capture wizard, profiles.js paperwork). Tokens only.
    ============================================================ */
 
-.v3-brand { text-align: center; padding-top: env(safe-area-inset-top, 0px); }
-.v3-brand .wordmark { font: var(--type-heading); letter-spacing: 0.02em; }
 
 /* rifle name + load line, swipe/dots between rifles */
 .v3-rname { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-top: 10px; width: 100%; }
@@ -1943,10 +1941,6 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 .v3-link.danger { color: var(--status-problem); }
 .v3-linkrow { text-align: center; }
-.v3-back {
-    position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 6px; background: none; border: none;
-    font-size: 15px; font-weight: 600; color: var(--text-secondary); padding: 10px; min-height: var(--tap-min); z-index: 2;
-}
 
 /* big choices (Paper / Steel / Chronograph) */
 .v3-bigchoice { display: flex; flex-direction: column; gap: 14px; padding: 0 var(--edge); margin-top: 26px; }

@@ -58,8 +58,9 @@ RifleApp.prototype._currentRifle = function () {
 
 /** No rifles yet — the 90-second-to-payoff invite (unchanged from v2.4). */
 RifleApp.prototype._renderNoRifle = function () {
-    var html = '<div class="screen">' +
-        this._brandHtml() +
+    // v3.0: no per-screen brand line — #app-header already shows PROVEN.
+    // above every view; a second one here would duplicate it.
+    var html = '<div class="screen" style="padding-top:var(--space-lg)">' +
         '<div class="v3-numberbox"><div class="lbl">PROVEN TO</div>' +
         '<div class="num">0<em>yd</em></div><div class="conf">No rifle yet</div></div>' +
         '<button class="v3-gold" id="rf-add-rifle">＋&nbsp;&nbsp;Add your rifle</button>' +
@@ -73,17 +74,12 @@ RifleApp.prototype._renderNoRifle = function () {
     });
 };
 
-RifleApp.prototype._brandHtml = function () {
-    return '<div class="v3-brand"><span class="wordmark">PROVEN<i>.</i></span></div>';
-};
-
 RifleApp.prototype._renderRifle = function () {
     var self = this;
     var rifle = this._currentRifle();
     var many = this._rifles.length > 1;
 
-    var html = '<div class="screen">';
-    html += this._brandHtml();
+    var html = '<div class="screen" style="padding-top:var(--space-lg)">';
     html += many
         ? '<button class="v3-rname v3-rname-tap" id="rf-rname"><h1>' + UI.esc(rifle.name || 'Rifle') + '</h1>' +
           (rifle.caliber ? '<span class="load">' + UI.esc(rifle.caliber) + '</span>' : '') + '</button>'

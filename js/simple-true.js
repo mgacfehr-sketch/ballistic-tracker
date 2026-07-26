@@ -434,5 +434,7 @@ var SimpleTrue = (typeof document !== 'undefined') ? (function () {
         });
     }
 
-    return { askHit: askHit };
+    // v3.0: exposed so RiflePayoff (view 4) shares this exact write path
+    // instead of duplicating the append-only truing-event logic.
+    return { askHit: askHit, keep: _keep };
 })() : null;
