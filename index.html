@@ -9,6 +9,11 @@
     <title>Proven</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <!-- v3.0 type system (docs/mockups/proven-v3-concept.html) — visual-only;
+         offline / CDN failure falls back to the system stacks in tokens.css -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/ui.css">
     <script>
@@ -345,23 +350,11 @@
         <div id="view-chrono" class="app-view"></div>
         <div id="view-admin" class="app-view"></div>
 
-        <!-- ── Bottom navigation: three destinations, thumb reach.
-             Flow views (session, solver, chrono, admin) are full-screen
-             pushes launched from Home / rifle hub; never a tab. ────── -->
-        <nav id="app-nav" class="navbar">
-            <button class="nav-item nav-tab active" data-view="home">
-                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg>
-                Home
-            </button>
-            <button class="nav-item nav-tab" data-view="profiles">
-                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="4" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="20" y2="12"/></svg>
-                Rifles
-            </button>
-            <button class="nav-item nav-tab" data-view="ai">
-                <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M21 5l-9 9-2-4"/></svg>
-                Ask yorT
-            </button>
-        </nav>
+        <!-- v3.0 Part 2: the bottom tab bar is RETIRED. Flow views (session
+             capture, profiles/paperwork, solver, wind, chrono, admin) are
+             full-screen pushes launched from RifleApp (js/rifle-app.js) via
+             AppNav.go(); each returns to AppNav.go('home') on completion,
+             the same mechanism the old tabs used, just not tab-driven. -->
     </div>
 
     <!-- ── Help overlay ───────────────────────────────────── -->
@@ -443,6 +436,7 @@
     <script src="js/onboarding.js"></script>
     <script src="js/offline-cache.js"></script>
     <script src="js/sync-queue.js"></script>
+    <script src="js/rifle-app.js"></script>
     <script src="js/app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

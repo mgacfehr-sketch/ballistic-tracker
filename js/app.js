@@ -222,6 +222,7 @@
         var windCallManager = null;
         var chronoManager = null;
         var homeManager = null;
+        var rifleApp = null;
         if (db) {
             profileManager = new ProfileManager(db);
             profileManager.init();
@@ -236,33 +237,23 @@
             profileManager.reportManager = new RifleReportManager(db, profileManager);
             profileManager.certificateManager = new CertificateManager(db, profileManager);
 
-            // Foundation: tool activations + action-first Home
+            // v3.0: RifleApp is now THE resting screen (Part 1). HomeManager/
+            // Categories/Lanes stay instantiated for step 11's orderly
+            // retirement but no longer render — see V3-REPORT.md step 1.
             homeManager = new HomeManager(db);
             homeManager.init();
-            homeManager.show(); // Home is the default view — render core actions immediately
+            rifleApp = new RifleApp(db);
+            rifleApp.init();
+            rifleApp.show(); // the rifle is the default view — render immediately
             if (typeof ToolRegistry !== 'undefined') {
                 var pLane = (typeof Lanes !== 'undefined') ? Lanes.init(db) : Promise.resolve();
                 Promise.all([ToolRegistry.init(db), pLane]).then(function () {
-                    // Re-render if the user is already looking at Home
-                    var homeView = document.getElementById('view-home');
-                    if (homeView && homeView.classList.contains('active')) {
-                        homeManager.show();
-                    }
                     // First-run onboarding (after activations are known;
                     // deep links win inside maybeRunFirstRun)
                     if (typeof Onboarding !== 'undefined' && Onboarding.maybeRunFirstRun) {
                         Onboarding.maybeRunFirstRun(db);
                     }
                 });
-                if (typeof Lanes !== 'undefined') {
-                    Lanes.onChange(function () {
-                        var homeView = document.getElementById('view-home');
-                        if (homeView && homeView.classList.contains('active') &&
-                            homeView.getAttribute('data-screen') === 'home') {
-                            homeManager.show();
-                        }
-                    });
-                }
             }
 
             // ── AppNav facade ──────────────────────────────────
@@ -455,9 +446,9 @@
                 chronoManager.show();
             }
 
-            // Show Home when switching to the home tab
-            if (viewName === 'home' && homeManager) {
-                homeManager.show();
+            // v3.0: the rifle is the home view
+            if (viewName === 'home' && rifleApp) {
+                rifleApp.show();
             }
 
             // Show admin when switching to admin tab

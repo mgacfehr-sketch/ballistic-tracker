@@ -1,37 +1,41 @@
 /* ============================================================
    PROVEN · by Workhorse — DESIGN TOKENS (single source of truth)
-   Transcribed verbatim from docs/mockups/proven-templates-v2.html.
-   Light = field paper + ink, gold for brand/state moments.
-   Dark  = graphite + brass (the instrument).
+   v3.0: transcribed from docs/mockups/proven-v3-concept.html (the
+   "One Screen" rebuild) — supersedes the v2 proven-templates-v2.html
+   palette per the same precedent (mockup defines tokens.css).
+   Light = warm paper + ink, gold for brand/state moments.
+   Dark  = graphite + brass (the instrument) — not mockup-specified
+   (v3 mockup is light-only); values kept, same relationship, new v3
+   component classes reference tokens exclusively so dark inherits.
    Theme switching: [data-theme] on <html>. Light is the default.
    Every color/size/space in the app comes from these variables —
    no hardcoded values anywhere else.
    ============================================================ */
 
 :root, [data-theme="light"] {
-    --surface-background: #F7F6F3;
+    --surface-background: #F7F5EF;
     --surface-card: #FFFFFF;
-    --text-primary: #16181B;
-    --text-secondary: #4A4E54;
+    --text-primary: #1C1B18;
+    --text-secondary: #6B675C;
     --text-onbrand: #FFFFFF;
-    --border-default: #D8D5CF;
-    --border-strong: #B9B5AC;
+    --border-default: #E3DDCE;
+    --border-strong: #C9C0AA;
     /* brand: ink primary actions (from the wordmark), gold for the mark, rules, active accents */
-    --brand-primary: #16181B;
+    --brand-primary: #1C1B18;
     --brand-primary-press: #000000;
-    --brand-gold: #B08D2F;
-    --brand-gold-strong: #8F711F;
-    --brand-subtle: #F3EEDF;
-    --status-ready: #2E7D32;
+    --brand-gold: #A8842C;
+    --brand-gold-strong: #8F6E1F;
+    --brand-subtle: #FBF6E9;
+    --status-ready: #2E7D46;
     --status-ready-subtle: #E3F0E4;
     --status-ready-on: #FFFFFF;
     --status-caution: #B26A00;
     --status-caution-subtle: #F6EBD9;
     --status-caution-on: #FFFFFF;
-    --status-problem: #C62828;
+    --status-problem: #B3402A;
     --status-problem-subtle: #F8E2E2;
     --status-problem-on: #FFFFFF;
-    --dial-track: #E7E4DD;
+    --dial-track: #EEE8D8;
 }
 
 [data-theme="dark"] {
@@ -89,15 +93,25 @@
 }
 
 :root {
-    --font-ui: -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
-    --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, monospace;
-    --type-display: 700 34px/1.15 var(--font-ui);
-    --type-title: 700 26px/1.2 var(--font-ui);
-    --type-heading: 600 20px/1.3 var(--font-ui);
+    --font-ui: 'Inter', -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, monospace;
+    /* v3.0: the condensed display face — headings, the number, buttons, section labels.
+       Google Fonts CDN (pinned in index.html); offline/CDN-failure falls back to the
+       system stack already listed here — no functional break, visual-only degrade. */
+    --font-display: 'Barlow Semi Condensed', -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
+    --type-display: 800 34px/1.15 var(--font-display);
+    --type-title: 800 26px/1.2 var(--font-display);
+    --type-heading: 700 20px/1.3 var(--font-display);
     --type-body: 400 18px/1.45 var(--font-ui);
     --type-body-strong: 600 18px/1.45 var(--font-ui);
     --type-label: 600 15px/1.4 var(--font-ui);
+    /* v3.0: the condensed, letter-spaced field label (HOW FAR / I DIALED) —
+       kept distinct from --type-label so the hundreds of existing --type-label/
+       t-micro uses across legacy screens (paperwork, the advanced logger)
+       are untouched. Letter-spacing lives on the class, not this shorthand. */
+    --type-fieldlabel: 700 14px/1.3 var(--font-display);
     --type-mono-big: 700 34px/1.1 var(--font-mono);
+    --type-mono-hero: 700 56px/1.05 var(--font-mono);
     --space-xs: 4px;
     --space-sm: 8px;
     --space-md: 16px;

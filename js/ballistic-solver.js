@@ -564,8 +564,7 @@ BallisticSolverManager.prototype._render = function () {
         var goBtn = document.getElementById('solver-go-profiles');
         if (goBtn) {
             goBtn.addEventListener('click', function () {
-                var tab = document.querySelector('.nav-tab[data-view="profiles"]');
-                if (tab) tab.click();
+                if (window.AppNav) AppNav.go('profiles');
             });
         }
         return;

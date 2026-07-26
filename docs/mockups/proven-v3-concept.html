@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Proven v3 — one-screen concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F7F5EF;--card:#FFFFFF;--ink:#1C1B18;--soft:#6B675C;--gold:#A8842C;
+--gold-deep:#8F6E1F;--rule:#E3DDCE;--green:#2E7D46;--red:#B3402A;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#DDD8CB;font-family:'Inter',sans-serif;color:var(--ink);display:flex;justify-content:center;padding:18px 0 40px}
+.phone{width:min(400px,100vw);min-height:820px;background:var(--paper);position:relative;
+  box-shadow:0 20px 60px rgba(28,27,24,.25);overflow:hidden;border-radius:26px}
+.view{display:none;flex-direction:column;min-height:820px;padding:54px 18px 26px}
+.view.on{display:flex}
+
+/* type */
+.brand{font-family:'Barlow Semi Condensed';font-weight:800;font-size:15px;letter-spacing:.03em;color:var(--soft)}
+.brand b{color:var(--ink)} .brand i{color:var(--gold);font-style:normal}
+h2{font-family:'Barlow Semi Condensed';font-weight:800;font-size:26px;line-height:1.15}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* the one gold button */
+.gold{display:block;width:100%;min-height:58px;background:var(--gold);color:#fff;border:none;border-radius:14px;
+  font-family:'Barlow Semi Condensed';font-weight:700;font-size:19px;letter-spacing:.02em;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.gold:active{background:var(--gold-deep)}
+.link{background:none;border:none;color:var(--gold-deep);font-family:'Inter';font-weight:600;font-size:15px;
+  text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:12px;display:inline-block}
+.back{position:absolute;top:14px;left:10px;background:none;border:none;font-size:15px;font-weight:600;
+  color:var(--soft);cursor:pointer;padding:10px}
+
+/* ═ SCREEN 1: THE RIFLE ═ */
+.rname{display:flex;align-items:baseline;justify-content:center;gap:10px;margin-top:6px}
+.rname h1{font-family:'Barlow Semi Condensed';font-weight:800;font-size:24px}
+.dots{display:flex;gap:6px;justify-content:center;margin-top:8px}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--rule)} .dots i.on{background:var(--gold)}
+.numberbox{text-align:center;margin:22px 0 6px;cursor:pointer}
+.numberbox .lbl{font-family:'Barlow Semi Condensed';font-weight:600;font-size:12px;letter-spacing:.28em;color:var(--soft)}
+.numberbox .num{font-family:'JetBrains Mono';font-weight:700;font-size:56px;line-height:1.05;margin:2px 0}
+.numberbox .num em{font-style:normal;color:var(--gold);font-size:24px;vertical-align:baseline}
+.numberbox .conf{font-size:14px;color:var(--soft)}
+.numberbox .conf b{color:var(--green);font-weight:600}
+.chart{background:var(--card);border:1px solid var(--rule);border-radius:16px;padding:14px 16px 8px;margin:14px 0 16px;cursor:pointer}
+.chart .cttl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.chart .cttl span{font-family:'Barlow Semi Condensed';font-weight:700;font-size:14px;letter-spacing:.08em}
+.chart .cttl small{color:var(--soft);font-size:12px}
+.crow{display:flex;justify-content:space-between;padding:7px 2px;border-top:1px solid var(--rule);font-size:16.5px}
+.crow .d{color:var(--soft)} .crow .v{font-family:'JetBrains Mono';font-weight:600}
+.crow.hot .v{color:var(--gold-deep)}
+.feed{margin-top:18px}
+.feed .fttl{font-family:'Barlow Semi Condensed';font-weight:700;font-size:13px;letter-spacing:.14em;color:var(--soft);margin-bottom:6px}
+.fitem{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;margin-bottom:8px;
+  display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:15px}
+.fitem b{font-weight:600} .fitem small{display:block;color:var(--soft);font-size:12.5px;margin-top:2px}
+.fitem .chev{color:var(--rule);font-size:20px}
+
+/* ═ ADD FLOW ═ */
+.bigchoice{display:flex;flex-direction:column;gap:14px;margin-top:26px}
+.bigchoice button{min-height:96px;background:var(--card);border:1.5px solid var(--rule);border-radius:18px;
+  font-family:'Barlow Semi Condensed';font-weight:700;font-size:23px;cursor:pointer;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.bigchoice small{font-family:'Inter';font-weight:500;font-size:13px;color:var(--soft)}
+.bigchoice button:active{border-color:var(--gold)}
+
+/* steel entry */
+.fieldlbl{font-family:'Barlow Semi Condensed';font-weight:700;font-size:14px;letter-spacing:.1em;color:var(--soft);margin:20px 0 8px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{min-height:52px;min-width:74px;padding:0 14px;border:1.5px solid var(--rule);background:var(--card);border-radius:12px;
+  font-family:'JetBrains Mono';font-weight:600;font-size:17px;cursor:pointer;color:var(--ink)}
+.chip.on{border-color:var(--gold);background:#FBF6E9;color:var(--gold-deep)}
+.stepper{display:flex;align-items:center;gap:0;background:var(--card);border:1.5px solid var(--rule);border-radius:14px;overflow:hidden}
+.stepper button{width:64px;min-height:60px;border:none;background:none;font-size:30px;color:var(--gold-deep);cursor:pointer;font-weight:600}
+.stepper .val{flex:1;text-align:center;font-family:'JetBrains Mono';font-weight:700;font-size:26px}
+.stepper .val small{display:block;font-family:'Inter';font-weight:500;font-size:12px;color:var(--soft)}
+.spacer{flex:1}
+
+/* payoff */
+.payoff{text-align:center;margin-top:40px}
+.payoff .say{font-size:21px;line-height:1.5;margin:18px 0 6px}
+.payoff .say b{font-family:'JetBrains Mono';font-weight:700}
+.payoff .say .old{color:var(--soft);text-decoration:line-through}
+.payoff .say .new{color:var(--green)}
+.payoff .sub{color:var(--soft);font-size:15px;margin-bottom:30px}
+
+/* why sheet */
+.seg{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:14px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.seg .l b{font-family:'Barlow Semi Condensed';font-weight:700;font-size:16px;display:block}
+.seg .l small{color:var(--soft);font-size:13px}
+.seg .st{font-family:'JetBrains Mono';font-weight:600;font-size:13px}
+.seg .st.ok{color:var(--green)} .seg .st.no{color:var(--soft)}
+
+/* record detail */
+.kv{display:flex;justify-content:space-between;padding:11px 2px;border-bottom:1px solid var(--rule);font-size:16px}
+.kv .k{color:var(--soft)} .kv .v{font-family:'JetBrains Mono';font-weight:600}
+.danger{color:var(--red)}
+
+.note{position:fixed;left:0;right:0;bottom:0;background:#1C1B18;color:#F7F5EF;text-align:center;
+  font-size:12px;padding:8px;opacity:.92}
+</style>
+</head>
+<body>
+<div class="phone">
+
+<!-- ═══════ 1. THE RIFLE (the only resting screen) ═══════ -->
+<div class="view on" id="v-rifle">
+  <div style="text-align:center"><span class="brand"><b>PROVEN</b><i>.</i></span></div>
+  <div class="rname"><h1>TB 6.5 PRC</h1><span style="color:var(--soft);font-size:14px">Hornady 143</span></div>
+  <div class="dots"><i class="on"></i><i></i><i></i></div>
+
+  <div class="numberbox" onclick="go('v-why')">
+    <div class="lbl">PROVEN TO</div>
+    <div class="num">600<em>yd</em></div>
+    <div class="conf">rough · <b>zero ✓</b> · speed ✓ · <span style="color:var(--soft)">one more shot at 600 confirms it</span></div>
+  </div>
+
+  <div class="chart" onclick="go('v-chart')">
+    <div class="cttl"><span>DROP CHART</span><small>29″Hg · 61°F · tap for full ›</small></div>
+    <div class="crow"><span class="d">300 yd</span><span class="v">1.4 MOA</span></div>
+    <div class="crow"><span class="d">400 yd</span><span class="v">2.6 MOA</span></div>
+    <div class="crow"><span class="d">500 yd</span><span class="v">3.9 MOA</span></div>
+    <div class="crow hot"><span class="d">600 yd</span><span class="v">5.4 MOA</span></div>
+  </div>
+
+  <button class="gold" onclick="go('v-add')">＋ &nbsp;Add what you shot</button>
+
+  <div class="feed">
+    <div class="fttl">WHAT'S HAPPENED</div>
+    <div class="fitem" onclick="go('v-record')"><span><b>Steel at 600</b><small>Today · dial corrected 4.0 → 3.8</small></span><span class="chev">›</span></div>
+    <div class="fitem"><span><b>Zero confirmed</b><small>Jul 23 · 5 shots · 0.60 MOA</small></span><span class="chev">›</span></div>
+    <div class="fitem"><span><b>Bullet speed measured</b><small>Jul 23 · 2,846 fps ± 6 · 10 shots</small></span><span class="chev">›</span></div>
+  </div>
+</div>
+
+<!-- ═══════ 2. ADD: what did you shoot? ═══════ -->
+<div class="view" id="v-add">
+  <button class="back" onclick="go('v-rifle')">‹ TB 6.5 PRC</button>
+  <h2 style="text-align:center;margin-top:26px">What did you shoot?</h2>
+  <div class="bigchoice">
+    <button onclick="go('v-paper')">Paper<small>photograph your target</small></button>
+    <button onclick="go('v-steel')">Steel<small>tell me one hit at distance</small></button>
+    <button onclick="go('v-chrono')">Chronograph<small>type the speed or import the file</small></button>
+  </div>
+</div>
+
+<!-- ═══════ 3a. PAPER ═══════ -->
+<div class="view" id="v-paper">
+  <button class="back" onclick="go('v-add')">‹ Back</button>
+  <h2 style="text-align:center;margin-top:24px">Photograph the target</h2>
+  <div style="flex:1;background:#111;border-radius:18px;margin:18px 0;display:flex;align-items:center;justify-content:center;color:#777;font-size:15px">camera</div>
+  <div style="text-align:center;color:var(--soft);font-size:13.5px;margin-bottom:10px">Suppressed · Lot 3120-A — same as last time · <button class="link" style="padding:2px">change</button></div>
+  <button class="gold" onclick="go('v-rifle')">Use photo</button>
+</div>
+
+<!-- ═══════ 3b. STEEL: three things, one screen ═══════ -->
+<div class="view" id="v-steel">
+  <button class="back" onclick="go('v-add')">‹ Back</button>
+  <h2 style="margin-top:22px">Steel</h2>
+  <div class="fieldlbl">HOW FAR</div>
+  <div class="chips"><button class="chip">400</button><button class="chip on">600</button><button class="chip">800</button><button class="chip">925</button><button class="chip">…</button></div>
+  <div class="fieldlbl">I DIALED</div>
+  <div class="stepper"><button>−</button><div class="val">4.0<small>MOA up</small></div><button>＋</button></div>
+  <div class="fieldlbl">IT HIT</div>
+  <div class="stepper"><button>−</button><div class="val">8″ high<small>tap − if it hit low</small></div><button>＋</button></div>
+  <div style="text-align:center;margin-top:10px"><button class="link">add bullet speed</button> · <button class="link">advanced</button></div>
+  <div class="spacer"></div>
+  <button class="gold" onclick="go('v-payoff')">Done</button>
+</div>
+
+<!-- ═══════ 4. THE PAYOFF ═══════ -->
+<div class="view" id="v-payoff">
+  <div class="payoff">
+    <div style="font-size:44px">✓</div>
+    <div class="say">Got it. Your <b>600-yard</b> dial changes from <b class="old">4.0</b> to <b class="new">3.8</b>.</div>
+    <div class="sub">Everything past ~400 just got more accurate.<br>One more shot at 600 makes it solid.</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="gold" onclick="go('v-rifle')">Keep it</button>
+  <div style="text-align:center"><button class="link" onclick="go('v-rifle')">Undo</button></div>
+</div>
+
+<!-- ═══════ 3c. CHRONO ═══════ -->
+<div class="view" id="v-chrono">
+  <button class="back" onclick="go('v-add')">‹ Back</button>
+  <h2 style="margin-top:22px">Bullet speed</h2>
+  <div class="fieldlbl">AVERAGE SPEED</div>
+  <div class="stepper"><button>−</button><div class="val">2846<small>feet per second</small></div><button>＋</button></div>
+  <div class="fieldlbl">FROM ABOUT HOW MANY SHOTS?</div>
+  <div class="chips"><button class="chip">1</button><button class="chip">5</button><button class="chip on">10</button><button class="chip">…</button></div>
+  <div style="text-align:center;margin-top:12px"><button class="link">import a chronograph file instead</button></div>
+  <div class="spacer"></div>
+  <button class="gold" onclick="go('v-rifle')">Save</button>
+</div>
+
+<!-- ═══════ 5. WHY (tap the number) ═══════ -->
+<div class="view" id="v-why">
+  <button class="back" onclick="go('v-rifle')">‹ TB 6.5 PRC</button>
+  <h2 style="margin-top:24px;margin-bottom:4px">Proven to 600 — rough</h2>
+  <div style="color:var(--soft);font-size:14.5px;margin-bottom:16px">Here's what that's based on, and what would raise it.</div>
+  <div class="seg"><span class="l"><b>Zero</b><small>5 shots at 100 · Jul 23</small></span><span class="st ok">CONFIRMED</span></div>
+  <div class="seg"><span class="l"><b>Bullet speed</b><small>2,846 ± 6 · 10 shots · Jul 23</small></span><span class="st ok">MEASURED</span></div>
+  <div class="seg"><span class="l"><b>Checked at distance</b><small>one hit at 600 — one more makes it solid</small></span><span class="st" style="color:var(--gold-deep)">ROUGH</span></div>
+  <div class="seg"><span class="l"><b>Scope check</b><small>optional — for the last bit of precision</small></span><span class="st no">NOT DONE</span></div>
+  <div class="spacer"></div>
+  <button class="gold" onclick="go('v-add')">＋ &nbsp;Add what you shot</button>
+</div>
+
+<!-- ═══════ 6. FULL CHART (tap the chart) ═══════ -->
+<div class="view" id="v-chart">
+  <button class="back" onclick="go('v-rifle')">‹ TB 6.5 PRC</button>
+  <h2 style="margin-top:24px">Drop chart</h2>
+  <div style="color:var(--soft);font-size:13.5px;margin:2px 0 12px">Using your measured speed and today's conditions.</div>
+  <div class="chart" style="cursor:default;margin-top:0">
+    <div class="crow"><span class="d">200</span><span class="v">0.4</span></div>
+    <div class="crow"><span class="d">300</span><span class="v">1.4</span></div>
+    <div class="crow"><span class="d">400</span><span class="v">2.6</span></div>
+    <div class="crow"><span class="d">500</span><span class="v">3.9</span></div>
+    <div class="crow hot"><span class="d">600</span><span class="v">5.4</span></div>
+    <div class="crow"><span class="d">700</span><span class="v">7.0</span></div>
+    <div class="crow"><span class="d">800</span><span class="v">8.9</span></div>
+    <div class="crow"><span class="d">925</span><span class="v">11.4</span></div>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:13px 14px;font-size:14.5px">
+    <b style="font-family:'Barlow Semi Condensed'">FOR YOUR RANGEFINDER</b><br>
+    <span class="mono" style="font-size:16px">BC .344 G7 &nbsp;·&nbsp; speed 2,831</span><br>
+    <small style="color:var(--soft)">enter these into your Revic/Sig — they include your corrections</small>
+  </div>
+  <div style="text-align:center;margin-top:8px"><button class="link">Print</button> · <button class="link">Share</button></div>
+  <div class="spacer"></div>
+</div>
+
+<!-- ═══════ 7. A RECORD (tap a feed item) ═══════ -->
+<div class="view" id="v-record">
+  <button class="back" onclick="go('v-rifle')">‹ TB 6.5 PRC</button>
+  <h2 style="margin-top:24px">Steel at 600</h2>
+  <div style="color:var(--soft);font-size:13.5px;margin-bottom:14px">Today, 8:04 AM</div>
+  <div class="kv"><span class="k">Distance</span><span class="v">600 yd</span></div>
+  <div class="kv"><span class="k">Dialed</span><span class="v">4.0 MOA</span></div>
+  <div class="kv"><span class="k">It hit</span><span class="v">8″ high</span></div>
+  <div class="kv"><span class="k">Bullet speed</span><span class="v">2,851 fps</span></div>
+  <div class="kv"><span class="k">Correction</span><span class="v" style="color:var(--green)">4.0 → 3.8 (kept)</span></div>
+  <div style="text-align:center;margin-top:16px">
+    <button class="link">Edit</button> · <button class="link danger">Delete</button>
+  </div>
+  <div class="spacer"></div>
+</div>
+
+</div>
+<div class="note">Tap through it: the number · the chart · ＋ Add · a feed item. One gold button per screen.</div>
+<script>
+function go(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+document.getElementById(id).classList.add('on');window.scrollTo(0,0);}
+</script>
+</body>
+</html>

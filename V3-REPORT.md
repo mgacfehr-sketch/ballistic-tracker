@@ -102,6 +102,59 @@ full logger, which view 5 (advanced inline reveal) re-renders as-is.
 
 ---
 
+## Step 1 — View shell, color law, safe-area, scroll lock
+
+- **`tokens.css`** repointed to the v3 mockup's palette (mapped onto the
+  EXISTING variable names — no parallel token system): warmer paper
+  background, refreshed ink/soft/gold/rule/green/red values. New font
+  tokens: `--font-display` (Barlow Semi Condensed — headings/title/
+  heading tiers now use it sitewide, a deliberate unified type refresh
+  since headings are sparse and benefit from brand consistency); `--font-ui`
+  gains Inter, `--font-mono` gains JetBrains Mono, both as PREFERRED faces
+  with the existing system stacks as fallback (CDN failure degrades
+  visually only, never functionally). New `--type-fieldlabel` token kept
+  SEPARATE from `--type-label` deliberately — `--type-label`/`.t-micro` is
+  used at high density across dozens of untouched legacy screens (the
+  paperwork drill-down, the advanced steel logger) and changing it
+  globally would visibly break those screens; the mockup's condensed
+  letter-spaced field-label treatment is new and scoped to v3 screens only.
+  New `--type-mono-hero` (56px) for the number.
+- **Google Fonts CDN** pinned in `index.html` (Barlow Semi Condensed
+  600/700/800, Inter 400/500/600, JetBrains Mono 500/600/700) with
+  `preconnect` hints — matches the mockup's own font request exactly.
+- **New `css/ui.css` §19** — all v3 component classes, prefixed `v3-` to
+  guarantee zero collision with legacy classes the retained screens still
+  use (`.chip`/`.chip-opt`/`.stepper` are all still live in
+  `steel-session.js`'s full logger, reached via the "advanced" link in
+  step 5): `.v3-brand`, `.v3-rname`/`.v3-dots`, `.v3-numberbox`,
+  `.v3-chart`/`.v3-crow`, `.v3-feed`/`.v3-fitem`, `.v3-gold`/`.v3-link`/
+  `.v3-back`, `.v3-bigchoice`, `.v3-fieldlbl`/`.v3-chips`/`.v3-chip`,
+  `.v3-stepper`, `.v3-payoff`, `.v3-seg`, `.v3-kv`, `.v3-rfbox`.
+- **The bottom tab bar is REMOVED** (`index.html`'s `#app-nav` deleted per
+  Part 2). `.app-view` gains `env(safe-area-inset-bottom)` padding via
+  `.screen` (previously absorbed by the navbar's own padding — now every
+  view needs it directly since nothing sits below it).
+- **`app.js`**: `switchView('home')` now mounts `RifleApp` instead of
+  `HomeManager`; `HomeManager`/`Categories`/`Lanes` stay instantiated
+  (nothing calls them to render) for an orderly step-11 retirement rather
+  than a risky mid-contract rip-out.
+- Fixed two dead click handlers left over from navbar removal
+  (`session-flow.js`, `ballistic-solver.js` — both clicked
+  `.nav-tab[data-view="profiles"]`, now call `AppNav.go('profiles')`
+  directly).
+- **New `js/rifle-app.js`** — `RifleApp` manager, the shell + rifle
+  resolution (by id, by Recents, else first) + no-rifle invite. Full
+  number/chart/feed data wiring is step 2's job; this step proves the
+  mount/routing/fonts/safe-area/color-law mechanics.
+- Headless proof: no-rifle, with-rifle (2 rifles, dots visible), and dark
+  theme all screenshot-verified against the mockup's composition —
+  condensed headings, mono hero number, letter-spaced field label, gold
+  button, warm paper background all render correctly in both themes.
+- **807 tests green** (unchanged — this step is shell/CSS/routing, no new
+  pure logic yet).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

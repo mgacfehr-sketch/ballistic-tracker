@@ -335,8 +335,7 @@ SessionFlow.prototype._loadProfilePicker = function () {
             var goBtn = document.getElementById('btn-go-profiles');
             if (goBtn) {
                 goBtn.addEventListener('click', function () {
-                    var profilesTab = document.querySelector('.nav-tab[data-view="profiles"]');
-                    if (profilesTab) profilesTab.click();
+                    if (window.AppNav) AppNav.go('profiles');
                 });
             }
             return;
