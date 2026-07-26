@@ -23,8 +23,15 @@ AdminManager.prototype.show = function () {
     if (!self.container) return;
 
     self.container.innerHTML =
-        '<div class="view-toolbar"><h2 class="toolbar-title">Admin</h2></div>' +
+        '<div class="view-toolbar">' +
+        '<button type="button" class="toolbar-back" id="admin-back-btn">' + Icon('chevron-left', 20) + 'Home</button>' +
+        '<h2 class="toolbar-title">Admin</h2></div>' +
         '<div class="screen" id="admin-content"><p class="t-body u-quiet">Loading&hellip;</p></div>';
+
+    var backBtn = document.getElementById('admin-back-btn');
+    if (backBtn) backBtn.addEventListener('click', function () {
+        if (window.AppNav) AppNav.go('home');
+    });
 
     Promise.all([
         self.db.adminGetStats(),

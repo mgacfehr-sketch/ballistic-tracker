@@ -548,7 +548,8 @@ BallisticSolverManager.prototype._render = function () {
     var html = '';
 
     // Toolbar
-    html += '<div class="profile-toolbar"><div class="toolbar-spacer"></div>';
+    html += '<div class="profile-toolbar">' +
+        '<button type="button" class="toolbar-back" id="solver-back-btn">' + Icon('chevron-left', 20) + 'Home</button>';
     html += '<span class="profile-title">Ballistic Solver</span>';
     html += '<div class="toolbar-spacer"></div></div>';
 

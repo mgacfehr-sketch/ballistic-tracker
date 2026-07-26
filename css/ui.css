@@ -920,7 +920,10 @@ button.rowlink:active { background: var(--brand-subtle); }
 .fab-zone {
     position: sticky;
     bottom: 0;
-    padding: var(--space-md) var(--edge) var(--space-md);
+    /* device bug: this sits OUTSIDE .screen so it never got .screen's own
+       safe-area padding — on a home-indicator phone the primary CTA
+       (Add rifle) sat under/behind the gesture bar and was untappable */
+    padding: var(--space-md) var(--edge) calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
     background: linear-gradient(to top, var(--surface-background) 70%, transparent);
 }
 

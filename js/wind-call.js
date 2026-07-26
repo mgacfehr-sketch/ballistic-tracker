@@ -52,7 +52,9 @@ WindCallManager.prototype._renderUI = function (groups) {
     var self = this;
     var html = '';
 
-    html += '<div class="view-toolbar"><h2 class="toolbar-title">Wind call</h2></div>';
+    html += '<div class="view-toolbar">' +
+        '<button type="button" class="toolbar-back" id="wind-back-btn">' + Icon('chevron-left', 20) + 'Home</button>';
+    html += '<h2 class="toolbar-title">Wind call</h2></div>';
     html += '<div class="screen">';
 
     // Rifle/load selector
@@ -112,6 +114,11 @@ WindCallManager.prototype._renderUI = function (groups) {
 
 WindCallManager.prototype._bindEvents = function (groups) {
     var self = this;
+
+    var backBtn = document.getElementById('wind-back-btn');
+    if (backBtn) backBtn.addEventListener('click', function () {
+        if (window.AppNav) AppNav.go('home');
+    });
 
     var select = document.getElementById('wind-rifle-select');
     if (select) {

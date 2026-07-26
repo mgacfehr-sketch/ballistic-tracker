@@ -277,7 +277,13 @@ SessionFlow.prototype._nextStep = function () {
  * results step clears the results overlay (recalculating rebuilds it).
  */
 SessionFlow.prototype._prevStep = function () {
-    if (this.currentStep <= 0) return;
+    if (this.currentStep <= 0) {
+        // v3.0: step 1 is the flow's own entry point — with the bottom
+        // tab bar gone, "back" from here means leaving the flow
+        // entirely, not a no-op that strands the user.
+        if (window.AppNav) AppNav.go('home');
+        return;
+    }
     if (STEPS[this.currentStep] === 'results') {
         this.canvas.overlayResults = null;
         this._removeMarkersOfType('centroid');

@@ -42,6 +42,7 @@ ChronoManager.prototype.show = function () {
 
     var html = '';
     html += '<div class="view-toolbar" id="chrono-toolbar-import">';
+    html += '<button type="button" class="toolbar-back" id="chrono-home-back-btn">' + Icon('chevron-left', 20) + 'Home</button>';
     html += '<h2 class="toolbar-title">Chrono import</h2>';
     html += '</div>';
 
@@ -88,6 +89,10 @@ ChronoManager.prototype.show = function () {
     this.container.innerHTML = html;
 
     var self = this;
+    var homeBackBtn = document.getElementById('chrono-home-back-btn');
+    if (homeBackBtn) homeBackBtn.addEventListener('click', function () {
+        if (window.AppNav) AppNav.go('home');
+    });
     var input = document.getElementById('chrono-file');
     input.addEventListener('change', function () {
         if (input.files && input.files.length > 0) {

@@ -88,22 +88,23 @@ RifleApp.prototype._renderNoRifle = function () {
 RifleApp.prototype._renderRifle = function () {
     var self = this;
     var rifle = this._currentRifle();
-    var many = this._rifles.length > 1;
 
     var html = '<div class="screen" style="padding-top:var(--space-lg)">';
     // v3.0 step 8: the name is always the tap target for THE RIFLE'S
     // PAPERWORK (view 8, reusing ProfileManager.showRifleDetail via
-    // AppNav.openRifle) — with >1 rifle, the dots row below becomes the
-    // switcher tap target instead (swipe still works either way).
+    // AppNav.openRifle) — the dots row below is always the switcher/
+    // add-rifle tap target instead (swipe still works with 2+ rifles).
     html += '<button class="v3-rname v3-rname-tap" id="rf-rname"><h1>' + UI.esc(rifle.name || 'Rifle') + '</h1>' +
         (rifle.caliber ? '<span class="load">' + UI.esc(rifle.caliber) + '</span>' : '') + '</button>';
-    if (many) {
-        html += '<button class="v3-dots" id="rf-dots">';
-        this._rifles.forEach(function (r, i) {
-            html += '<i' + (i === self._cardIndex ? ' class="on"' : '') + '></i>';
-        });
-        html += '</button>';
-    }
+    // Device bug: with exactly one rifle this row rendered nothing at
+    // all, so "add a rifle" — a switcher-list row, not a Paperwork
+    // sub-screen — had no tap target to find. Always render it; a
+    // single rifle just shows one dot instead of none.
+    html += '<button class="v3-dots" id="rf-dots" aria-label="Switch or add a rifle">';
+    this._rifles.forEach(function (r, i) {
+        html += '<i' + (i === self._cardIndex ? ' class="on"' : '') + '></i>';
+    });
+    html += '</button>';
     html += '<div id="rf-sync" style="padding:0 var(--edge)"></div>';
     html += '<button class="v3-numberbox" id="rf-number"><div class="lbl">PROVEN TO</div>' +
         '<div class="num" id="rf-num-val">&mdash;<em>yd</em></div><div class="conf" id="rf-conf">&nbsp;</div></button>';
@@ -377,7 +378,11 @@ RifleApp.prototype._bindRifleNav = function () {
     }, { passive: true });
 };
 
-/** Plain list, per the contract ("a plain list appears if >4 or on name-area tap"). */
+/** Plain list, per the contract ("a plain list appears if >4 or on name-area tap").
+ *  Device bug: "add a rifle" had no tap target here at all — a user
+ *  looking to add their next rifle naturally opens this list first,
+ *  not Paperwork's "Everything else" drawer. "+ Add a rifle" and
+ *  "Scan certificate" are always the last two rows. */
 RifleApp.prototype._openRifleList = function () {
     var self = this;
     var overlay = document.createElement('div');
@@ -387,6 +392,8 @@ RifleApp.prototype._openRifleList = function () {
         rows += '<button class="option-row' + (i === self._cardIndex ? ' on' : '') + '" data-pick="' + i + '">' +
             '<span>' + UI.esc(r.name || 'Rifle') + (r.caliber ? '<span class="choice-desc">' + UI.esc(r.caliber) + '</span>' : '') + '</span></button>';
     });
+    rows += '<button class="option-row" data-pick-add="1"><span class="u-gold">＋ Add a rifle</span></button>';
+    rows += '<button class="option-row" data-pick-scan="1"><span>Scan certificate</span></button>';
     overlay.innerHTML = '<div class="overlay-card"><div class="overlay-title">Which rifle?</div>' + rows + '</div>';
     document.body.appendChild(overlay);
     function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
@@ -401,4 +408,33 @@ RifleApp.prototype._openRifleList = function () {
             self._renderRifle();
         });
     }
+    var addRow = overlay.querySelector('[data-pick-add]');
+    if (addRow) addRow.addEventListener('click', function () {
+        close();
+        if (typeof FirstRifleFlow !== 'undefined') FirstRifleFlow.start(self.db);
+        else if (window.AppNav) AppNav.go('profiles');
+    });
+    var scanRow = overlay.querySelector('[data-pick-scan]');
+    if (scanRow) scanRow.addEventListener('click', function () {
+        close();
+        self._explainScanCertificate();
+    });
+};
+
+/** Same explanatory overlay as the Rifles-list "Scan certificate"
+ *  button (profiles.js) — certificates carry a QR; scanning it is a
+ *  camera-app action, not something this button does directly. */
+RifleApp.prototype._explainScanCertificate = function () {
+    var overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.innerHTML =
+        '<div class="overlay-card">' +
+        '<div class="overlay-title">Scan a certificate</div>' +
+        '<p class="overlay-text">Every Proven certificate carries a QR code. Point your phone&rsquo;s camera at it &mdash; the link opens that rifle right here.</p>' +
+        '<button class="btn u-full" id="rf-scan-cert-close">Got it</button>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    overlay.querySelector('#rf-scan-cert-close').addEventListener('click', close);
 };

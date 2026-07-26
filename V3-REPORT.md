@@ -815,6 +815,81 @@ The v3.0 contract's build order (steps 0–12) is complete.
 
 ---
 
+## Post-ship: two device-testing bugs (2026-07-26)
+
+**Bug 1 — "I cannot add a new rifle."**
+Root cause: `.fab-zone` (the Rifles-list "Add rifle"/"Scan certificate"
+pinned bottom bar) renders as a sibling of `.screen`, not inside it —
+so it never got `.screen`'s own `env(safe-area-inset-bottom)` padding
+(the fix step 1 made specifically "so the last button on any view
+clears the iOS home indicator"). On a real phone, Add Rifle sat
+under/behind the home-indicator gesture area. Fixed: `.fab-zone` now
+carries the same safe-area padding.
+
+Also fixed the deeper discoverability problem the bug report called
+out directly: with exactly one rifle, the resting screen's dots row
+didn't render at all (`if (many)`, i.e. 2+ rifles only) — so the
+rifle-switcher list, "where a user actually looks" for Add a rifle,
+had no tap target whatsoever. The dots/switcher button now always
+renders (a single dot with one rifle), and `_openRifleList`'s overlay
+always ends with two new rows: **"＋ Add a rifle"** (→
+`FirstRifleFlow.start`, the same guided wizard the empty-fleet screen
+uses) and **"Scan certificate"** (the same explanatory overlay
+`profiles.js`'s Rifles-list button already shows). Add Rifle and Scan
+Certificate are now reachable from both places the report asked for:
+Paperwork's Rifles list (fab-zone, now safe-area-correct) and the
+name/dots switcher.
+
+**Bug 2 — "Admin has no exit."**
+Confirmed and swept for the whole class of bug: with the bottom tab
+bar gone (step 1), any screen whose ONLY previous exit was that bar
+is now an orphan. Found and fixed four real ones (all reachable in
+the current app, not hypothetical):
+- `js/admin.js` — the reported bug. Added a `.toolbar-back` button
+  (same family as `chrono.js`'s working back button) → `AppNav.go('home')`.
+- `js/ballistic-solver.js` — reachable via Categories' Ballistics tool;
+  its `.profile-toolbar` had no back control in either the empty or
+  populated state. Fixed.
+- `js/chrono.js` — the **import** screen (the entry point; the
+  **review** sub-screen already had a working back-to-import) had no
+  way out at all. Fixed.
+- Session flow **step 1** (`#step-profile`, the rifle/load picker) —
+  the flow's own entry point never had a `.btn-step-back` (the old
+  tab bar was its exit); `_prevStep()`'s `currentStep <= 0` guard was
+  a silent no-op. Added the button (identical markup to step 2's) and
+  changed the guard to `AppNav.go('home')` — every step's back button
+  shares one binder, so this one small change fixes the whole flow's
+  entry point.
+- `js/app.js`'s "Ask yorT is coming" placeholder and `js/wind-call.js`
+  — currently unreachable (both features are hard-disabled), fixed
+  defensively so the bug can't resurface the moment either ships.
+
+Everything else audited clean: `profiles.js`, `history.js`,
+`categories.js`, `rifle-*.js`, `steel-session.js`, `truing.js`,
+`device-export.js`, `rifle-report.js`, `certificate.js`,
+`scope-check.js`, `ladder.js`, `field.js` all already had a working
+exit on every screen (`history.js` in particular has a shared
+`_toolbarHtml()` helper every render function calls, so it was never
+at risk). `dope-log.js`, `cold-bore.js`, `zero-guardian.js`,
+`data-export.js`, `transfer.js`, `garmin-import.js`,
+`labradar-import.js`, `wizard.js` render into an existing parent
+screen's container or a self-dismissing modal/overlay — not
+independently orphanable, correctly excluded from the sweep.
+
+**New test: `tests/test-screen-nav.js`.** A structural/source-text
+check, not a real DOM walk — the project ships zero build tools or
+npm packages (CLAUDE.md), so no Playwright/jsdom dependency belongs in
+`tests/`. For ~30 known reachable screen-render functions, it extracts
+each function's source and asserts at least one recognized "way out"
+marker is present (`backline`, `toolbar-back`, `btn-step-back`,
+`AppNav.go(`, `app.show(`, `this._toolbarHtml(`, etc.), plus dedicated
+checks for the `.fab-zone` safe-area padding and the rifle-switcher's
+new rows. Verified it has teeth: reverting the admin.js fix alone
+makes it fail with exactly the right message. 43 new checks, all
+green. **889 tests total** (846 + 43), 0 failures.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - **The `Categories`/paperwork "Everything else" shortcut list** (step

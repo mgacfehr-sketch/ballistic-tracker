@@ -428,11 +428,14 @@
                 var aiView = views.ai;
                 if (aiView) {
                     aiView.innerHTML = '<div class="screen">' +
+                        '<div class="pagehead"><button class="backline" id="ai-back-btn">&lsaquo; Home</button></div>' +
                         (typeof UI !== 'undefined' ? UI.brandBar() : '') +
                         '<div class="empty-teach">' +
                         '<p><b>Ask yorT is coming.</b></p>' +
                         '<p class="t-micro" style="line-height:1.5">Answers grounded in YOUR rifles, sessions, and history — not forum guesses. It ships once the beta settles.</p>' +
                         '</div></div>';
+                    var aiBackBtn = document.getElementById('ai-back-btn');
+                    if (aiBackBtn) aiBackBtn.addEventListener('click', function () { switchView('home'); });
                 }
             }
 
