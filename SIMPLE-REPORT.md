@@ -72,6 +72,34 @@ observation (quick mode already builds exactly one), so the one-observation
 
 ---
 
+## Step 2 — Truing dead-end fixed (§3.1), both lanes
+
+- **"Send to Truing" now lands DIRECTLY on Full true** with the handed-over
+  string preselected — the mode-picker stop is gone from that path.
+- **The mode picker is one status block + ONE primary**: "Continue ›" (or
+  "True anyway ›" when a prerequisite is unmet — surfaced, never a gate).
+  Continue → Full true when strings exist, Quick true otherwise. The two
+  modes remain as quiet rows for Detailed users; the old silent no-op
+  ("Full true" doing nothing with zero strings) now launches the steel
+  logger instead.
+- **Applied screen enriched**: "Your rifle's numbers" (trued BC · MV) plus
+  the "For your rangefinder" line — `deviceCompensation()` when scope
+  tracking is verified ("compensated for your scope's clicks"), else the
+  true values "enter as-is".
+- **Headless proof of the owner's real case**: an 8-shot 925-yd full string
+  handed from steel → Full true (preselected, checklist 8/8 velocities) →
+  Review correction → result (BC 0.315→0.299 recommended per doctrine, with
+  the honest 62%-of-supersonic extrapolation warning; Moderate confidence,
+  3/5) → Apply → Applied with numbers + compensated rangefinder line
+  (BC 0.300 · 2989 fps at factor 1.03). Screenshots in the run log.
+
+### Judgment calls (step 2)
+- Prerequisites "good" = tracking known + zero confirmed + MV measured; any
+  gap only changes the button label to "True anyway ›" (doctrine enforced by
+  coach, not by gates — unchanged v2.3 stance).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

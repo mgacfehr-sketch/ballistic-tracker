@@ -78,6 +78,16 @@ var TruingJob = (function () {
                 renderNoLoad();
                 return;
             }
+            // v2.5 §3.1: a string handed over from Steel Session lands
+            // DIRECTLY on Full true with that string preselected — the
+            // mode picker was a dead-end stop nobody asked for.
+            // (renderFull consumes + clears the sessionStorage handoff.)
+            var handoff = null;
+            try { handoff = sessionStorage.getItem('yort_truing_string'); } catch (e) { /* */ }
+            if (handoff && _S.steelStrings.some(function (st) { return st.id === handoff; })) {
+                renderFull();
+                return;
+            }
             renderModePicker();
         });
     }
@@ -162,23 +172,38 @@ var TruingJob = (function () {
                 : 'This load stays supersonic past 3000 yd — drag truing is out of reach at your ranges; MV is the working lever.') +
             '</p></div>';
 
+        // v2.5 §3.1: prerequisites are ONE status block, never a gate —
+        // followed by ONE clear primary that always goes somewhere.
         html += UI.sectionHead('Prerequisites');
         html += _prereqRows();
 
-        html += UI.sectionHead('How do you want to true?');
-        html += '<button class="card u-full" style="text-align:left;border-width:2px" id="tr-quick">' +
-            '<div class="card-pad"><b style="font:var(--type-heading, 600 20px sans-serif)">Quick true</b>' +
-            '<p class="t-micro u-mt-10" style="line-height:1.5">&ldquo;I dialed 15.0, it took 15.75.&rdquo; ' +
-            'Assumes no wind and your saved muzzle velocity. Fast — a rough correction in the field.</p></div></button>';
-        html += '<button class="card u-full u-mt-10" style="text-align:left" id="tr-full">' +
-            '<div class="card-pad"><b style="font:var(--type-heading, 600 20px sans-serif)">Full true</b>' +
-            '<p class="t-micro u-mt-10" style="line-height:1.5">Ties in your steel-session shots — per-shot velocity ' +
-            'and wind removed from the math, trued on real ballistic error only. The dope you bet a hunt on.</p>' +
+        var prereqsGood = !!(S.tracking || typeof S.rifle.scopeCorrectionFactor === 'number') &&
+            S.zeroEvents.length > 0 && !!S.mvMeasured;
+        var primaryLabel = prereqsGood ? 'Continue &rsaquo;' : 'True anyway &rsaquo;';
+        html += '<button class="btn-primary btn-edge u-mt-14" id="tr-continue">' + primaryLabel + '</button>';
+        html += '<p class="t-micro edge u-mt-10">' +
             (S.steelStrings.length
-                ? '<p class="t-micro u-gold u-mt-10">' + S.steelStrings.length + ' logged string' +
-                  (S.steelStrings.length === 1 ? '' : 's') + ' ready to tie in &rsaquo;</p>'
-                : '<p class="t-micro u-mt-10">No full steel strings yet — log one and come back.</p>') +
-            '</div></button>';
+                ? S.steelStrings.length + ' logged string' + (S.steelStrings.length === 1 ? '' : 's') +
+                  ' ready to tie in.'
+                : 'No steel strings yet — you can still true from one observed hit.') + '</p>';
+
+        // The two modes, demoted to quiet rows (Detailed users pick)
+        html += UI.sectionHead('Or pick a mode');
+        var modeRows = UI.rowlink({
+            button: true, id: 'tr-quick',
+            title: 'Quick true',
+            sub: '"I dialed 15.0, it took 15.75." Assumes no wind and your saved velocity — rough.',
+            chev: true
+        });
+        modeRows += UI.rowlink({
+            button: true, id: 'tr-full',
+            title: 'Full true',
+            sub: S.steelStrings.length
+                ? 'Tie in your steel strings — velocity and wind removed from the math'
+                : 'Needs a logged steel string — log one and this lights up',
+            chev: !!S.steelStrings.length
+        });
+        html += UI.card(modeRows);
 
         html += UI.sectionHead('Today\'s air');
         html += '<div id="tr-env">' + _envHtml() + '</div>';
@@ -188,9 +213,18 @@ var TruingJob = (function () {
         document.getElementById('tr-back').addEventListener('click', function () {
             if (window.Categories) Categories.show('truing', S.rifle.id);
         });
+        // The primary: strings → Full true; none → Quick true. Always forward.
+        document.getElementById('tr-continue').addEventListener('click', function () {
+            if (S.steelStrings.length) renderFull();
+            else renderQuick();
+        });
         document.getElementById('tr-quick').addEventListener('click', function () { renderQuick(); });
         document.getElementById('tr-full').addEventListener('click', function () {
-            if (S.steelStrings.length) renderFull();
+            if (S.steelStrings.length) { renderFull(); return; }
+            // never a silent no-op (the old dead-end)
+            if (window.ToolActions && ToolActions.steelSession) {
+                ToolActions.steelSession(_db, S.rifle.id);
+            }
         });
         _bindEnv();
     }
@@ -676,10 +710,40 @@ var TruingJob = (function () {
         }).then(function () {
             if (typeof Readiness !== 'undefined') Readiness.invalidate(S.rifle.id);
             _container.setAttribute('data-screen', 'truing-done');
+
+            // v2.5 §3.1: surface the true numbers + the rangefinder line
+            var corrected = {};
+            for (var k in profile) { if (profile.hasOwnProperty(k)) corrected[k] = profile[k]; }
+            if (isBc) corrected.bc = opt.value; else corrected.muzzleVelocity = opt.value;
+            var numbersLine = 'BC ' + corrected.bc.toFixed(3) + ' ' + (profile.dragModel || 'G7') +
+                ' · ' + Math.round(corrected.muzzleVelocity) + ' fps';
+            var factor = (S.tracking && S.tracking.factor) ||
+                (typeof S.rifle.scopeCorrectionFactor === 'number' ? S.rifle.scopeCorrectionFactor : null);
+            var rangefinderLine;
+            if (factor && Math.abs(factor - 1) >= 0.0005 && typeof deviceCompensation === 'function') {
+                var dc = null;
+                try { dc = deviceCompensation(corrected, _envForSolve(), factor); } catch (e) { /* fall through */ }
+                rangefinderLine = dc && !dc.identity
+                    ? 'For your rangefinder: BC ' + dc.bcOut.toFixed(3) + ' · speed ' + dc.mvOut +
+                      ' fps — compensated for your scope\'s clicks'
+                    : 'For your rangefinder: BC ' + corrected.bc.toFixed(3) + ' · speed ' +
+                      Math.round(corrected.muzzleVelocity) + ' fps — enter as-is';
+            } else {
+                rangefinderLine = 'For your rangefinder: BC ' + corrected.bc.toFixed(3) + ' · speed ' +
+                    Math.round(corrected.muzzleVelocity) + ' fps — enter as-is';
+            }
+
             _container.innerHTML = '<div class="screen">' +
                 '<div class="pagehead"><div class="pagetitle">Applied</div></div>' +
                 UI.banner('ready', 'Every future solution for ' + UI.esc(S.load.name || 'this load') +
                     ' uses the trued ' + (isBc ? 'BC' : 'MV') + '. The old value is kept in the truing history — nothing is ever erased.', true) +
+                '<div class="card edge u-mt-14" style="border:2px solid var(--brand-gold);text-align:center">' +
+                '<div class="card-pad">' +
+                '<div class="t-micro">Your rifle\'s numbers</div>' +
+                '<div class="mono" style="font-size:24px;font-weight:700;color:var(--brand-gold-strong);margin:4px 0">' +
+                UI.esc(numbersLine) + '</div>' +
+                '<div class="t-micro">' + UI.esc(rangefinderLine) + '</div>' +
+                '</div></div>' +
                 '<button class="btn-primary btn-edge u-mt-14" id="tr-done">Done</button></div>';
             document.getElementById('tr-done').addEventListener('click', function () {
                 if (window.Categories) Categories.show('truing', S.rifle.id);
