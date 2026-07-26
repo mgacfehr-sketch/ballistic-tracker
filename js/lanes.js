@@ -75,6 +75,38 @@ var LanesCore = {
 
     serialize: function (detailed, source) {
         return { v: 1, detailed: !!detailed, source: source || 'user' };
+    },
+
+    /**
+     * Roy-ify a sentence (§1.4): translate precise vocabulary into
+     * Roy's words for simple-lane DISPLAY. Ordered, case-preserving on
+     * the first letter. The detailed lane never calls this.
+     */
+    royify: function (text) {
+        var RULES = [
+            [/\bmuzzle velocity\b/gi, 'bullet speed'],
+            [/\bMV\b/g, 'speed'],
+            [/\bDOPE card\b/gi, 'drop chart'],
+            [/\bDOPE\b/g, 'drop chart'],
+            [/\bchronograph file\b/gi, 'speed meter file'],
+            [/\bchrono file\b/gi, 'speed meter file'],
+            [/\bchronograph\b/gi, 'speed meter'],
+            [/\bchrono\b/gi, 'speed meter'],
+            [/\bballistic profile\b/gi, 'your rifle’s numbers']
+        ];
+        var out = String(text || '');
+        RULES.forEach(function (r) {
+            out = out.replace(r[0], function (match) {
+                var repl = r[1];
+                // keep a leading capital ("Muzzle velocity" → "Bullet speed")
+                if (match.charAt(0) === match.charAt(0).toUpperCase() &&
+                    match.charAt(1) && match.charAt(1) === match.charAt(1).toLowerCase()) {
+                    return repl.charAt(0).toUpperCase() + repl.slice(1);
+                }
+                return repl;
+            });
+        });
+        return out;
     }
 };
 
@@ -157,6 +189,11 @@ var Copy = {
         var s = LanesCore.copy(LANE_COPY, key,
             typeof Lanes !== 'undefined' && Lanes.isDetailed());
         return titleCase ? LanesCore.title(s) : s;
+    },
+    /** Simple lane: Roy's words. Detailed lane: text unchanged. */
+    roy: function (text) {
+        if (typeof Lanes !== 'undefined' && Lanes.isDetailed()) return String(text || '');
+        return LanesCore.royify(text);
     }
 };
 

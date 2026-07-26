@@ -223,7 +223,7 @@ HomeManager.prototype._renderCardAt = function (el) {
         '</div>' +
         '<div class="rc-strip" id="rc-strip">' +
         this._segBtn('zero', 'Zero', null) +
-        this._segBtn('mv', 'MV', null) +
+        this._segBtn('mv', this._mvLabel(), null) +
         this._segBtn('trued', 'Trued', null) +
         this._segBtn('tracking', 'Tracking', null) +
         '</div>' +
@@ -249,6 +249,11 @@ HomeManager.prototype._renderCardAt = function (el) {
 HomeManager.prototype._segBtn = function (key, label, cls) {
     return '<button data-seg="' + key + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
         '<span class="seg-bar"></span>' + label + '</button>';
+};
+
+/** §1.4: "Speed" for Roy, "MV" for the detailed lane. */
+HomeManager.prototype._mvLabel = function () {
+    return (typeof Lanes !== 'undefined' && !Lanes.isDetailed()) ? 'Speed' : 'MV';
 };
 
 /** Segment fill state from the status element (§2.10 vocabulary). */
@@ -294,7 +299,7 @@ HomeManager.prototype._fillCard = function (el, rifle, g) {
             var cls = self._segClass(key, status);
             btn.className = cls || '';
             btn.innerHTML = '<span class="seg-bar"></span>' +
-                (key === 'mv' ? 'MV' : key.charAt(0).toUpperCase() + key.slice(1));
+                (key === 'mv' ? self._mvLabel() : key.charAt(0).toUpperCase() + key.slice(1));
         });
         strip.addEventListener('click', function (e) {
             var btn = e.target.closest ? e.target.closest('[data-seg]') : null;
@@ -323,7 +328,8 @@ HomeManager.prototype._openSegmentSheet = function (key, rifle, status) {
     };
     var a = ACTIONS[key];
     CalibrationStatusCard.openSheet(key, status[key], {
-        actionLabel: a.label,
+        actionLabel: (typeof Copy !== 'undefined') ? Copy.roy(a.label) : a.label,
+        transform: (typeof Copy !== 'undefined') ? Copy.roy : undefined,
         onAction: function () { self._launch(a.type, rifle, {}); }
     });
 };
@@ -416,15 +422,17 @@ HomeManager.prototype._renderNextAction = function (rifle, na, ctx) {
 
     if (na.action.type === 'none') {
         slot.innerHTML = '<div class="rc-action" style="text-align:center;cursor:default">' +
-            '<b>' + UI.esc(na.title) + '</b></div>';
+            '<b>' + UI.esc((typeof Copy !== 'undefined' ? Copy.roy(na.title) : na.title)) + '</b></div>';
         return;
     }
 
+    // §1.4: the card speaks Roy's words in the simple lane
+    var roy = (typeof Copy !== 'undefined') ? Copy.roy : function (t) { return t; };
     slot.innerHTML =
         '<button class="rc-action" id="rc-action">' +
-        '<b>' + UI.esc(na.title) + '</b>' +
-        (na.detail ? '<span class="rc-detail">' + UI.esc(na.detail) + '</span>' : '') +
-        (na.payoff ? '<span class="rc-payoff">' + UI.esc(na.payoff) + '</span>' : '') +
+        '<b>' + UI.esc(roy(na.title)) + '</b>' +
+        (na.detail ? '<span class="rc-detail">' + UI.esc(roy(na.detail)) + '</span>' : '') +
+        (na.payoff ? '<span class="rc-payoff">' + UI.esc(roy(na.payoff)) + '</span>' : '') +
         '</button>' +
         (na.dismissible ? '<button class="rc-notnow" id="rc-notnow">Not now</button>' : '');
 

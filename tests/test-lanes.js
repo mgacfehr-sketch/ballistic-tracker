@@ -43,5 +43,18 @@ check('serialize shape', JSON.stringify(Core.serialize(true, 'inferred')),
     '{"v":1,"detailed":true,"source":"inferred"}');
 check('serialize defaults to user source', Core.serialize(false).source, 'user');
 
+console.log('\nroyify (§1.4 — Roy\'s words on display, ordered + case-kept):');
+check('muzzle velocity → bullet speed', Core.royify('Measure your muzzle velocity'),
+    'Measure your bullet speed');
+check('leading capital kept', Core.royify('Muzzle velocity beats guessing'),
+    'Bullet speed beats guessing');
+check('MV → speed (word-bounded)', Core.royify('MV not measured'), 'speed not measured');
+check('DOPE card → drop chart', Core.royify('Print a DOPE card'), 'Print a drop chart');
+check('chrono file → speed meter file', Core.royify('Type in an average, or import a chrono file.'),
+    'Type in an average, or import a speed meter file.');
+check('plain chrono → speed meter', Core.royify('chrono data'), 'speed meter data');
+check('untouched words pass through', Core.royify('Confirm your zero'), 'Confirm your zero');
+check('null-safe', Core.royify(null), '');
+
 console.log('\nResults: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

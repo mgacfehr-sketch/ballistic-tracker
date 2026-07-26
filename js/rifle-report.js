@@ -163,7 +163,7 @@ RifleReportManager.prototype._render = function (rifle, agg, strings, loads) {
             html += '</div>';
         }
     } else {
-        html += '<div class="plate"><div class="empty-teach"><p>No chrono strings imported yet &mdash; use Import chrono data on Home.</p></div></div>';
+        html += '<div class="plate"><div class="empty-teach"><p>No velocity data yet &mdash; type in your bullet speed on the rifle page, or import chrono data.</p></div></div>';
     }
 
     html += '</div>'; // .screen

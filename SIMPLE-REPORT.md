@@ -291,6 +291,32 @@ Fixes for every hole from the step-0 diagnosis:
 
 ---
 
+## Step 9 — Language pass (§1.4) + theme polish
+
+- **`LanesCore.royify()`** (8 new tests, lanes suite 28): ordered,
+  case-preserving display translation — muzzle velocity→bullet speed,
+  MV→speed, DOPE (card)→drop chart, chrono(graph)/file→speed meter (file),
+  ballistic profile→your rifle's numbers. `Copy.roy(text)` applies it only
+  in the simple lane; the detailed lane's precise vocabulary is untouched.
+  One map — the vocabularies cannot drift per-screen.
+- **Applied at the display seams:** the card's next-action (title/detail/
+  payoff), the go-shoot floor, the segment strip ("Speed" for Roy, "MV"
+  detailed), and the segment what/why sheets (calibration-status
+  `openSheet` gained an optional `transform`; the engine's stored words
+  never change — display only).
+- Copy strays fixed: rifle-report's velocity empty state no longer says
+  "use Import chrono data on Home" (that door moved two contracts ago) —
+  now offers type-it-in first.
+- Dark theme verified on the new v2.5 surfaces (simple Home with Roy copy,
+  the hit screen); light verified throughout the run.
+
+### Judgment calls (step 9)
+- royify is DISPLAY-ONLY at render seams — events, tables, and engine
+  wording stay precise, so the detailed lane and the data model never see
+  Roy's vocabulary.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

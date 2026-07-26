@@ -446,15 +446,17 @@ var CalibrationStatusCard = (typeof document !== 'undefined') ? (function () {
      */
     function _openSheet(sheet, element, opts) {
         opts = opts || {};
+        // v2.5 §1.4: callers may translate display copy (Roy's words)
+        var t = typeof opts.transform === 'function' ? opts.transform : function (s) { return s; };
         var overlay = document.createElement('div');
         overlay.className = 'overlay';
         overlay.innerHTML =
             '<div class="overlay-card">' +
-            '<div class="overlay-title">' + UI.esc(sheet.title) + '</div>' +
-            '<p class="overlay-text mono">' + UI.esc(element.line) + '</p>' +
-            '<p class="overlay-text">' + UI.esc(sheet.what) + '</p>' +
-            '<p class="overlay-text">' + UI.esc(sheet.why) + '</p>' +
-            '<p class="overlay-text u-gold">' + UI.esc(sheet.unlock) + '</p>' +
+            '<div class="overlay-title">' + UI.esc(t(sheet.title)) + '</div>' +
+            '<p class="overlay-text mono">' + UI.esc(t(element.line)) + '</p>' +
+            '<p class="overlay-text">' + UI.esc(t(sheet.what)) + '</p>' +
+            '<p class="overlay-text">' + UI.esc(t(sheet.why)) + '</p>' +
+            '<p class="overlay-text u-gold">' + UI.esc(t(sheet.unlock)) + '</p>' +
             (opts.actionLabel && opts.onAction
                 ? '<button class="btn-primary u-full" id="cal-sheet-action">' + UI.esc(opts.actionLabel) + '</button>'
                 : '') +
