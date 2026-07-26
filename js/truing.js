@@ -54,7 +54,7 @@ var TruingJob = (function () {
             db.getSteelStringsByRifle ? db.getSteelStringsByRifle(rifleId).catch(function () { return []; }) : Promise.resolve([])
         ]).then(function (res) {
             var rifle = res[0];
-            if (!rifle) { if (window.Categories) Categories.show('truing'); return; }
+            if (!rifle) { if (window.AppNav) AppNav.go('home'); return; }
             var loads = res[1] || [];
             var load = null;
             loads.forEach(function (l) { if (!load && (l.truedMv || l.truedBc)) load = l; });
@@ -113,7 +113,7 @@ var TruingJob = (function () {
             '<div class="empty-teach"><p>Truing needs a load with a BC and a velocity — add those to a load first.</p>' +
             '<button class="btn-primary" id="tr-add-load">Open the rifle</button></div></div>';
         document.getElementById('tr-back').addEventListener('click', function () {
-            if (window.Categories) Categories.show('truing', _S.rifle.id);
+            if (window.AppNav) AppNav.go('home');
         });
         document.getElementById('tr-add-load').addEventListener('click', function () {
             if (window.AppNav) AppNav.openRifle(_S.rifle.id);
@@ -211,7 +211,7 @@ var TruingJob = (function () {
         _container.innerHTML = html;
 
         document.getElementById('tr-back').addEventListener('click', function () {
-            if (window.Categories) Categories.show('truing', S.rifle.id);
+            if (window.AppNav) AppNav.go('home');
         });
         // The primary: strings → Full true; none → Quick true. Always forward.
         document.getElementById('tr-continue').addEventListener('click', function () {
@@ -612,7 +612,7 @@ var TruingJob = (function () {
         });
         document.getElementById('tr-apply').addEventListener('click', _apply);
         document.getElementById('tr-cancel').addEventListener('click', function () {
-            if (window.Categories) Categories.show('truing', S.rifle.id);
+            if (window.AppNav) AppNav.go('home');
         });
     }
 
@@ -746,7 +746,7 @@ var TruingJob = (function () {
                 '</div></div>' +
                 '<button class="btn-primary btn-edge u-mt-14" id="tr-done">Done</button></div>';
             document.getElementById('tr-done').addEventListener('click', function () {
-                if (window.Categories) Categories.show('truing', S.rifle.id);
+                if (window.AppNav) AppNav.go('home');
             });
         }).catch(function (err) {
             btn.disabled = false;
@@ -763,6 +763,6 @@ if (typeof window !== 'undefined') {
     window.ToolActions = window.ToolActions || {};
     window.ToolActions.truing = function (db, rifleId) {
         if (rifleId) TruingJob.open(db, rifleId);
-        else if (typeof Categories !== 'undefined') Categories.show('truing');
+        else if (window.AppNav) AppNav.go('home');
     };
 }

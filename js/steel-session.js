@@ -64,7 +64,7 @@ var SteelSession = (function () {
         ]).then(function (res) {
             var rifle = res[0];
             if (!rifle) {
-                if (window.Categories) Categories.show('steel');
+                if (window.AppNav) AppNav.go('home');
                 return;
             }
             var loads = res[1] || [];
@@ -167,7 +167,7 @@ var SteelSession = (function () {
     function bindSetup() {
         var S = _S;
         document.getElementById('st-back').addEventListener('click', function () {
-            if (window.Categories) Categories.show('steel', S.rifle.id);
+            if (window.AppNav) AppNav.go('home');
         });
         var distWrap = document.getElementById('st-dist');
         distWrap.addEventListener('click', function (e) {
@@ -718,7 +718,7 @@ var SteelSession = (function () {
             renderSetup();
         });
         document.getElementById('st-done').addEventListener('click', function () {
-            if (window.Categories) Categories.show('steel', S.rifle.id);
+            if (window.AppNav) AppNav.go('home');
         });
     }
 
@@ -919,13 +919,13 @@ if (typeof window !== 'undefined') {
     window.ToolActions.steelSession = function (db, rifleId) {
         if (rifleId) {
             SteelSession.open(db, rifleId);
-        } else if (typeof Categories !== 'undefined') {
-            Categories.show('steel');
+        } else if (window.AppNav) {
+            AppNav.go('home');
         }
     };
     // v2.5 §3.3: the casual escape — photograph the plate, minimal save
     window.ToolActions.steelCasual = function (db, rifleId) {
         if (rifleId) SteelSession.open(db, rifleId, 'casual');
-        else if (typeof Categories !== 'undefined') Categories.show('steel');
+        else if (window.AppNav) AppNav.go('home');
     };
 }

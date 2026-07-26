@@ -290,6 +290,38 @@ data-write inspection) covers the whole flow as one unit.
 
 ---
 
+## Step 5 — Advanced inline reveal on steel
+
+Confirmed the step-0 judgment call and fixed what it exposed. "advanced"
+(view 3b) already routed to the existing `steel-session.js` full logger via
+`ToolActions.steelSession(db, rifle.id)` — wired in step 3. What step 5
+actually needed: that screen's OWN navigation (back, done, no-rifle
+fallback) still pointed at `Categories.show('steel', ...)`, a screen that
+no longer renders anything reachable from the new UI. Tapping back from the
+full logger would have dumped Roy into a stale, orphaned intermediate
+screen instead of returning to the rifle.
+
+- **`js/steel-session.js`**: 5 call sites (`open`'s no-rifle fallback,
+  the setup screen's back button, the saved-string screen's Done, and both
+  `ToolActions` launcher fallbacks) now call `AppNav.go('home')`.
+- **`js/truing.js`**: found and fixed the identical pattern — 6 call
+  sites (reachable from the full logger's own "Send string to Truing"
+  follow-on, and from the why-sheet's "Checked at distance" row landing
+  in step 6). Same fix, same reasoning.
+- Neither file is a protected engine (`STANDARDS.md` §3 lists them as UI
+  managers, not engines) — safe to edit; this is exactly the "decorate the
+  engines, rebuild the surface" mandate the contract describes.
+- Headless proof: a full click-through (view 1 → Add → Steel → advanced)
+  renders the complete existing logger (wind clock, distance chips,
+  dialed steppers — all untouched, inheriting the v3 font system for
+  free since it already used the shared token classes) at full fidelity;
+  tapping back lands cleanly on view 1 with the correct rifle, correct
+  status, and the empty-feed message rendering correctly.
+- **846 tests green** (unchanged — navigation-target fixes only, no new
+  pure logic).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)
