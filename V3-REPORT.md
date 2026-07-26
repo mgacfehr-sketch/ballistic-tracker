@@ -637,6 +637,80 @@ screen instead of returning to the rifle.
 
 ---
 
+---
+
+## Step 11 — Retire old surfaces + mapping table + language/color pass
+
+This step turned out to be almost entirely an audit, not a rewrite —
+tracing every old surface's actual reachability first, then only
+touching what genuinely needed it. Per Part 4's non-goal ("nothing
+deleted"), no files were removed; "retirement" here means confirmed
+dormant vs. confirmed still-needed, documented so nobody re-wires a
+dead screen by accident later.
+
+### Mapping table — old surface → v3.0 status
+
+| Old surface | Status | Notes |
+|---|---|---|
+| Bottom tab bar (`#app-nav`) | **Removed** (step 1) | Gone from `index.html`; safe-area moved to `.screen`. |
+| `home.js` (`HomeManager`) | **Dormant** | Still instantiated (`homeManager.init()`) but never `.show()`n; its own `data-screen === 'home'` guard means it can never redraw over `#view-home` even if `ToolRegistry.onChange` fires. Left in place, not deleted. |
+| `lanes.js` (`Lanes`) | **Partially retired** | The user-facing Simple/Detailed *switcher* is dead (`Lanes.setDetailed` is only ever called from the dormant `home.js`) — Roy has no manual toggle anymore. But `Lanes.isDetailed()` is still read live in `session-flow.js`'s `_askSessionQuestions` to silently pick defaults-vs-ask behavior, now driven automatically by `Lanes.resolve()`'s own logic (has the rifle got a full-tier steel string yet). Kept fully wired — this one earns its keep as an internal behavior flag, not a UI. |
+| `log-shooting.js`, `mv-entry.js`, `rifle-simple.js` | **Fully dormant** | Zero references anywhere outside their own files (confirmed by grep) — no launcher, no `ToolActions` entry, no call site. Safe dead weight; left on disk per the no-deletion rule. |
+| `feed-core.js`, `simple-true.js`, `next-action.js` | **Repurposed, not retired** | All three are load-bearing in v3.0 (feed-core is new/central; simple-true powers the payoff; next-action is the resting screen's coach line) — noted here only because the v2.5-era summary language once called them "superseded," which undersold that they got a second life instead. |
+| `categories.js` (`Categories`) + its screens (steel/truing/wind-call/dope-log/cleaning/scope-check/records/ballistics) | **Still live**, reached via Paperwork's "Everything else" shortcuts (step 8) | NOT primary navigation anymore, but genuinely still the only home for several tools (cleaning log, wind call, DOPE log, scope-adjustment history, records/export) that have no v3 view yet. Correction to step 8's report: `device-export.js`'s `Categories.show('ballistics')` fallback calls were flagged there as unreachable — re-audited this step and they are NOT dead; `ToolActions.deviceExport` is invoked from inside `categories.js` itself (a live tool button), so device-export.js is a live, reachable screen same as the rest of Categories. |
+| The old bottom-tab "Rifles" list / rifle detail (`profiles.js`) | **Kept, now Paperwork (view 8)** | Reused wholesale per step 8, not rebuilt. |
+| Session flow's blind rifle/load picker (`session-flow.js` `_loadProfilePicker`) | **Kept as a fallback only** | Every v3.0 Add-flow call site now passes a known `rifleId`, so this picker is bypassed in the common path; it still exists for the (now rare) case of entering the session view without rifle context. |
+
+### Language/color pass
+
+- Swept every currently-reachable JS file (`profiles.js`, `history.js`,
+  `categories.js`, `session-flow.js`, all `rifle-*.js`, `steel-session.js`,
+  `truing.js`, `onboarding.js`, `suppressors.js`) for hardcoded hex
+  colors bypassing `tokens.css`. **Zero real violations** — the only
+  hex-looking matches were `onboarding.js`'s certificate QR canvas
+  (correctly hardcoded — it's a printed artifact with its own fixed
+  palette, not a themed screen) and two false positives in `truing.js`
+  that were HTML numeric entities (`&#9679;`/`&#9662;`), not colors.
+- Searched all reachable files for user-facing "Simple lane" / "Detailed
+  lane" / lane-switch copy. **None found** — every "lane" reference left
+  in the codebase is an internal code comment; Roy never sees the word.
+  Confirms Part 2's "kill the Lanes concept" was already achieved
+  correctly by earlier steps (the flag survives internally; the user-
+  facing switcher does not).
+- Checked Paperwork's "Confirm zero" and similar rifle-detail copy for
+  voice consistency with the new resting screen — reads fine as-is;
+  Paperwork is explicitly a detail/utility screen (Part 1's own
+  language), not required to match the resting screen's plainer voice.
+
+### Found, documented, deliberately NOT touched
+
+- **A pre-existing render race, same pattern in four places.**
+  `AppNav.openRifle`, `AppNub.openReport`, `AppNav.openSession` (new,
+  step 7), and `Categories.show`'s internal `AppNav.go('home')` call
+  all follow the same shape: call `switchView(viewName)` (which,
+  for `'profiles'`, unconditionally kicks off `profileManager.
+  showRifleList()`), then immediately kick off a second, more specific
+  render into the same container. Both renders are async; whichever
+  resolves last wins the container's `innerHTML`. This predates v3.0
+  entirely (`openRifle`/`openReport` are original code, not written
+  this run) and evidently works in practice — in every case the
+  "specific" render's promise chain is equal-or-longer than the generic
+  one's, so it reliably lands last. `openSession` (mine) is the
+  closest to a genuine coin-flip (`getSession(id)` vs. `Promise.all([
+  getAllRifles, getSetting])` — comparable round-trip counts), so it's
+  the one most worth an owner look. Didn't change it because: (a) it
+  matches the three pre-existing call sites' established shape rather
+  than inventing a different, inconsistent mechanism just for one seam,
+  and (b) fixing it properly means either exposing a new "activate this
+  container without side effects" hook off `switchView` or making
+  `showRifleList` cancellable — both bigger changes than this step's
+  budget, and neither is mockup-mandated. Flagged for a follow-up, not
+  fixed blind.
+- No `CACHE_VERSION` bump this step — no app-shell file changed
+  (documentation and an audit only, zero code edits).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)
