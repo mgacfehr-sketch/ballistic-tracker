@@ -324,7 +324,10 @@ var RifleAdd = (function () {
         return Math.abs(v) + '&Prime; ' + (v > 0 ? 'high' : 'low');
     }
 
-    return { show: show };
+    // v3.0 view 5: the Why sheet's "Bullet speed" row jumps straight
+    // to the chrono screen (view 3c), skipping the Paper/Steel/
+    // Chronograph chooser.
+    return { show: show, showChrono: _chronoScreen };
 })();
 
 // Launcher (registration seam)

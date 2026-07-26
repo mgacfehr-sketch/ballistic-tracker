@@ -322,6 +322,53 @@ screen instead of returning to the rifle.
 
 ---
 
+## Step 6 — Views 5 (Why) and 6 (Full Chart)
+
+- **New `js/rifle-why.js`** — "Proven to 600 — rough" + the four
+  calibration elements as tappable rows, reusing
+  `CalibrationStatusCard.gather()` (unchanged, pure) for every number and
+  word. Rows jump DIRECTLY into their flow, not via the Add chooser:
+  Zero → `SessionLaunch.start` (paper capture) · Bullet speed →
+  `RifleAdd.showChrono` (a newly-exposed direct entry to view 3c,
+  skipping the Paper/Steel/Chronograph picker) · Checked at distance →
+  the existing DETAILED `TruingJob.open` (the fixed v2.5 flow, for power
+  users — the payoff/view 4 remains the everyday path from the steel
+  screen) · Scope check → the existing `ScopeCheck.start` tall-target
+  wizard.
+- **Real bug caught by screenshot, not code review:** a Thin-confidence
+  "Checked at distance" row rendered its ROUGH status word in green
+  (confirmed-style) instead of gold — my first pass collapsed a
+  three-state row (not done / rough / solid) into a two-state
+  `ok`-boolean, so any non-untrued trued state fell through to the "ok"
+  (green) branch regardless of confidence. Rewrote with an explicit
+  `cls` per state (`ZERO_CLS`/`MV_CLS` maps, and dedicated Good/High-vs-
+  Thin/Moderate branching for `trued`) so ROUGH renders gold exactly
+  like the mockup's own inline override
+  (`style="color:var(--gold-deep)"`).
+- **New `js/rifle-chart.js`** — the full 10-row drop table (100–1000 yd)
+  plus "FOR YOUR RANGEFINDER: BC · speed" using the same
+  `deviceCompensation` math `rifle-simple.js` (v2.5) used, labeled
+  "enter as-is" or "enter as-is — do the scope check to refine" per Part
+  1's exact wording when tracking is unverified. Print/Share both open
+  the existing DOPE card wizard (`ToolActions.dopeCards`) — no new PDF
+  generator; the wizard already owns format selection and its own
+  print/share sheet.
+- Headless proof: both views screenshot-verified against the mockup
+  (light + dark) after the color-class fix; a scripted click confirms
+  the "Bullet speed" row lands directly on the chrono screen (not the
+  chooser), matching "Speed→chrono flow" literally.
+- **846 tests green** (unchanged — UI wiring over already-tested
+  engines).
+
+### Judgment calls (step 6)
+- `ScopeCheck.start`'s wizard still asks Roy to pick a rifle from ALL
+  rifles (pre-dates the always-a-specific-rifle model) even though he's
+  tapping from THAT rifle's Why screen — a minor redundant tap, not a
+  bug. Left as-is rather than rewriting a tested wizard mid-contract;
+  worth a follow-up polish pass, noted in the owner queue.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)
