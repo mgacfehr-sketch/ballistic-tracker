@@ -269,6 +269,28 @@ Fixes for every hole from the step-0 diagnosis:
 
 ---
 
+## Step 8 — Scroll drift (§3.5) + safe-area sweep (§3.6)
+
+- **Vertical-only lock:** `.app-view { overflow-x: hidden }` — no page can
+  drift sideways, app-wide (data tables keep their own internal
+  `overflow-x: auto` wrappers, so nothing is clipped).
+- **The offender found:** `.instrument-value` (`white-space: nowrap`, 34px
+  mono) inside the flexed `.stat-strip` on the rifle page — three wide
+  round-count values pushed the strip wider than the viewport (~0.5"
+  drift). Now wraps at the unit (`overflow-wrap: anywhere`).
+- **Headless overflow audit:** six screens measured at 390px (Home simple,
+  simple rifle page, Data & Records, unified History, simple steel, truing
+  result) — zero elements past the right edge, scrollWidth = clientWidth
+  everywhere.
+- **Safe-area sweep (§3.6):** all tab views sit under the padded shell
+  header (v2.4 fix) ✓; the one full-screen surface OUTSIDE the shell —
+  the wizard (`.wiz`, first-run onboarding) — now pads by
+  `env(safe-area-inset-top)` so its progress bar and close button clear
+  the status bar. Overlays are centered cards (unaffected); the auth
+  screen is a centered form (unaffected).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

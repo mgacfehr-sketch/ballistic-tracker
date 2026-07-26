@@ -169,6 +169,8 @@ img { max-width: 100%; }
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    /* v2.5 §3.5: vertical-only — no page may drift sideways */
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
 }
 .app-view.active { display: block; }
@@ -726,7 +728,9 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 .instrument-value {
     font: var(--type-mono-big);
-    white-space: nowrap;
+    /* v2.5 §3.5: nowrap here pushed .stat-strip wider than the page on
+       the rifle screen (~0.5" sideways drift) — values wrap at the unit */
+    overflow-wrap: anywhere;
 }
 .instrument-value.t-display { font: var(--type-mono-big); }
 .instrument-unit {
@@ -1175,6 +1179,8 @@ button.rowlink:active { background: var(--brand-subtle); }
     flex-direction: column;
     max-width: 720px;
     margin: 0 auto;
+    /* v2.5 §3.6: full-screen surfaces clear the iOS status bar too */
+    padding-top: env(safe-area-inset-top, 0px);
 }
 .wiz-progress {
     flex: 1;
