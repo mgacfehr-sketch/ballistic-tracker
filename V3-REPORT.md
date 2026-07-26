@@ -155,6 +155,69 @@ full logger, which view 5 (advanced inline reveal) re-renders as-is.
 
 ---
 
+## Step 2 — View 1: The Rifle, fully wired
+
+- **New `js/feed-core.js`** (pure, 39 tests) — `buildFeed()` merges six event
+  families (sessions/zero/steel/truing/speed/cleaning) for one rifle into a
+  single newest-first list, worded the way Roy would say it. The one
+  genuinely tricky piece: correlating a simple-lane steel string with its
+  truing event (same distance, applied within 10 minutes — exactly how
+  `log-shooting`/`simple-true` save the pair) so they render as ONE feed
+  item ("Steel at 600 · dial corrected 4.0 → 3.8") instead of two. A zero-
+  confirming session and its zero_event fold into one "Zero confirmed" item
+  the same way — never double-counted. Uncorrelated truing (detailed lane,
+  or the owner's 925-yd string reviewed later) shows standalone as "Rifle
+  trued". `pickDropRows(hotYd)` — the embedded chart's 4 rows, always
+  ending on the proven-to distance, padding forward when it's small so the
+  chart is never sparse.
+- **`simple-true.js`** gains one additive field: `_keep()` now stashes the
+  computed `payoff` (oldDial/newDial/units/moved) into the truing event's
+  `inputs` blob, so the feed can render "dial corrected X → Y" by reading
+  it back instead of re-running trajectory math per feed item.
+- **`js/rifle-app.js`** — `_renderRifle` now pulls real data: calibration
+  status via the existing `CalibrationStatusCard.gather()` (untouched, pure
+  derivation reused verbatim) drives the number and the zero✓/speed✓
+  indicators; the coach line under the number is the next-action engine's
+  output, exactly as Part 2 mandates ("repurposed... never a separate
+  widget") — ported the gathering logic from v2.4's `home.js` rather than
+  calling into it (home.js is slated for full retirement in step 11, no
+  sense wiring a dependency on code about to be deleted); the embedded
+  chart calls `computeTrajectory` directly (same engine `rifle-simple.js`
+  used for its rangefinder line) for the 4 rows from `pickDropRows`; the
+  feed gathers all six sources and renders via `buildFeed`. Swipe/dots
+  ported from v2.4's card-nav gesture handler. Tap targets wired to
+  `RifleWhy`/`RifleChart`/`RifleAdd`/`RifleRecord` — stub globals that
+  steps 3–7 will implement; tapping them today is a silent no-op (`if
+  (window.X)` guards), never a crash.
+- **CSS bug found and fixed**: `.v3-rname-tap` was written as a descendant
+  selector (`.v3-rname button.v3-rname-tap`) but the button carries BOTH
+  classes on one element, not a nested structure — it never matched, so
+  the multi-rifle name button wasn't centered. Fixed to a compound selector
+  (`.v3-rname.v3-rname-tap`) plus an explicit `width:100%` (buttons don't
+  reliably fill their container under `display:flex` the way a `div`
+  does). Caught by the headless screenshot, not by eyeballing the code —
+  confirms the "verify each step's screens against the mockup" discipline
+  the contract asks for.
+- **Word choice**: the mockup's coach text is illustrative ("one more shot
+  at 600 confirms it"); I render next-action's OWN derived detail/title
+  text rather than hand-copying the mockup's exact sentence, since
+  next-action's ladder already covers every state (not just "confirm-true")
+  and its wording is tested. `_confWord()` maps engine confidence words to
+  Roy's ("Thin"→"rough", "Moderate"→"getting there", "Good"→"solid",
+  "High"→"locked in") — new local vocabulary, NOT routed through the old
+  `Copy.roy()`/Lanes system, which Part 2 kills as a concept; v3 screens
+  speak Roy's words directly, unconditionally.
+- Headless proof: the full mockup composition (brand → rifle+dots → number
+  with confidence/coach line → embedded 4-row chart with the proven
+  distance highlighted gold → gold button → feed with 4 correctly-merged,
+  correctly-worded items) renders pixel-close to the mockup in both
+  themes, using entirely real computed data (a genuine `computeTrajectory`
+  drop table, genuine `deriveCalibrationStatus`/`deriveNextAction` output,
+  genuine `buildFeed` merge).
+- **846 tests green** (807 + 39 feed-core).
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

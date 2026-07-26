@@ -404,7 +404,10 @@ var SimpleTrue = (typeof document !== 'undefined') ? (function () {
                 confidence: out.confidence,
                 hitInches: S.hitIn,
                 dialed: ctx.dialed || 0,
-                shotMV: S.mv
+                shotMV: S.mv,
+                // v3.0: the feed (view 1) renders "dial corrected X → Y"
+                // straight from this — no trajectory recompute needed.
+                payoff: out.payoff
             },
             ledger: r.ledger,
             supersonicPct: r.supersonicPct,

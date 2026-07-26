@@ -1880,10 +1880,9 @@ button.rowlink:active { background: var(--brand-subtle); }
 .v3-brand .wordmark { font: var(--type-heading); letter-spacing: 0.02em; }
 
 /* rifle name + load line, swipe/dots between rifles */
-.v3-rname { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-top: 10px; }
-.v3-rname button.v3-rname-tap {
-    background: none; border: none; display: flex; align-items: baseline; gap: 10px;
-    min-height: var(--tap-min); padding: 4px 10px;
+.v3-rname { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-top: 10px; width: 100%; }
+.v3-rname.v3-rname-tap {
+    background: none; border: none; min-height: var(--tap-min); padding: 4px 10px;
 }
 .v3-rname h1 { font: var(--type-title); }
 .v3-rname .load { color: var(--text-secondary); font: var(--type-body); }
