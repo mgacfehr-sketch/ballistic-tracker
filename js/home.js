@@ -216,6 +216,10 @@ HomeManager.prototype._renderCardAt = function (el) {
         '<div class="rc-meter-label">Proven to</div>' +
         '<div class="rc-meter-value" id="rc-yards">&mdash;<span class="rc-meter-unit">yards</span></div>' +
         '<div class="rc-meter-conf" id="rc-conf">&nbsp;</div>' +
+        '<div style="display:flex;justify-content:center;margin-top:8px">' +
+        '<button class="btn-utility" id="rc-dope">' +
+        ((typeof Copy !== 'undefined') ? UI.esc(Copy.t('dope', true)) : 'Drop chart') +
+        ' &rsaquo;</button></div>' +
         '</div>' +
         '<div class="rc-strip" id="rc-strip">' +
         this._segBtn('zero', 'Zero', null) +
@@ -228,6 +232,11 @@ HomeManager.prototype._renderCardAt = function (el) {
         '</div>';
 
     this._bindCardNav(el);
+
+    var dope = document.getElementById('rc-dope');
+    if (dope) dope.addEventListener('click', function () {
+        if (window.ToolActions && ToolActions.dopeCards) ToolActions.dopeCards(self.db);
+    });
 
     // Async: status → meter + strip + load line + next action
     if (typeof CalibrationStatusCard === 'undefined' || !CalibrationStatusCard) return;
@@ -521,6 +530,41 @@ HomeManager.prototype._renderDoors = function () {
     var el = document.getElementById('home-doors');
     if (!el || typeof Categories === 'undefined') return;
     var self = this;
+
+    // v2.5 §2.1: the SIMPLE lane has exactly TWO rows below the card.
+    // The Detailed lane keeps the four doors.
+    if (typeof Lanes !== 'undefined' && !Lanes.isDetailed()) {
+        el.innerHTML =
+            '<button class="door" id="home-log-shooting">' +
+            '<span class="ic">' + Icon('job-range', 20) + '</span>' +
+            '<b>Log shooting</b>' +
+            '<span class="chev">&rsaquo;</span></button>' +
+            '<button class="door" id="home-my-rifle">' +
+            '<span class="ic">' + Icon('job-records', 20) + '</span>' +
+            '<b>My rifle</b>' +
+            '<span class="chev">&rsaquo;</span></button>' +
+            this._moreToolsRowHtml();
+
+        function cardRifle() {
+            if (self._rifles && self._rifles.length) return self._rifles[self._cardIndex];
+            return null;
+        }
+        document.getElementById('home-log-shooting').addEventListener('click', function () {
+            var r = cardRifle();
+            if (window.ToolActions && ToolActions.logShooting) {
+                ToolActions.logShooting(self.db, r ? r.id : null);
+            }
+        });
+        document.getElementById('home-my-rifle').addEventListener('click', function () {
+            var r = cardRifle();
+            if (!r) return;
+            if (typeof SimpleRiflePage !== 'undefined') SimpleRiflePage.show(self.db, r.id);
+            else if (window.AppNav) AppNav.openRifle(r.id);
+        });
+        var moreS = document.getElementById('home-more-tools');
+        if (moreS) moreS.addEventListener('click', function () { self._openMoreTools(); });
+        return;
+    }
 
     var html = '';
     HomeManager.DOOR_KEYS.forEach(function (key) {

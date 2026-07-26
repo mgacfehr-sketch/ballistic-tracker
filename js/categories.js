@@ -1432,6 +1432,24 @@ var Categories = (function () {
         }).catch(function () { return null; });
     }
 
+    /** Minimal ctx for the exported sub-screens (v2.5 simple rifle page). */
+    function _buildCtx(rifleId) {
+        return Promise.all([
+            _db.getRifle(rifleId).catch(function () { return null; }),
+            _db.getLoadsByRifle(rifleId).catch(function () { return []; }),
+            _db.getBarrelsByRifle(rifleId).catch(function () { return []; })
+        ]).then(function (res) {
+            var rifle = res[0];
+            if (!rifle) return null;
+            var barrels = res[2] || [];
+            var activeBarrel = null;
+            barrels.forEach(function (b) { if (!activeBarrel && b.isActive) activeBarrel = b; });
+            if (!activeBarrel && barrels.length) activeBarrel = barrels[0];
+            return { db: _db, rifle: rifle, loads: res[1] || [], barrels: barrels,
+                activeBarrel: activeBarrel, managers: _managers };
+        });
+    }
+
     return {
         KEYS: KEYS,
         DEFS: DEFS,
@@ -1441,7 +1459,18 @@ var Categories = (function () {
         visibleTools: visibleTools,
         getChipRifleId: getChipRifleId,
         setChipRifleId: setChipRifleId,
-        openSwitcher: openSwitcher
+        openSwitcher: openSwitcher,
+        // v2.5: the simple rifle page reuses these sub-screens directly
+        showHistory: function (rifleId, chip) {
+            _buildCtx(rifleId).then(function (ctx) {
+                if (ctx) showUnifiedHistory(ctx, chip);
+            });
+        },
+        openReportCertificateFor: function (rifleId) {
+            _buildCtx(rifleId).then(function (ctx) {
+                if (ctx) openReportCertificate(ctx);
+            });
+        }
     };
 })();
 

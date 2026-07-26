@@ -204,6 +204,37 @@ observation (quick mode already builds exactly one), so the one-observation
 
 ---
 
+## Step 6 — Simple rifle page (§2.4) + Home per lane (§2.1)
+
+- **Home, simple lane:** exactly TWO rows below the card — **Log shooting**
+  and **My rifle** — plus the quiet "+ More tools" (where the lane switch
+  lives). The card gains a gold **"Drop chart ›"** utility directly under
+  the number (label follows the copy map: "DOPE card" in Detailed). The
+  Detailed lane keeps the four doors unchanged.
+- **`js/rifle-simple.js`** — ONE scrolling page, frequency-ordered: the
+  calibration status card → Drop chart + Add bullet speed (gold utilities)
+  → **Your rifle's numbers** (bullet w/ BC + trued marker · bullet speed
+  with honest source: "trued from your hits" / "measured, typed in, over
+  10 shots" / "the box number" · **"For your rangefinder: BC · speed"**
+  from `deviceCompensation` when tracking is verified — "checked against
+  your scope's clicks" — else "enter as-is") → History (the unified list)
+  → Barrel (rounds / since-cleaning) → Report & Certificate → Rifle
+  details & loads (the full page) → Export data.
+- categories.js exports `showHistory(rifleId, chip)` and
+  `openReportCertificateFor(rifleId)` so the simple page reuses the exact
+  §2.5/§2.2 sub-screens (no duplicates).
+- Headless proof: simple Home (card + Drop chart + two rows) and the
+  rifle page (status green, sourced speed, compensated rangefinder line
+  BC 0.316 / 2995 fps at factor 1.03).
+
+### Judgment calls (step 6)
+- "+ More tools" stays visible in the simple lane — it is the settings
+  surface holding the Detailed-mode switch (§1.1), not a door.
+- "My rifle" needs the card's rifle; before rifles resolve the tap is a
+  no-op rather than a wrong-rifle guess.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)
