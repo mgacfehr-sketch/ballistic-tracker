@@ -140,10 +140,14 @@ var Onboarding = (function () {
 
     // ── First-run onboarding: RIFLE-FIRST (v2.4 §1.5) ─────────
     // The payoff ladder: (1) your rifle, (2) your bullet & box
-    // velocity, (3) the suppressor question — then LAND ON THE CARD:
-    // DOPE available immediately, "Proven to 0 yards · Estimated",
-    // next-action lit. 90 seconds to first payoff. No feature
-    // checklist — all four doors are on by default (More tools hides).
+    // velocity — then LAND ON THE CARD: DOPE available immediately,
+    // "Proven to 0 yards · Estimated", next-action lit. Two questions,
+    // not three (v3.0 step 9: the suppressor question moved out of
+    // first-run entirely — it's an edge case for most Roys, and asking
+    // it here just added a screen most people click through blind).
+    // It now lives as a standing "Suppressed shooting" toggle in the
+    // Rifles list's settings area (profiles.js _fillSuppressorFold),
+    // reachable any time instead of once at setup.
 
     function _fieldHtml(id, label, unit, attrs) {
         return '<div class="field">' +
@@ -251,7 +255,7 @@ var Onboarding = (function () {
 
     var ONBOARDING_WIZARD = {
         id: 'onboarding',
-        version: 3, // v2.4: rifle-first; the v2 checklist state resets cleanly
+        version: 4, // v3.0 step 9: dropped the suppressor step — two questions, not three
         steps: [
             {
                 id: 'rifle',
@@ -264,15 +268,6 @@ var Onboarding = (function () {
                 prompt: 'Your bullet &amp; box velocity',
                 type: 'custom',
                 mount: _mountLoadStep
-            },
-            {
-                id: 'suppressed',
-                prompt: 'Do you ever shoot suppressed?',
-                type: 'choice',
-                choices: [
-                    { value: 'no', label: 'No', desc: 'Sessions will never ask about a can' },
-                    { value: 'yes', label: 'Yes', desc: 'Sessions will ask which can is on' }
-                ]
             }
         ]
     };
@@ -315,21 +310,8 @@ var Onboarding = (function () {
             // The card opens on this rifle: "Proven to 0 yards · Estimated"
             if (rifle && typeof Recents !== 'undefined') Recents.touchRifle(rifle);
 
-            var suppressed = answers.suppressed === 'yes';
-            var pDone = [db.setUserSetting('onboarding_done', true)];
-            if (typeof Suppressors !== 'undefined') {
-                pDone.push(Suppressors.setEnabled(db, suppressed));
-            }
-            Promise.all(pDone).catch(function () { /* cached locally */ });
-
-            function land() {
-                if (window.AppNav) window.AppNav.go('home');
-            }
-            if (suppressed && typeof Suppressors !== 'undefined') {
-                Suppressors.addSheet(db, { intro: true, onDone: land });
-            } else {
-                land();
-            }
+            db.setUserSetting('onboarding_done', true).catch(function () { /* cached locally */ });
+            if (window.AppNav) window.AppNav.go('home');
         });
     }
 

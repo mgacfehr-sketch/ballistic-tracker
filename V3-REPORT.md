@@ -511,6 +511,58 @@ screen instead of returning to the rifle.
 
 ---
 
+---
+
+## Step 9 — Onboarding shrink + suppressor question move
+
+- **`js/onboarding.js`: dropped the 'suppressed' step.**
+  `ONBOARDING_WIZARD.steps` goes from 3 to 2 (rifle → bullet & box
+  velocity); `_completeFirstRun` no longer branches on
+  `answers.suppressed` or calls `Suppressors.setEnabled`/`addSheet` —
+  first-run always lands straight on the resting screen. Bumped
+  `version: 3 → 4` (documentation only — nothing in `wizard.js` actually
+  reads it; no persisted partial-wizard state exists to collide with).
+  Most Roys shoot bare; asking a binary question about a use case that
+  doesn't apply to most people, during the 90-second first payoff, was
+  pure friction for the common case.
+- **The setting didn't just move — it got a permanent home.** Before
+  this step, `Suppressors.isEnabled` (a global user setting) could
+  ONLY be set to `true` from the onboarding wizard — there was no other
+  code path that ever called `Suppressors.setEnabled`. Removing the
+  onboarding step without adding a replacement would have made "shoot
+  suppressed" **permanently unreachable** for anyone who didn't hit
+  that exact wizard step (new users afterward, and existing users who
+  said "no" once). New `ProfileManager.prototype._fillSuppressorFold`
+  adds a standing "Suppressed shooting" fold to the Rifles list (next
+  to the existing Account fold, same visual pattern) — Off shows "Turn
+  on & add a can" (sets the flag, then opens the existing `addSheet`);
+  On shows "Manage cans" / "Turn off". Reuses `Suppressors.addSheet`
+  and `setEnabled` verbatim — no new suppressor logic, just a
+  reachable, standing entry point instead of a one-shot gate.
+- **Verification**: a scratchpad harness
+  (`harness-v3-suppressor.html`/`inspect-v3-suppressor.js`) drove all
+  three states — Off (default), the full Turn-on → add-a-can →
+  Save → Done round trip (confirmed `suppressor_enabled: true` and the
+  new can both land in the mock db), and a pre-enabled Manage view.
+  All three render correctly with no console/page errors; screenshot
+  confirms the fold matches the existing Account fold's visual
+  language exactly.
+- **821 tests green**, no regressions (`test-onboarding.js` only
+  exercises the pure OCR parser, untouched by this step).
+
+### Judgment calls (step 9)
+- Did not add a "how do I get here" hint anywhere else in the app
+  (e.g. on the Add→Steel screen) pointing at the new fold — the
+  existing "advanced" and per-screen link patterns already establish
+  that secondary settings live one tap away in quieter spots, so this
+  follows precedent rather than needing new discovery UI.
+- Left `Suppressors.addSheet`'s copy (`opts.intro` wording: "Sessions
+  will ask which can is on…") unchanged even though it was originally
+  written for the onboarding context — it reads fine standalone too,
+  so didn't touch working copy that isn't wrong.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

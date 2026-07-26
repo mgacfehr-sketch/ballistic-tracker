@@ -95,6 +95,14 @@ ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed)
         })
     );
 
+    // Suppressed shooting (v3.0 step 9: moved out of onboarding — a
+    // standing toggle here instead of a one-time first-run question).
+    if (typeof Suppressors !== 'undefined') {
+        html += '<details class="fold u-mt-14 edge"><summary>Suppressed shooting</summary>';
+        html += '<div class="fold-body" id="sup-fold-body"><p class="t-body u-quiet">Loading&hellip;</p></div>';
+        html += '</details>';
+    }
+
     // Account (privacy + deletion — store compliance)
     html += '<details class="fold u-mt-14 edge"><summary>Account</summary>';
     html += '<div class="fold-body">';
@@ -116,6 +124,7 @@ ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed)
     this.container.innerHTML = html;
     this._bindRifleListEvents();
     this._fillFleetReadiness(rifles);
+    this._fillSuppressorFold();
 };
 
 /** Readiness chips per row + the fleet summary line (async fill). */
@@ -149,6 +158,38 @@ ProfileManager.prototype._fillFleetReadiness = function (rifles) {
         if (counts.unchecked) chips += UI.chip('problem', counts.unchecked + ' not checked');
         summary.innerHTML = chips;
     });
+};
+
+/** Suppressed-shooting fold: standing toggle (v3.0 step 9), replaces
+ *  the old one-time onboarding question. */
+ProfileManager.prototype._fillSuppressorFold = function () {
+    var self = this;
+    var body = document.getElementById('sup-fold-body');
+    if (!body || typeof Suppressors === 'undefined') return;
+    Suppressors.isEnabled(this.db).then(function (on) {
+        if (!body.isConnected) return;
+        body.innerHTML = on
+            ? '<p class="t-body u-quiet">On &mdash; sessions ask which can is on.</p>' +
+              '<button type="button" class="action u-full u-mt-10" id="sup-manage">Manage cans</button>' +
+              '<button type="button" class="action u-full u-mt-10" id="sup-turnoff">Turn off</button>'
+            : '<p class="t-body u-quiet">Off &mdash; sessions never ask about a can.</p>' +
+              '<button type="button" class="action u-full u-mt-10" id="sup-turnon">Turn on &amp; add a can</button>';
+
+        var manage = document.getElementById('sup-manage');
+        if (manage) manage.addEventListener('click', function () {
+            Suppressors.addSheet(self.db, { onDone: function () { self._fillSuppressorFold(); } });
+        });
+        var turnoff = document.getElementById('sup-turnoff');
+        if (turnoff) turnoff.addEventListener('click', function () {
+            Suppressors.setEnabled(self.db, false).then(function () { self._fillSuppressorFold(); });
+        });
+        var turnon = document.getElementById('sup-turnon');
+        if (turnon) turnon.addEventListener('click', function () {
+            Suppressors.setEnabled(self.db, true).then(function () {
+                Suppressors.addSheet(self.db, { intro: true, onDone: function () { self._fillSuppressorFold(); } });
+            });
+        });
+    }).catch(function () { /* leave "Loading…" — non-critical setting */ });
 };
 
 ProfileManager.prototype._bindRifleListEvents = function () {
