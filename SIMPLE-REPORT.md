@@ -317,6 +317,56 @@ Fixes for every hole from the step-0 diagnosis:
 
 ---
 
-## OWNER REVIEW QUEUE
+## Step 10 — QA
 
-- (accumulates during the run)
+- **Suites: 807 tests green** (733 baseline + 20 lanes + 8 royify + 25
+  simple-true + 4 next-action + 17 sync-queue regression — and every
+  earlier suite untouched).
+- **Headless, 390×844, both themes:** simple Home (Roy copy, Drop chart,
+  two rows) light + dark · Log shooting → steel screen → "Where did it
+  hit?" (light + dark) → THE PAYOFF (Keep/Undo) · simple rifle page
+  (status, sourced speed, compensated rangefinder line) · truing landing/
+  result/Applied for the 925-yd string · Data & Records with sync banner
+  seam.
+- **Tap audit:** all new interactive elements ≥52px (64px hit/dial
+  steppers, 52px chips/folds/utilities; fixed the one stray — the Sync
+  now banner button had an inline 44px override).
+- **Overflow audit:** six screens, zero horizontal drift (step 8).
+- **Honesty audit baked into tests:** zero-band and bracket-capped
+  observations refuse politely; one shot = rough; accumulation raises
+  confidence; dead-center = "barely moves".
+
+---
+
+## OWNER REVIEW QUEUE (do these on your phone)
+
+1. **THE ROY WALK (the contract's acceptance test):** fresh account →
+   onboarding (rifle → bullet & box speed typed → suppressor) → land on
+   the card → Log shooting → Steel → 600 → dial what your chart says →
+   one hit, "4 inches low" on the stepper → payoff shows the dial change →
+   Keep it → card should read **"Proven to 600 — rough"**-class state with
+   next action "One more shot at 600 firms it up" → Drop chart from the
+   card. Every screen ≤1 primary action, no jargon.
+2. **YOUR 925 STRING, DETAILED LANE:** More tools → Detailed mode ON →
+   Steel/Field Session → log the 8 shots → Save (single primary) →
+   "True this rifle now ›" → lands ON your string preselected → Review
+   correction → result (both corrections + recommendation + confidence
+   meter + Why? ledger) → **Apply** → "Your rifle's numbers" + the
+   "For your rangefinder" line. This is the dead-end fix — walk it
+   end-to-end.
+3. **AIRPLANE MODE:** airplane on → photograph and save a paper session
+   ("Saved — will sync…") → it must appear in History immediately marked
+   "waiting to sync" → airplane off, reopen the app → it must appear
+   normally (no marker). If anything parks, History/Data & Records now
+   show a "Sync now" banner — data is never invisible.
+4. **MANUAL BULLET SPEED:** card → Speed segment → "Add bullet speed" →
+   type an average + shot count → segment flips to measured. Try "just a
+   guess" too — it must stay *estimated* (honest).
+5. **Detailed-mode inference:** your existing account has full steel
+   strings, so Detailed should be ON automatically the first time you
+   open this build (switch it freely afterward).
+6. **iOS safe-area + scroll:** confirm the header clears the status bar on
+   every screen (incl. the first-run wizard) and the rifle page no longer
+   drifts sideways.
+7. Reminder from v2.4 still open: run `SIMPLIFY-migrations.sql` if you
+   haven't (account deletion), and the real-print target photo test.

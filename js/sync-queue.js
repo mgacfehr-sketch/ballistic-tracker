@@ -512,7 +512,7 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
             if (s.errored) bits.push(s.errored + ' failed');
             el.innerHTML = UI.banner('caution',
                 '<span class="t-label" style="line-height:1.5">' + UI.esc(bits.join(' · ')) +
-                '</span> <button class="btn-utility" id="sync-now-btn" style="min-height:44px;padding:4px 14px;margin-left:8px">Sync now</button>',
+                '</span> <button class="btn-utility" id="sync-now-btn" style="padding:4px 14px;margin-left:8px">Sync now</button>',
                 true);
             var btn = el.querySelector('#sync-now-btn');
             if (btn) btn.addEventListener('click', function () {
