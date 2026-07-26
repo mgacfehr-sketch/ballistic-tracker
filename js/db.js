@@ -1263,6 +1263,19 @@ BallisticDB.prototype.getZeroEventsByRifle = function (rifleId) {
         });
 };
 
+// v3.0 §3.2: the record view's Delete — a single append-only EVENT
+// stays deletable by the user who logged it (Part 0.6 principle #5,
+// "explicit account/record deletion is user-initiated"); it just never
+// happens automatically.
+BallisticDB.prototype.deleteZeroEvent = function (id) {
+    var self = this;
+    return self.supabase.from('zero_events').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};
+
 BallisticDB.prototype.addMvMeasurement = function (data) {
     var self = this;
     var record = {
@@ -1296,6 +1309,15 @@ BallisticDB.prototype.getMvMeasurementsByRifle = function (rifleId) {
         .then(function (res) {
             if (res.error) throw res.error;
             return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.deleteMvMeasurement = function (id) {
+    var self = this;
+    return self.supabase.from('mv_measurements').delete()
+        .eq('id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
         });
 };
 
@@ -1496,6 +1518,23 @@ BallisticDB.prototype.updateSteelShot = function (record) {
         .then(function (res) {
             if (res.error) throw res.error;
             return _rowToJs(res.data);
+        });
+};
+
+// v3.0 §3.2: the record view's Delete for a steel string — cascades
+// its shots first (a string with orphaned shots would still read back
+// fine since shots are always queried scoped to string_id, but leaving
+// them around is just clutter, not a hazard either way).
+BallisticDB.prototype.deleteSteelString = function (id) {
+    var self = this;
+    return self.supabase.from('steel_shots').delete()
+        .eq('string_id', id).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return self.supabase.from('steel_strings').delete()
+                .eq('id', id).eq('user_id', self.userId);
+        }).then(function (res) {
+            if (res.error) throw res.error;
         });
 };
 

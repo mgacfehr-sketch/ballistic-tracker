@@ -369,6 +369,93 @@ screen instead of returning to the rifle.
 
 ---
 
+---
+
+## Step 7 — View 7 (Record) + edit/delete (Part 3 §3.2)
+
+- **New `js/rifle-record.js`** — tapping a feed item opens a "kv rows +
+  Edit/Delete" screen matching the mockup's `#v-record` exactly. Feed
+  items (`feed-core.js`) carry only `{id, type, date, title, sub,
+  pending}` — no raw row attached — so each type re-fetches its own
+  record by id from `db.js`, mirroring the gather-by-rifle pattern
+  `rifle-app.js` already uses, rather than threading raw records
+  through the feed (would have coupled `feed-core.js`, a pure/tested
+  module, to per-type shapes it doesn't otherwise need).
+- **Per-type behavior (this is the actual owner-facing design, not just
+  wiring):**
+  - `steel` (a string, alone or correlated with a truing event) —
+    **Edit** appears only for the simple-lane case (exactly one shot):
+    lets Roy fix the elevation/windage miss or bullet speed via the
+    existing `db.updateSteelShot()`, a **pure data correction with no
+    recompute cascade** — it does not re-run truing. Strings with >1
+    shot (the advanced/full-tier log) show a shot count instead of a
+    per-shot Edit; that log's own screen remains the place to fix it.
+    **Delete** removes the string (+ its shots, cascaded in the new
+    `db.deleteSteelString()`) and, if the correlated truing event is
+    still the load's *current* correction (`load.truedBc`/`truedMv`
+    still equals the event's `newValue`), asks a second, separate
+    confirm to also "undo" — reverting the load's trued value back to
+    the event's `oldValue` via `updateLoad`. The `truing_events` row
+    itself is **never deleted** (append-only, STANDARDS §6.2) — it just
+    stops being "current."
+  - `zero` / `speed` / `cleaning` — plain Delete only (no Edit — these
+    are direct log entries, not something to hand-correct in place).
+    New additive `db.js` methods: `deleteZeroEvent`, `deleteMvMeasurement`
+    (both follow the existing `deleteCleaningLog` shape exactly).
+    Deleting a `zero` record removes only the confirmation event — the
+    underlying paper session stays in the rifle's paperwork untouched.
+  - `correction` (an uncorrelated truing event — the detailed lane, or
+    a simple correction with no matching string) — **read-only, no
+    Delete**, with an explicit one-line note that this is a permanent
+    history entry. This is the append-only doctrine made visible to
+    Roy instead of just silently enforced.
+  - `paper` — hands off entirely to the existing, mature session-detail
+    screen (`history.js`'s `showSessionDetail`, with its own image
+    load/save/share and delete) via a new `AppNav.openSession(sessionId,
+    rifleId)` rather than rebuilding that UI a second time. Smaller
+    change, per the contract's own tiebreaker.
+- **New pure helper `feed-core.js`: `findTruingForString(st,
+  truingEvents)`** — the same string↔event correlation `buildFeed()`
+  uses internally, exposed standalone so the record view can answer
+  "what correction came from this string?" without re-deriving the
+  whole feed. Exported and covered by the existing 39 `feed-core`
+  tests continuing to pass (no behavior change to `buildFeed` itself).
+- **`db.js` additive-only, three new methods** (all scoped by
+  `user_id`, matching every existing delete): `deleteZeroEvent`,
+  `deleteMvMeasurement`, `deleteSteelString` (cascades `steel_shots`
+  first, then the string — orphaned shots would be harmless either way
+  since they're always queried scoped to `string_id`, but cascading is
+  cleaner).
+- **Verification:** built a scratchpad harness (`harness-v3-record.html`
+  + `inspect-v3-record.js`) with a mock db capturing every write call.
+  Screenshotted `steel` (with a correlated "kept" correction row),
+  `zero`, `speed` in both themes, plus the `steel-edit` form and a live
+  `steel-delete` click-through. The delete run confirmed the full
+  undo-cascade path end to end: `deleteSteelString('st1')` →
+  `updateLoad({truedMv: 2960})` (reverted from 2923, the event's
+  `oldValue`) — proving the "still current → offer undo" branch fires
+  correctly, not just that it compiles.
+- **821 tests green** across the full `tests/test-*.js` sweep (0
+  failures) — unchanged from step 6's count; no new pure module this
+  step, only additive `db.js` methods and UI wiring over already-tested
+  engines.
+
+### Judgment calls (step 7)
+- Chose **not** to add `deleteTruingEvent` to `db.js` at all, even
+  though a generic "delete this record" screen might reach for one —
+  append-only history is a named architecture rule (STANDARDS §6.2),
+  not a style preference, so the record view models "undo" as a
+  forward-moving `updateLoad` write instead of a row deletion.
+- `cleaning` records reuse the pre-existing `db.deleteCleaningLog` —
+  no new method needed there.
+- Multi-shot (`full`-tier) steel strings get a read-only shot count
+  instead of a per-shot editor in this screen — editing many shots at
+  once belongs to the advanced logger, not the one-glance record view;
+  flagging in case the owner wants that log's own edit affordance
+  extended later rather than duplicated here.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - (accumulates during the run)

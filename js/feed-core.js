@@ -167,6 +167,25 @@ function buildFeed(input) {
 }
 
 /**
+ * v3.0 §7 (view 7, the record screen): the same string↔truing-event
+ * correlation buildFeed uses internally, exposed standalone so the
+ * record view can find "what correction came from this string" without
+ * re-deriving the whole feed. Pure, same rule (same distance, applied
+ * within FEED_CORRELATE_MS of the string's session date).
+ */
+function findTruingForString(st, truingEvents) {
+    if (!st) return null;
+    var match = null;
+    (truingEvents || []).forEach(function (te) {
+        if (match || !te || !te.far || typeof te.far.rangeYds !== 'number') return;
+        if (st.distanceYd !== te.far.rangeYds) return;
+        var dt = Math.abs(Date.parse(st.sessionDate) - Date.parse(te.appliedAt));
+        if (isFinite(dt) && dt <= FEED_CORRELATE_MS) match = te;
+    });
+    return match;
+}
+
+/**
  * The embedded drop chart's 4 "nearest-relevant" rows (view 1): the
  * proven-to distance and the three 100-yd steps below it, so the row
  * Roy cares about most is always the last (hot) one. When proven-to is
@@ -181,5 +200,5 @@ function pickDropRows(hotYd) {
 
 // Export for Node unit tests
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { buildFeed: buildFeed, FEED_CORRELATE_MS: FEED_CORRELATE_MS, pickDropRows: pickDropRows };
+    module.exports = { buildFeed: buildFeed, FEED_CORRELATE_MS: FEED_CORRELATE_MS, pickDropRows: pickDropRows, findTruingForString: findTruingForString };
 }

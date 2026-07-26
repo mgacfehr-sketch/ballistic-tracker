@@ -276,6 +276,10 @@
                     switchView('profiles');
                     profileManager.reportManager.show(rifleId);
                 },
+                openSession: function (sessionId, rifleId) {
+                    switchView('profiles');
+                    historyManager.showSessionDetail(sessionId, rifleId);
+                },
                 openCategory: function (key, rifleId) {
                     if (typeof Categories !== 'undefined') Categories.show(key, rifleId);
                 }
