@@ -135,7 +135,12 @@ HistoryManager.prototype._renderSessionList = function (rifle, sessions) {
     var startBtn = document.getElementById('btn-history-start');
     if (startBtn) {
         startBtn.addEventListener('click', function () {
-            if (window.AppNav) window.AppNav.go('session');
+            // AUDIT-FINDINGS.md F2: this button already has rifle.id in
+            // scope (the back button above uses it) — a blind
+            // AppNav.go('session') dropped that and landed on the
+            // all-rifles picker instead of this rifle.
+            if (window.SessionLaunch) SessionLaunch.start({ rifleId: rifle.id });
+            else if (window.AppNav) window.AppNav.go('session');
         });
     }
 

@@ -265,6 +265,18 @@ check('The chart card taps straight to ammo creation when there are no numbers y
         throw new Error('the chart card\'s click handler no longer routes to _openAmmoForm for the no-numbers case');
     }
 });
+check('History\'s "Check a target" empty state (js/history.js) keeps its rifle context', function () {
+    var source = readFile('js/history.js');
+    var region = extractRegion(source, 'HistoryManager.prototype._renderSessionList = function', 2200);
+    if (region.indexOf("SessionLaunch.start({ rifleId: rifle.id })") === -1) {
+        // AUDIT-FINDINGS.md F2: this button is unambiguously rifle-scoped
+        // (rifle.id is already used elsewhere in this same function) —
+        // a blind AppNav.go('session') dropped that and landed the user
+        // on the all-rifles picker instead of starting a session for
+        // the rifle they were already looking at.
+        throw new Error('the "Check a target" empty-state button no longer starts SessionLaunch with this rifle\'s id');
+    }
+});
 
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
