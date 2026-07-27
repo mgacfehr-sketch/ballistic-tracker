@@ -278,6 +278,40 @@ check('History\'s "Check a target" empty state (js/history.js) keeps its rifle c
     }
 });
 
+console.log('\nSessionLaunch never falls through to the flat, unscoped all-rifles picker:');
+
+check('SessionLaunch.start (js/app.js) flags a pending scoped launch before switchView', function () {
+    var source = readFile('js/app.js');
+    var region = extractRegion(source, 'window.SessionLaunch = {', 4300);
+    if (region.indexOf('_scopedLaunchPending = true') === -1) {
+        // AUDIT-FINDINGS.md F3: switchView('session') synchronously
+        // triggers _loadProfilePicker()'s flat, all-rifles render. When
+        // SessionLaunch.start already knows the rifle, it must flag that
+        // BEFORE switchView fires so the flat picker skips itself
+        // instead of racing (and possibly winning) against the
+        // rifle-scoped picker rendered once the lookup resolves.
+        throw new Error('SessionLaunch.start no longer sets _scopedLaunchPending before switchView(\'session\')');
+    }
+    if (region.indexOf('_renderProfilePicker([{ rifle: rifle, loads: [] }])') === -1) {
+        throw new Error('the no-load case no longer scopes the picker to just the origin rifle');
+    }
+    // The flag must be cleared at least 3 times: the two early-return
+    // guards, plus once after the scoped Promise chain settles (success
+    // or failure) — otherwise a later, genuinely blind picker call
+    // could be wrongly suppressed forever.
+    var clears = region.split('_scopedLaunchPending = false').length - 1;
+    if (clears < 3) {
+        throw new Error('_scopedLaunchPending is not cleared on every exit path (found ' + clears + ', need >= 3) — it could wrongly suppress a later flat picker');
+    }
+});
+check('_loadProfilePicker (js/session-flow.js) yields to a pending scoped launch', function () {
+    var source = readFile('js/session-flow.js');
+    var region = extractRegion(source, 'SessionFlow.prototype._loadProfilePicker = function', 400);
+    if (region.indexOf('_scopedLaunchPending') === -1) {
+        throw new Error('_loadProfilePicker no longer checks _scopedLaunchPending — the race with SessionLaunch.start\'s scoped picker is back');
+    }
+});
+
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -304,8 +304,22 @@
             window.SessionLaunch = {
                 start: function (opts) {
                     opts = opts || {};
+                    // AUDIT-FINDINGS.md F3: switchView('session') below
+                    // synchronously triggers _loadProfilePicker()'s flat,
+                    // all-rifles render — a genuine wrong-rifle risk once
+                    // any account has 2+ rifles. When we already know
+                    // which rifle this launch is for, flag it BEFORE that
+                    // fires so the flat picker skips its own render
+                    // instead of racing (and possibly winning) against
+                    // the rifle-scoped one below.
+                    if (sessionFlow && opts.rifleId && !opts.quickMode) {
+                        sessionFlow._scopedLaunchPending = true;
+                    }
                     switchView('session');
-                    if (!sessionFlow || sessionFlow.currentStep !== 0) return;
+                    if (!sessionFlow || sessionFlow.currentStep !== 0) {
+                        if (sessionFlow) sessionFlow._scopedLaunchPending = false;
+                        return;
+                    }
                     if (opts.quickMode) {
                         sessionFlow._selectQuickMode();
                         return;
@@ -318,12 +332,31 @@
                     // load instead of staring at a picker that already
                     // knows which rifle he tapped.
                     Promise.all([
+                        db.getRifle(opts.rifleId).catch(function () { return null; }),
                         db.getLoadsByRifle(opts.rifleId),
                         db.getSessionsByRifle(opts.rifleId).catch(function () { return []; })
                     ]).then(function (res) {
-                        var loads = res[0] || [];
-                        if (!loads.length || sessionFlow.currentStep !== 0) return;
-                        var sessions = (res[1] || []).slice().sort(function (a, b) {
+                        var rifle = res[0], loads = res[1] || [];
+                        if (sessionFlow.currentStep !== 0) return;
+                        if (!loads.length) {
+                            // AUDIT-FINDINGS.md F3: no ammo for this rifle yet —
+                            // scope the picker to just this rifle instead of
+                            // falling through to _loadProfilePicker's flat
+                            // all-rifles list (a real wrong-rifle risk on any
+                            // account with 2+ rifles). "+ New ammo" is already
+                            // offered per rifle group in that picker.
+                            if (rifle) {
+                                sessionFlow._renderProfilePicker([{ rifle: rifle, loads: [] }]);
+                            } else {
+                                // rifle not even cached (rare) — fall back to
+                                // the flat picker rather than showing nothing;
+                                // clear the guard first or it self-suppresses.
+                                sessionFlow._scopedLaunchPending = false;
+                                sessionFlow._loadProfilePicker();
+                            }
+                            return;
+                        }
+                        var sessions = (res[2] || []).slice().sort(function (a, b) {
                             return (b.date || '').localeCompare(a.date || '');
                         });
                         var loadId = null;
@@ -334,7 +367,8 @@
                             }
                         }
                         sessionFlow._selectProfile(opts.rifleId, loadId || loads[0].id);
-                    }).catch(function () { /* picker stays — user chooses */ });
+                    }).catch(function () { /* picker stays — user chooses */ })
+                        .then(function () { sessionFlow._scopedLaunchPending = false; });
                 }
             };
             // TargetSheet: the blank calibration target's two real handlers

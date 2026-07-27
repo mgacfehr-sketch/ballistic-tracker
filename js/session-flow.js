@@ -324,6 +324,10 @@ SessionFlow.prototype._updateHint = function () {
 SessionFlow.prototype._loadProfilePicker = function () {
     var picker = this.els.profilePicker;
     if (!picker) return;
+    // AUDIT-FINDINGS.md F3: a rifle-scoped SessionLaunch.start is already
+    // in flight and will render its own (safer, wrong-rifle-proof) picker
+    // once it resolves — don't race it with this flat, all-rifles one.
+    if (this._scopedLaunchPending) return;
 
     if (!this.db) {
         picker.innerHTML = '<p class="t-micro">Database not available</p>';
