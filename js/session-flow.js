@@ -968,7 +968,7 @@ SessionFlow.prototype._tryAutoCalibration = function (img) {
             self.canvas.calibrationLine = null;
             self.canvas.render();
 
-            self.els.calibrationStatus.innerHTML = '<span class="chip is-go">' + Icon('check', 14) + 'Verified</span> Proven target detected &mdash; auto-scaled (' + warp.pixelsPerInch.toFixed(0) + ' px/in)';
+            self.els.calibrationStatus.innerHTML = '<span class="chip is-go">' + Icon('check', 14) + 'Verified</span> Proven target detected &mdash; scale set';
             self._showEl(self.els.btnRedoCalibration);
             self._showEl(self.els.btnNextCalibration);
             self._showEl(self.els.btnManualCalibration);
@@ -1529,8 +1529,7 @@ SessionFlow.prototype._onCalibrationTap = function (point) {
         };
         this.canvas.render();
 
-        var ppi = result.pixelsPerInch;
-        this.els.calibrationStatus.textContent = 'Calibrated: ' + formatFixed(ppi, 1) + ' px/in';
+        this.els.calibrationStatus.textContent = 'Calibrated';
         this._showEl(this.els.btnRedoCalibration);
         this._showEl(this.els.btnNextCalibration);
         this._hideEl(this.els.btnManualCalibration);

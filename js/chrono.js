@@ -59,7 +59,7 @@ ChronoManager.prototype.show = function () {
     html += '<div id="chrono-import-section">';
     html += '<div class="plate">';
     html += '<h3 class="t-head">Import chrono data</h3>';
-    html += '<p class="t-body u-quiet">Garmin ShotView (CSV or XLSX) or a LabRadar series report (CSV) &mdash; straight from the device.</p>';
+    html += '<p class="t-body u-quiet">Garmin ShotView or a LabRadar report &mdash; straight from the device.</p>';
     html += '<div class="field-row u-mt-14">';
     html += '<div class="field"><label class="field-label" for="chrono-rifle">Rifle for this import</label>';
     html += '<select id="chrono-rifle"><option value="">Pick a rifle</option></select></div>';
