@@ -46,7 +46,7 @@ AdminManager.prototype.show = function () {
         var el = document.getElementById('admin-content');
         if (el) {
             el.innerHTML = '<div class="alert-strip is-stop">' + Icon('alert', 18) +
-                '<span>Failed to load admin data: ' + self._esc(err.message) + '</span></div>';
+                '<span>Failed to load admin data: ' + self._esc(friendlyError(err)) + '</span></div>';
         }
     });
 };
@@ -204,7 +204,7 @@ AdminManager.prototype._exportAllData = function () {
 
         if (btn) { btn.disabled = false; btn.innerHTML = Icon('download', 18) + 'Export all data'; }
     }).catch(function (err) {
-        alert('Export failed: ' + err.message);
+        alert('Export failed: ' + friendlyError(err));
         if (btn) { btn.disabled = false; btn.innerHTML = Icon('download', 18) + 'Export all data'; }
     });
 };

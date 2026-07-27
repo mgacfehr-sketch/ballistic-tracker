@@ -78,7 +78,7 @@ CertificateManager.prototype.showPreflight = function (rifleId) {
     }).catch(function (err) {
         container.innerHTML = '<div class="screen"><div class="alert-strip is-stop">' +
             Icon('alert', 18) + '<span>Could not load certificate data: ' +
-            escapeHtml(err.message) + '</span></div></div>';
+            escapeHtml(friendlyError(err)) + '</span></div></div>';
     });
 };
 

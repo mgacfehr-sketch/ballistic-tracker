@@ -134,7 +134,7 @@ var RifleRecord = (function () {
                     return app.db.updateLoad(load);
                 }
             }).then(function () { app.show(rifle.id); })
-                .catch(function (err) { alert('Delete failed: ' + err.message); });
+                .catch(function (err) { alert('Delete failed: ' + friendlyError(err)); });
         });
     }
 
@@ -167,7 +167,7 @@ var RifleRecord = (function () {
                 mvSource: isFinite(mv) && mv > 0 ? (shot.mvSource || 'manual') : null
             };
             app.db.updateSteelShot(patch).then(function () { app.show(rifle.id); })
-                .catch(function (err) { btn.disabled = false; alert('Save failed: ' + err.message); });
+                .catch(function (err) { btn.disabled = false; alert('Save failed: ' + friendlyError(err)); });
         });
     }
 
@@ -190,7 +190,7 @@ var RifleRecord = (function () {
             document.getElementById('rr-delete').addEventListener('click', function () {
                 if (!confirm('Delete this zero confirmation? The paper session itself stays in the rifle’s paperwork.')) return;
                 app.db.deleteZeroEvent(z.id).then(function () { app.show(rifle.id); })
-                    .catch(function (err) { alert('Delete failed: ' + err.message); });
+                    .catch(function (err) { alert('Delete failed: ' + friendlyError(err)); });
             });
         });
     }
@@ -211,7 +211,7 @@ var RifleRecord = (function () {
             document.getElementById('rr-delete').addEventListener('click', function () {
                 if (!confirm('Delete this speed measurement?')) return;
                 app.db.deleteMvMeasurement(m.id).then(function () { app.show(rifle.id); })
-                    .catch(function (err) { alert('Delete failed: ' + err.message); });
+                    .catch(function (err) { alert('Delete failed: ' + friendlyError(err)); });
             });
         });
     }
@@ -234,7 +234,7 @@ var RifleRecord = (function () {
             document.getElementById('rr-delete').addEventListener('click', function () {
                 if (!confirm('Delete this cleaning log entry?')) return;
                 app.db.deleteCleaningLog(c.id).then(function () { app.show(rifle.id); })
-                    .catch(function (err) { alert('Delete failed: ' + err.message); });
+                    .catch(function (err) { alert('Delete failed: ' + friendlyError(err)); });
             });
         });
     }

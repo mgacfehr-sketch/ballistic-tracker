@@ -97,7 +97,7 @@
                     btnLogin.disabled = false;
                     btnSignup.disabled = false;
                     if (result.error) {
-                        showAuthError(result.error.message);
+                        showAuthError(friendlyError(result.error));
                     } else {
                         startApp(result.data.user);
                     }
@@ -124,7 +124,7 @@
                     btnLogin.disabled = false;
                     btnSignup.disabled = false;
                     if (result.error) {
-                        showAuthError(result.error.message);
+                        showAuthError(friendlyError(result.error));
                     } else if (result.data.session) {
                         startApp(result.data.user);
                     } else {
@@ -148,7 +148,7 @@
                 }).then(function (result) {
                     btnForgot.disabled = false;
                     if (result.error) {
-                        showAuthError(result.error.message);
+                        showAuthError(friendlyError(result.error));
                     } else {
                         showAuthError('Password reset link sent — check your email.');
                     }
@@ -178,7 +178,7 @@
                 client.auth.updateUser({ password: pw }).then(function (result) {
                     btnSetPassword.disabled = false;
                     if (result.error) {
-                        showAuthError(result.error.message);
+                        showAuthError(friendlyError(result.error));
                     } else {
                         resetPanel.classList.add('hidden');
                         startApp(result.data.user);

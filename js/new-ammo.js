@@ -61,7 +61,7 @@ var NewAmmoForm = (function () {
                 onSaved(load);
             }).catch(function (err) {
                 saveBtn.disabled = false;
-                if (errEl) errEl.textContent = 'Could not save — ' + (err && err.message ? err.message : 'try again.');
+                if (errEl) errEl.textContent = 'Could not save — ' + friendlyError(err);
             });
         });
     }

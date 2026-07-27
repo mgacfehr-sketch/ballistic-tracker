@@ -171,7 +171,7 @@ ChronoManager.prototype._handleFile = function (file) {
             self._setSessions([session]);
         }).catch(function (err) {
             document.getElementById('chrono-results').innerHTML = '';
-            self._showError(err.message);
+            self._showError(friendlyError(err));
         });
     } else if (name.slice(-5) === '.xlsx') {
         if (typeof XLSX === 'undefined') {
@@ -184,7 +184,7 @@ ChronoManager.prototype._handleFile = function (file) {
             self._setSessions(parseShotViewWorkbook(workbook));
         }).catch(function (err) {
             document.getElementById('chrono-results').innerHTML = '';
-            self._showError(err.message);
+            self._showError(friendlyError(err));
         });
     } else {
         this._showError('Unsupported file type. Pick a ShotView .csv or .xlsx export.');
@@ -609,7 +609,7 @@ ChronoManager.prototype._importSelected = function () {
         }).catch(function (err) {
             btn.disabled = false;
             self._showError('Saved ' + saved + ' of ' + fresh.length + ' strings, then failed: ' +
-                err.message + ' — fix the connection and re-import the rest (already-saved strings are kept, duplicates will be skipped).');
+                friendlyError(err) + ' — fix the connection and re-import the rest (already-saved strings are kept, duplicates will be skipped).');
         });
     });
 };
@@ -682,7 +682,7 @@ ChronoManager.prototype.showAssignmentReview = function (rifleId) {
         };
         self._renderAssignmentReview();
     }).catch(function (err) {
-        self._showError('Could not load strings: ' + err.message);
+        self._showError('Could not load strings: ' + friendlyError(err));
     });
 };
 
@@ -888,7 +888,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
                 self.db.updateVelocityString({ id: id, roundCountAt: value }).then(function () {
                     self.showAssignmentReview(rifleId);
                 }).catch(function (err) {
-                    self._showError('Could not update the round count: ' + err.message);
+                    self._showError('Could not update the round count: ' + friendlyError(err));
                 });
             }
             field.addEventListener('keydown', function (e) {
@@ -960,7 +960,7 @@ ChronoManager.prototype._renderAssignmentReview = function () {
             self.db.deleteVelocityString(id).then(function () {
                 self.showAssignmentReview(rifleId);
             }).catch(function (err) {
-                self._showError('Could not delete the string: ' + err.message);
+                self._showError('Could not delete the string: ' + friendlyError(err));
             });
         });
     }
@@ -1027,7 +1027,7 @@ ChronoManager.prototype._confirmAssignment = function (rifleId, stringIds, loadV
         self.showAssignmentReview(rifleId); // re-render with fresh state
     }).catch(function (err) {
         btn.disabled = false;
-        status.textContent = 'Assignment failed: ' + err.message;
+        status.textContent = 'Assignment failed: ' + friendlyError(err);
     });
 };
 
