@@ -174,27 +174,40 @@ var RifleAdd = (function () {
             var mv = mvInput && mvInput.value ? parseFloat(mvInput.value) : NaN;
             S.mv = isFinite(mv) && mv >= 500 && mv <= 5000 ? mv : null;
 
-            if (!ctx.load || !ctx.load.bulletBC || !(ctx.load.muzzleVelocity || ctx.load.truedMv)) {
-                _noNumbersYet(app, rifle);
+            if (!ctx.load) {
+                // No ammo on file at all — get just enough to attach the
+                // string to. S already holds everything the user entered
+                // (distance/dial/hit), so nothing is lost going here.
+                btn.disabled = false;
+                _needsAmmo(app, rifle, S, units, ctx);
                 return;
             }
+            _finishSteelSave(app, rifle, S, units, ctx, btn);
+        });
+    }
 
-            var suppressorId = (ctx.suppressorEnabled && ctx.lastCan) ? ctx.lastCan : null;
-            var stringId = generateUUID();
-            _write(app.db, 'addSteelString', {
-                id: stringId, rifleId: rifle.id, loadId: ctx.load.id,
-                sessionDate: new Date().toISOString(), distanceYd: S.distanceYd, tier: 'full',
-                dialedElev: S.dialed, dialedWind: 0, units: units,
-                wind: null, directionOfFireDeg: null,
-                suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null, notes: 'v3-simple'
-            }).then(function () {
-                var elevOffUnits = simpleFromMOA(inchesToMOA(S.hitIn, S.distanceYd), units, S.distanceYd);
-                return _write(app.db, 'addSteelShot', {
-                    stringId: stringId, seq: 1,
-                    elevOff: Math.round(elevOffUnits * 100) / 100, windOff: 0, units: units,
-                    heldElev: 0, heldWind: 0, mvFps: S.mv, mvSource: S.mv ? 'manual' : null
-                });
-            }).then(function () {
+    /** Save always happens (STANDARDS §6.1 / Part 2 §3.4) — the truing
+     *  payoff is a separate, optional next step gated on the load
+     *  actually having BC + a velocity number, not a precondition for
+     *  logging the hit at all. */
+    function _finishSteelSave(app, rifle, S, units, ctx, btn) {
+        var suppressorId = (ctx.suppressorEnabled && ctx.lastCan) ? ctx.lastCan : null;
+        var stringId = generateUUID();
+        _write(app.db, 'addSteelString', {
+            id: stringId, rifleId: rifle.id, loadId: ctx.load.id,
+            sessionDate: new Date().toISOString(), distanceYd: S.distanceYd, tier: 'full',
+            dialedElev: S.dialed, dialedWind: 0, units: units,
+            wind: null, directionOfFireDeg: null,
+            suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null, notes: 'v3-simple'
+        }).then(function () {
+            var elevOffUnits = simpleFromMOA(inchesToMOA(S.hitIn, S.distanceYd), units, S.distanceYd);
+            return _write(app.db, 'addSteelShot', {
+                stringId: stringId, seq: 1,
+                elevOff: Math.round(elevOffUnits * 100) / 100, windOff: 0, units: units,
+                heldElev: 0, heldWind: 0, mvFps: S.mv, mvSource: S.mv ? 'manual' : null
+            });
+        }).then(function () {
+            if (ctx.load.bulletBC && (ctx.load.muzzleVelocity || ctx.load.truedMv)) {
                 if (typeof RiflePayoff !== 'undefined') {
                     RiflePayoff.run(app, rifle, ctx.load, {
                         rangeYds: S.distanceYd, dialed: S.dialed, hitInches: S.hitIn, units: units,
@@ -204,21 +217,45 @@ var RifleAdd = (function () {
                 } else {
                     app.show(rifle.id);
                 }
-            }).catch(function (err) {
-                btn.disabled = false;
-                alert('Save failed: ' + err.message + '\n\nStill on screen — try again.');
-            });
+            } else {
+                _loggedNeedsNumbers(app, rifle, ctx.load);
+            }
+        }).catch(function (err) {
+            if (btn) btn.disabled = false;
+            alert('Save failed: ' + err.message + '\n\nStill on screen — try again.');
         });
     }
 
-    /** No BC/speed on file — honest, one obvious fix, never a dead end. */
-    function _noNumbersYet(app, rifle) {
+    /** No ammo on file at all yet — the minimal "+ New ammo" form,
+     *  inline, right where the dead-end used to be. Saving it re-runs
+     *  the exact save this button was about to do. */
+    function _needsAmmo(app, rifle, S, units, ctx) {
         var container = app.container;
-        container.innerHTML = '<div class="screen"><h2 style="margin-top:60px;text-align:center;padding:0 var(--edge);font:var(--type-title)">One thing first</h2>' +
+        container.innerHTML = '<div class="screen"><div class="pagehead">' +
+            '<button class="backline" id="rna-back">&lsaquo; Back</button></div>' +
+            '<h2 style="padding:0 var(--edge);font:var(--type-title)">One thing first</h2>' +
+            '<p style="padding:0 var(--edge);color:var(--text-secondary);margin-bottom:14px">' +
+            UI.esc(rifle.name || 'This rifle') + ' has no ammo on file yet — what were you shooting?</p>' +
+            '<div class="edge" style="padding:0 var(--edge)">' + NewAmmoForm.html('rna') + '</div></div>';
+        document.getElementById('rna-back').addEventListener('click', function () {
+            _renderSteel(app, rifle, S, units, (units === 'MIL' ? 0.1 : 0.25), ctx);
+        });
+        NewAmmoForm.bind('rna', app.db, rifle.id, function (load) {
+            ctx.load = load;
+            _finishSteelSave(app, rifle, S, units, ctx, null);
+        });
+    }
+
+    /** The save already happened — this is a friendly nudge, never a
+     *  block. Roy can log a hundred more hits before ever filling in
+     *  BC/velocity if he wants; the payoff just waits for him. */
+    function _loggedNeedsNumbers(app, rifle, load) {
+        var container = app.container;
+        container.innerHTML = '<div class="screen"><h2 style="margin-top:60px;text-align:center;padding:0 var(--edge);font:var(--type-title)">Logged.</h2>' +
             '<p style="text-align:center;color:var(--text-secondary);padding:0 var(--edge);margin-top:10px">' +
-            'To turn a hit into better numbers, ' + UI.esc(rifle.name || 'this rifle') +
-            ' needs its bullet and box speed on file &mdash; two minutes, once.</p>' +
-            '<button class="v3-gold" id="rnn-add" style="margin-top:24px">Add bullet &amp; speed</button>' +
+            'To turn that hit into a dial correction, ' + UI.esc(load.name || 'this ammo') +
+            ' needs its BC and box speed on file &mdash; two minutes, once.</p>' +
+            '<button class="v3-gold" id="rnn-add" style="margin-top:24px">Add BC &amp; speed</button>' +
             '<div class="v3-linkrow"><button class="v3-link" id="rnn-back">Not now</button></div></div>';
         document.getElementById('rnn-add').addEventListener('click', function () {
             if (window.AppNav) AppNav.openRifle(rifle.id);
@@ -276,23 +313,60 @@ var RifleAdd = (function () {
                 loads.forEach(function (l) { if (!load && (l.truedMv || l.truedBc)) load = l; });
                 if (!load && loads.length) load = loads[0];
 
-                if (S.count === null) {
-                    if (!load) { btn.disabled = false; alert('Add a rifle load first — the speed rides with the ammo.'); return; }
-                    load.muzzleVelocity = Math.round(S.value);
-                    return app.db.updateLoad(load).then(function () { app.show(rifle.id); });
+                if (S.count === null && !load) {
+                    // "Just a guess" writes the number straight onto a
+                    // load — there has to be one to write it onto. Never
+                    // dead-end here: get the minimum ammo needed inline.
+                    btn.disabled = false;
+                    _chronoNeedsAmmo(app, rifle, S);
+                    return;
                 }
-                return _write(app.db, 'addMvMeasurement', {
-                    rifleId: rifle.id, loadId: load ? load.id : null,
-                    value: Math.round(S.value), shotCount: S.count,
-                    lotNumber: load ? (load.lotNumber || null) : null, source: 'manual'
-                }).then(function () {
-                    if (typeof Readiness !== 'undefined') Readiness.invalidate(rifle.id);
-                    app.show(rifle.id);
-                });
+                _finishChronoSave(app, rifle, S, load, btn);
             }).catch(function (err) {
                 btn.disabled = false;
                 alert('Could not save: ' + err.message);
             });
+        });
+    }
+
+    function _finishChronoSave(app, rifle, S, load, btn) {
+        if (S.count === null) {
+            load.muzzleVelocity = Math.round(S.value);
+            app.db.updateLoad(load).then(function () { app.show(rifle.id); })
+                .catch(function (err) {
+                    if (btn) btn.disabled = false;
+                    alert('Could not save: ' + err.message);
+                });
+            return;
+        }
+        _write(app.db, 'addMvMeasurement', {
+            rifleId: rifle.id, loadId: load ? load.id : null,
+            value: Math.round(S.value), shotCount: S.count,
+            lotNumber: load ? (load.lotNumber || null) : null, source: 'manual'
+        }).then(function () {
+            if (typeof Readiness !== 'undefined') Readiness.invalidate(rifle.id);
+            app.show(rifle.id);
+        }).catch(function (err) {
+            if (btn) btn.disabled = false;
+            alert('Could not save: ' + err.message);
+        });
+    }
+
+    /** No ammo on file at all — same minimal "+ New ammo" form as the
+     *  steel flow, inline, so the typed speed isn't lost. */
+    function _chronoNeedsAmmo(app, rifle, S) {
+        var container = app.container;
+        container.innerHTML = '<div class="screen"><div class="pagehead">' +
+            '<button class="backline" id="rca-back">&lsaquo; Back</button></div>' +
+            '<h2 style="padding:0 var(--edge);font:var(--type-title)">One thing first</h2>' +
+            '<p style="padding:0 var(--edge);color:var(--text-secondary);margin-bottom:14px">' +
+            UI.esc(rifle.name || 'This rifle') + ' has no ammo on file yet — the speed rides with the box.</p>' +
+            '<div class="edge" style="padding:0 var(--edge)">' + NewAmmoForm.html('rca') + '</div></div>';
+        document.getElementById('rca-back').addEventListener('click', function () {
+            _chronoScreen(app, rifle);
+        });
+        NewAmmoForm.bind('rca', app.db, rifle.id, function (load) {
+            _finishChronoSave(app, rifle, S, load, null);
         });
     }
 

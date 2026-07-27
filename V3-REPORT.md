@@ -890,6 +890,72 @@ green. **889 tests total** (846 + 43), 0 failures.
 
 ---
 
+## Post-ship: three more device-testing fixes (2026-07-27)
+
+**Fix 1 — rifle switcher discoverability, reworked.** Device feedback:
+tapping the name must open a scrollable list (fleets of 50+ rifles are
+real) — that's the primary switcher, not the dots, and not sharing the
+tap with Paperwork. Reworked view 1's header:
+- The rifle name now always opens `_openRifleList()` (the scrollable,
+  `.overlay-card`-backed list — already `max-height:86dvh;
+  overflow-y:auto`, so long fleets already scroll correctly) — not
+  Paperwork. A small chevron-down after the name makes the tap
+  affordance visible (device feedback: "if a list exists, it isn't
+  discoverable").
+- The dots row is now purely decorative (only renders for 2+ rifles,
+  no click handler) — swipe remains the "bonus" way to move between
+  cards; the name is the primary switcher, per the report.
+- **Fix 3 — "Rifle details" gets its own entry**, since sharing the
+  name with Paperwork wasn't discoverable either. A new, plainly
+  labeled `Rifle details ›` link sits right under the name/dots,
+  opening the same `ProfileManager.showRifleDetail()` via
+  `AppNav.openRifle()` as before.
+
+**Fix 2 — the load dead-end.** Creating a rifle correctly doesn't
+create a load, but every load-dependent screen then hard-blocked with
+no way to create one in place. Root-caused three separate dead-ends
+and fixed all three with one new shared component:
+- New `js/new-ammo.js` (`NewAmmoForm`) — a genuinely minimal, factory-
+  box-friendly inline form: **Name, Bullet, Weight** (grains) only —
+  no BC, no drag model, no velocity, because that's what's actually
+  printed on a box. Calls `db.addLoad()` directly (load creation is
+  explicitly online-only by design — see `sync-queue.js`'s own "out of
+  scope" note — so no `SyncQueue` involvement here, matching how
+  `onboarding.js` already creates loads).
+- **Paper session picker** (`session-flow.js` `_renderProfilePicker`):
+  "No loads — add one on the rifle page" (a dead-end pointing away
+  from the flow) is now "+ New ammo" inline per rifle; saving calls
+  `_selectProfile(rifleId, newLoad.id)` and continues straight into
+  the session.
+- **Steel entry** (`rifle-add.js`): restructured so **the save always
+  happens** — the string+shot are written to the load regardless of
+  whether it has BC/velocity yet (previously, a missing load OR
+  missing BC/velocity blocked the save entirely, contradicting the
+  file's own header comment, "Save always happens"). No load at all →
+  inline "+ New ammo" (entered distance/dial/hit are preserved in
+  memory, nothing lost) → save → then, if BC+velocity still aren't on
+  file, a non-blocking "Logged." confirmation offers to add them or
+  skip, instead of the old dead-end "One thing first" screen that sent
+  the user away and lost the entered hit.
+- **Chronograph "just a guess"** (`rifle-add.js`): the guess path
+  writes velocity straight onto a load, so it also needs one to exist;
+  replaced its `alert()`-and-bail with the same inline "+ New ammo"
+  form.
+- Verified via three scratchpad harnesses: the steel flow end-to-end
+  (distance/dial/hit → no-ammo form → save → string+shot land in the
+  mock db → "Logged." shown, all before any BC/velocity exist), the
+  paper picker's "+ New ammo" continuing straight into `_selectProfile`,
+  and the chevron/switcher/details-link split on view 1. No console or
+  page errors in any run.
+
+**New tests**: `tests/test-screen-nav.js` grew by 6 checks — the
+rifle-name/details-link split, and one dead-end guard per fixed
+screen (paper picker, steel save, chrono guess path) asserting the
+old blocking patterns are gone and the new inline-form path exists.
+**895 tests total** (889 + 6), 0 failures.
+
+---
+
 ## OWNER REVIEW QUEUE
 
 - **The `Categories`/paperwork "Everything else" shortcut list** (step

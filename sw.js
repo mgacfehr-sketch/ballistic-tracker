@@ -11,7 +11,7 @@
  *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 136;
+var CACHE_VERSION = 137;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
@@ -30,6 +30,7 @@ var APP_SHELL = [
     './js/calibration.js',
     './js/target-geometry.js',
     './js/aruco-calibration.js',
+    './js/new-ammo.js',
     './js/session-flow.js',
     './js/profiles.js',
     './js/history.js',

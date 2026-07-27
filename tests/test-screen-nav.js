@@ -72,7 +72,9 @@ var SCREENS = [
     { file: 'js/rifle-add.js', anchor: 'function show(app, rifle) {', label: 'RifleAdd chooser (view 2)' },
     { file: 'js/rifle-add.js', anchor: 'function _renderSteel(app, rifle, S, units, step, ctx) {', label: 'RifleAdd steel (view 3b)' },
     { file: 'js/rifle-add.js', anchor: 'function _chronoScreen(app, rifle) {', label: 'RifleAdd chrono (view 3c)' },
-    { file: 'js/rifle-add.js', anchor: 'function _noNumbersYet(app, rifle) {', label: 'RifleAdd "one thing first"' },
+    { file: 'js/rifle-add.js', anchor: 'function _needsAmmo(app, rifle, S, units, ctx) {', label: 'RifleAdd steel "needs ammo" inline form' },
+    { file: 'js/rifle-add.js', anchor: 'function _loggedNeedsNumbers(app, rifle, load) {', label: 'RifleAdd steel "logged, needs numbers"' },
+    { file: 'js/rifle-add.js', anchor: 'function _chronoNeedsAmmo(app, rifle, S) {', label: 'RifleAdd chrono "needs ammo" inline form' },
     { file: 'js/rifle-payoff.js', anchor: 'function _couldNotUse(', label: 'RiflePayoff refusal screen' },
     { file: 'js/rifle-payoff.js', anchor: 'function _renderPayoff(', label: 'RiflePayoff Keep/Undo screen' },
 
@@ -180,14 +182,18 @@ check('.fab-zone CSS accounts for env(safe-area-inset-bottom)', function () {
 // The rifle-switcher overlay is the other "where a user actually looks
 // for it" entry point for adding a rifle (device bug report) — and it
 // must be reachable even with exactly one rifle on file.
-check('Rifle switcher (rifle-app.js) always renders the dots/switcher entry, not just for 2+ rifles', function () {
+check('Rifle name (rifle-app.js) always renders and opens the switcher list, regardless of rifle count', function () {
     var source = readFile('js/rifle-app.js');
     var region = extractRegion(source, 'RifleApp.prototype._renderRifle = function', 3000);
-    if (/if\s*\(\s*many\s*\)\s*\{[^}]*v3-dots/.test(region)) {
-        throw new Error('the dots/switcher button is still gated behind a >1-rifle check');
+    if (region.indexOf('id="rf-rname"') === -1) {
+        throw new Error('no #rf-rname button rendered at all');
     }
-    if (region.indexOf('id="rf-dots"') === -1) {
-        throw new Error('no #rf-dots switcher button rendered at all');
+    if (region.indexOf('id="rf-details-link"') === -1) {
+        throw new Error('no separate "Rifle details" link rendered — Paperwork needs its own plainly-labeled entry, not a shared tap target with the switcher');
+    }
+    var bindRegion = extractRegion(source, "var rnameBtn = document.getElementById('rf-rname');", 400);
+    if (bindRegion.indexOf('_openRifleList()') === -1) {
+        throw new Error('the rifle name no longer opens the switcher list (_openRifleList) — device feedback was explicit that the name, not the dots, is the primary switcher');
     }
 });
 check('Rifle switcher overlay offers "Add a rifle" and "Scan certificate"', function () {
@@ -195,6 +201,46 @@ check('Rifle switcher overlay offers "Add a rifle" and "Scan certificate"', func
     var region = extractRegion(source, 'RifleApp.prototype._openRifleList = function', 3000);
     if (region.indexOf('data-pick-add') === -1) throw new Error('no "+ Add a rifle" row in the switcher list');
     if (region.indexOf('data-pick-scan') === -1) throw new Error('no "Scan certificate" row in the switcher list');
+});
+
+console.log('\nLoad pickers must never dead-end on a rifle with no ammo:');
+
+check('js/new-ammo.js exports NewAmmoForm.html/bind', function () {
+    var source = readFile('js/new-ammo.js');
+    if (source.indexOf('html: html, bind: bind') === -1 && (source.indexOf('html:') === -1 || source.indexOf('bind:') === -1)) {
+        throw new Error('NewAmmoForm does not export both html() and bind()');
+    }
+});
+check('Paper session picker (session-flow.js) offers "+ New ammo" per rifle', function () {
+    var source = readFile('js/session-flow.js');
+    var region = extractRegion(source, 'SessionFlow.prototype._renderProfilePicker = function', 6000);
+    if (region.indexOf('data-new-ammo-rifle') === -1) throw new Error('no "+ New ammo" row in the profile picker');
+    if (region.indexOf('NewAmmoForm') === -1) throw new Error('picker does not use NewAmmoForm');
+    if (region.indexOf('_selectProfile(') === -1) throw new Error('saving new ammo does not continue into the session (_selectProfile)');
+});
+check('Steel entry (rifle-add.js) never blocks the save on missing ammo/numbers', function () {
+    var source = readFile('js/rifle-add.js');
+    var region = extractRegion(source, "document.getElementById('rs-done').addEventListener", 1200);
+    if (region.indexOf('_needsAmmo(') === -1) {
+        throw new Error('no-load case no longer routes to the inline "+ New ammo" form');
+    }
+    if (region.indexOf('_finishSteelSave(') === -1) {
+        throw new Error('rs-done no longer calls a shared save path — check the load-present case still saves');
+    }
+    var saveRegion = extractRegion(source, 'function _finishSteelSave(', 2000);
+    if (saveRegion.indexOf('addSteelString') === -1 || saveRegion.indexOf('addSteelShot') === -1) {
+        throw new Error('_finishSteelSave no longer saves the string/shot unconditionally');
+    }
+});
+check('Chrono "just a guess" (rifle-add.js) never alert-and-bails on missing ammo', function () {
+    var source = readFile('js/rifle-add.js');
+    var region = extractRegion(source, "document.getElementById('rc-save').addEventListener", 900);
+    if (/alert\(['"]Add a rifle load first/.test(region)) {
+        throw new Error('the guess path still alert()s and bails instead of offering "+ New ammo" inline');
+    }
+    if (region.indexOf('_chronoNeedsAmmo(') === -1) {
+        throw new Error('no-load guess case no longer routes to the inline "+ New ammo" form');
+    }
 });
 
 console.log('\n' + '═'.repeat(40));

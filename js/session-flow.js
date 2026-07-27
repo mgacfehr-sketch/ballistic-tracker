@@ -396,7 +396,7 @@ SessionFlow.prototype._renderProfilePicker = function (groups) {
             (rifle.caliber ? ' &middot; ' + escapeHtml(rifle.caliber) : '') + '</div>';
 
         if (loads.length === 0) {
-            html += '<p class="t-micro">No loads &mdash; add one on the rifle page (Rifles)</p>';
+            html += '<p class="t-micro">No ammo on file for this rifle yet.</p>';
         } else {
             html += '<div class="choice-stack">';
             for (var l = 0; l < loads.length; l++) {
@@ -409,9 +409,34 @@ SessionFlow.prototype._renderProfilePicker = function (groups) {
             }
             html += '</div>';
         }
+        // Device feedback: a load picker with no way to create a load
+        // was a dead end. "+ New ammo" reveals a minimal inline form
+        // right here — saving it selects this rifle with the new load
+        // and continues into the session, nothing lost.
+        html += '<button type="button" class="action" data-new-ammo-rifle="' + escapeAttr(rifle.id) + '">' +
+            Icon('plus', 18) + 'New ammo</button>';
+        html += '<div class="hidden" id="new-ammo-panel-' + escapeAttr(rifle.id) + '"></div>';
     }
 
     picker.innerHTML = html;
+
+    if (typeof NewAmmoForm !== 'undefined') {
+        var newAmmoBtns = picker.querySelectorAll('[data-new-ammo-rifle]');
+        for (var na = 0; na < newAmmoBtns.length; na++) {
+            newAmmoBtns[na].addEventListener('click', function () {
+                var rId = this.getAttribute('data-new-ammo-rifle');
+                var panel = document.getElementById('new-ammo-panel-' + rId);
+                if (!panel) return;
+                this.classList.add('hidden');
+                panel.classList.remove('hidden');
+                var idPrefix = 'na-' + rId;
+                panel.innerHTML = NewAmmoForm.html(idPrefix);
+                NewAmmoForm.bind(idPrefix, self.db, rId, function (load) {
+                    self._selectProfile(rId, load.id);
+                });
+            });
+        }
+    }
 
     // Bind load buttons
     var btns = picker.querySelectorAll('.picker-load-btn');

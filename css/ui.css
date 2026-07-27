@@ -1887,12 +1887,19 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 .v3-rname h1 { font: var(--type-title); }
 .v3-rname .load { color: var(--text-secondary); font: var(--type-body); }
+/* decorative only (device feedback: switching now happens via the
+   rifle-name list, not a dots tap target) — swipe still moves these */
 .v3-dots {
     display: flex; gap: 6px; justify-content: center; align-items: center;
-    margin: 0 auto; background: none; border: none; padding: 14px; min-height: var(--tap-min);
+    margin-top: 8px;
 }
 .v3-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border-default); display: inline-block; }
 .v3-dots i.on { background: var(--brand-gold); }
+.v3-rname-chev { display: inline-flex; align-items: center; color: var(--text-secondary); align-self: center; }
+.v3-details-link {
+    display: block; margin: 2px auto 0; text-align: center; min-height: var(--tap-min);
+    background: none; border: none; color: var(--brand-gold-strong); font: var(--type-label);
+}
 
 /* the number */
 .v3-numberbox { text-align: center; margin: 20px 0 4px; background: none; border: none; width: 100%; padding: 6px; }
