@@ -572,7 +572,17 @@ ChronoManager.prototype._importSelected = function () {
         var chain = Promise.resolve();
         fresh.forEach(function (record) {
             chain = chain.then(function () {
-                return self.db.addVelocityString(record).then(function () { saved++; });
+                // AUDIT-FINDINGS.md F6: addVelocityString IS already
+                // queueable (SyncQueueCore.FN_TABLE) — every other add-
+                // flow in the app writes through SyncQueue.write for
+                // exactly this reason; this was the one call site that
+                // bypassed it and called db.addVelocityString directly,
+                // losing an already-parsed import offline instead of
+                // queuing it like everything else.
+                var write = (typeof SyncQueue !== 'undefined' && SyncQueue)
+                    ? SyncQueue.write('addVelocityString', record)
+                    : self.db.addVelocityString(record);
+                return write.then(function () { saved++; });
             });
         });
 

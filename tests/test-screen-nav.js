@@ -327,6 +327,22 @@ check('_loadProfilePicker (js/session-flow.js) yields to a pending scoped launch
         throw new Error('_loadProfilePicker no longer checks _scopedLaunchPending — the race with SessionLaunch.start\'s scoped picker is back');
     }
 });
+check('Chrono import (js/chrono.js) saves through SyncQueue, not a direct db call (F6)', function () {
+    var source = readFile('js/chrono.js');
+    if (source.indexOf('self.db.addVelocityString(record)') !== -1 &&
+        source.indexOf("SyncQueue.write('addVelocityString', record)") === -1) {
+        // AUDIT-FINDINGS.md F6: addVelocityString is already listed in
+        // SyncQueueCore.FN_TABLE — every other add-flow in the app
+        // writes through SyncQueue.write for exactly this reason. A
+        // direct db.addVelocityString call here means an offline import
+        // is lost instead of queued, despite the architecture already
+        // supporting it.
+        throw new Error('chrono import calls db.addVelocityString directly instead of through SyncQueue.write');
+    }
+    if (source.indexOf("SyncQueue.write('addVelocityString', record)") === -1) {
+        throw new Error('chrono import no longer routes the save through SyncQueue.write at all');
+    }
+});
 
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
