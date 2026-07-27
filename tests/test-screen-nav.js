@@ -242,6 +242,29 @@ check('Chrono "just a guess" (rifle-add.js) never alert-and-bails on missing amm
         throw new Error('no-load guess case no longer routes to the inline "+ New ammo" form');
     }
 });
+check('View 1 drop chart (rifle-app.js) never hangs on "loading" with no ammo on file', function () {
+    var source = readFile('js/rifle-app.js');
+    var region = extractRegion(source, 'RifleApp.prototype._fillChart = function', 2200);
+    // Every early-exit branch in this function must route through the
+    // coaching fallback (AUDIT-FINDINGS.md F1), not a bare `return;`
+    // that leaves the card on its initial loading placeholder forever.
+    var bareReturns = region.match(/\{\s*return;\s*\}|\)\s*return;/g) || [];
+    bareReturns.forEach(function (snippet) {
+        if (snippet.indexOf('_noChartYet') === -1) {
+            throw new Error('found an early return with no _noChartYet() fallback: ' + snippet.trim());
+        }
+    });
+    if (region.indexOf('_noChartYet()') === -1) {
+        throw new Error('_fillChart no longer calls _noChartYet() at all');
+    }
+});
+check('The chart card taps straight to ammo creation when there are no numbers yet', function () {
+    var source = readFile('js/rifle-app.js');
+    var region = extractRegion(source, "var chartBox = document.getElementById('rf-chart');", 500);
+    if (region.indexOf('_openAmmoForm') === -1) {
+        throw new Error('the chart card\'s click handler no longer routes to _openAmmoForm for the no-numbers case');
+    }
+});
 
 console.log('\n' + '═'.repeat(40));
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');

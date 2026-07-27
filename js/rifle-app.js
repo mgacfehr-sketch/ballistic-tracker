@@ -136,7 +136,14 @@ RifleApp.prototype._renderRifle = function () {
     });
     var chartBox = document.getElementById('rf-chart');
     if (chartBox) chartBox.addEventListener('click', function () {
-        if (window.RifleChart) RifleChart.show(self, rifle);
+        // AUDIT-FINDINGS.md F1: no bullet/BC on file means there's no
+        // chart to open — go straight to fixing that instead of a
+        // second screen that just repeats "nothing to show."
+        if (chartBox.getAttribute('data-has-numbers') === '0') {
+            self._openAmmoForm(rifle);
+        } else if (window.RifleChart) {
+            RifleChart.show(self, rifle);
+        }
     });
     var rnameBtn = document.getElementById('rf-rname');
     if (rnameBtn) rnameBtn.addEventListener('click', function () {
@@ -280,10 +287,23 @@ RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel,
     });
 };
 
+/** AUDIT-FINDINGS.md F1: no ammo (or an unsolvable profile) means
+ *  there's no chart to draw — say so and make the card itself the
+ *  fix, instead of leaving it on its "loading…" placeholder forever. */
+RifleApp.prototype._noChartYet = function () {
+    var el = document.getElementById('rf-chart-rows');
+    var sub = document.getElementById('rf-chart-sub');
+    var box = document.getElementById('rf-chart');
+    if (box) box.setAttribute('data-has-numbers', '0');
+    if (el) el.innerHTML = '<div class="v3-crow"><span class="d">Add your bullet &amp; box speed to see your drop chart</span></div>';
+    if (sub) sub.textContent = 'tap to add it';
+};
+
 RifleApp.prototype._fillChart = function (rifle, g) {
     var el = document.getElementById('rf-chart-rows');
     var sub = document.getElementById('rf-chart-sub');
-    if (!el || !g.load || !g.load.bulletBC || typeof computeTrajectory !== 'function') return;
+    var box = document.getElementById('rf-chart');
+    if (!el || !g.load || !g.load.bulletBC || typeof computeTrajectory !== 'function') { this._noChartYet(); return; }
     var status = g.status;
     var profile = {
         muzzleVelocity: g.load.truedMv || g.load.muzzleVelocity,
@@ -293,7 +313,8 @@ RifleApp.prototype._fillChart = function (rifle, g) {
         zeroRange: rifle.zeroRange || 100,
         scopeHeight: rifle.scopeHeight || 1.5
     };
-    if (!profile.muzzleVelocity) return;
+    if (!profile.muzzleVelocity) { this._noChartYet(); return; }
+    if (box) box.setAttribute('data-has-numbers', '1');
     var hot = status.rollup.calibratedToYd || 0;
     var rows = pickDropRows(hot);
     var out;
@@ -304,7 +325,7 @@ RifleApp.prototype._fillChart = function (rifle, g) {
             maxRange: rows[rows.length - 1] + 50, rangeStep: 10,
             windSpeedMph: 0, windClockPos: 12, tempF: 59, pressureInHg: 29.92, humidity: 50
         });
-    } catch (e) { return; }
+    } catch (e) { this._noChartYet(); return; }
     var table = (out && out.table) || [];
     function comeUpAt(yd) {
         var prev = null;
@@ -440,4 +461,23 @@ RifleApp.prototype._explainScanCertificate = function () {
     function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
     overlay.querySelector('#rf-scan-cert-close').addEventListener('click', close);
+};
+
+/** AUDIT-FINDINGS.md F1: the drop chart's "no numbers yet" tap target
+ *  — straight to the minimal ammo form, not a second screen that just
+ *  repeats the same coaching. Reuses NewAmmoForm exactly as the Add
+ *  flow's dead-end fixes already do. */
+RifleApp.prototype._openAmmoForm = function (rifle) {
+    var self = this;
+    if (typeof NewAmmoForm === 'undefined') return;
+    var container = this.container;
+    container.setAttribute('data-screen', 'v3-ammo');
+    container.innerHTML = '<div class="screen"><div class="pagehead">' +
+        '<button class="backline" id="raf-back">&lsaquo; ' + UI.esc(rifle.name || 'Home') + '</button></div>' +
+        '<h2 style="padding:0 var(--edge);font:var(--type-title)">Add your bullet &amp; box speed</h2>' +
+        '<p style="padding:0 var(--edge);color:var(--text-secondary);margin-bottom:14px">' +
+        'Once ' + UI.esc(rifle.name || 'this rifle') + ' has ammo on file, its drop chart shows up here.</p>' +
+        '<div class="edge" style="padding:0 var(--edge)">' + NewAmmoForm.html('raf') + '</div></div>';
+    document.getElementById('raf-back').addEventListener('click', function () { self.show(rifle.id); });
+    NewAmmoForm.bind('raf', this.db, rifle.id, function () { self.show(rifle.id); });
 };
