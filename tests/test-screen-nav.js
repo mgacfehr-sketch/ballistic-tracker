@@ -202,6 +202,22 @@ check('Rifle switcher overlay offers "Add a rifle" and "Scan certificate"', func
     if (region.indexOf('data-pick-add') === -1) throw new Error('no "+ Add a rifle" row in the switcher list');
     if (region.indexOf('data-pick-scan') === -1) throw new Error('no "Scan certificate" row in the switcher list');
 });
+check('Rifle switcher gets a search box past a rifle-count threshold (F4)', function () {
+    var source = readFile('js/rifle-app.js');
+    var region = extractRegion(source, 'RifleApp.prototype._openRifleList = function', 3500);
+    // AUDIT-FINDINGS.md F4: this overlay is the app's designated PRIMARY
+    // switcher — it already scrolled correctly at 50 rifles, but had no
+    // search, unlike profiles.js's own Rifles list (search past 8).
+    if (!/_rifles\.length > \d+/.test(region)) {
+        throw new Error('no rifle-count threshold gating a search input');
+    }
+    if (region.indexOf('id="rf-switcher-search"') === -1) {
+        throw new Error('no search <input> in the switcher overlay');
+    }
+    if (region.indexOf("addEventListener('input'") === -1) {
+        throw new Error('the search input has no filter handler wired up');
+    }
+});
 
 console.log('\nLoad pickers must never dead-end on a rifle with no ammo:');
 

@@ -411,14 +411,23 @@ RifleApp.prototype._openRifleList = function () {
     var self = this;
     var overlay = document.createElement('div');
     overlay.className = 'overlay';
+    // AUDIT-FINDINGS.md F4: this is the app's designated PRIMARY rifle
+    // switcher (device feedback: "the list is the primary switcher");
+    // a 50-rifle fleet is real, so it needs the same search-past-a-
+    // threshold pattern profiles.js's own Rifles list already uses.
+    var searchHtml = this._rifles.length > 8
+        ? '<div class="search">' + Icon('search', 18) +
+          '<input type="text" id="rf-switcher-search" placeholder="Search rifles&hellip;" aria-label="Search rifles"></div>'
+        : '';
     var rows = '';
     this._rifles.forEach(function (r, i) {
         rows += '<button class="option-row' + (i === self._cardIndex ? ' on' : '') + '" data-pick="' + i + '">' +
             '<span>' + UI.esc(r.name || 'Rifle') + (r.caliber ? '<span class="choice-desc">' + UI.esc(r.caliber) + '</span>' : '') + '</span></button>';
     });
-    rows += '<button class="option-row" data-pick-add="1"><span class="u-gold">＋ Add a rifle</span></button>';
-    rows += '<button class="option-row" data-pick-scan="1"><span>Scan certificate</span></button>';
-    overlay.innerHTML = '<div class="overlay-card"><div class="overlay-title">Which rifle?</div>' + rows + '</div>';
+    overlay.innerHTML = '<div class="overlay-card"><div class="overlay-title">Which rifle?</div>' +
+        searchHtml + '<div id="rf-switcher-rows">' + rows + '</div>' +
+        '<button class="option-row" data-pick-add="1"><span class="u-gold">＋ Add a rifle</span></button>' +
+        '<button class="option-row" data-pick-scan="1"><span>Scan certificate</span></button></div>';
     document.body.appendChild(overlay);
     function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
@@ -430,6 +439,17 @@ RifleApp.prototype._openRifleList = function () {
             if (typeof Recents !== 'undefined') Recents.touchRifle(r);
             close();
             self._renderRifle();
+        });
+    }
+    var search = document.getElementById('rf-switcher-search');
+    if (search) {
+        search.addEventListener('input', function () {
+            var q = this.value.toLowerCase();
+            var rifleRows = overlay.querySelectorAll('#rf-switcher-rows [data-pick]');
+            for (var r = 0; r < rifleRows.length; r++) {
+                var text = rifleRows[r].textContent.toLowerCase();
+                rifleRows[r].classList.toggle('hidden', q && text.indexOf(q) === -1);
+            }
         });
     }
     var addRow = overlay.querySelector('[data-pick-add]');
