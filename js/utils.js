@@ -3,6 +3,13 @@
  * No DOM access, no side effects beyond what's documented.
  */
 
+// Node test shim: SyncQueueCore is a real global in the browser (sync-queue.js
+// loads as a plain script); this mirrors truing-core.js's own require-shim
+// pattern so friendlyError() below is unit-testable without a DOM.
+if (typeof SyncQueueCore === 'undefined' && typeof require === 'function') {
+    var SyncQueueCore = require('./sync-queue.js').SyncQueueCore;
+}
+
 /**
  * Generate a UUID v4.
  * @returns {string}
@@ -133,6 +140,25 @@ function closeHelp() {
     if (overlay) overlay.classList.add('hidden');
 }
 
+// ── Error messages ────────────────────────────────────────────
+
+/**
+ * Every catch handler that shows `err.message` to the user was showing
+ * raw browser/JS-runtime text ("Failed to fetch", a bare TypeError) —
+ * not something a shooter would ever say, and not honest about WHY a
+ * save failed. Route all user-facing error text through this instead.
+ * Reuses SyncQueueCore.isNetworkError (already the single source of
+ * truth for "was this a dropped connection") rather than re-detecting
+ * network failures a second way.
+ */
+function friendlyError(err) {
+    var online = (typeof navigator === 'undefined') || navigator.onLine !== false;
+    if (typeof SyncQueueCore !== 'undefined' && SyncQueueCore && SyncQueueCore.isNetworkError(err, online)) {
+        return 'No signal right now — try again once you have a connection.';
+    }
+    return (err && err.message) ? err.message : 'Something went wrong — try again.';
+}
+
 /**
  * Draw a rounded rectangle path on a canvas context.
  * Used by canvas-manager (live overlay) and export (saved image overlay).
@@ -149,4 +175,9 @@ function _roundRect(ctx, x, y, w, h, r) {
     ctx.lineTo(x, y + r);
     ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
+}
+
+// Export for Node unit tests
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { friendlyError: friendlyError };
 }
