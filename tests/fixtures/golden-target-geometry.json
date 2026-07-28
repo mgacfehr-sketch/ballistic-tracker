@@ -1,0 +1,16 @@
+{
+  "_comment": "Gate 0 golden fixture for js/target-geometry.js. This engine is pure data — one exported constant object, no functions — so unlike the other protected engines the 'golden fixture' here is a full snapshot of the exported object itself, captured by actually running `require('../js/target-geometry.js')` (never hand-copied from source). This is THE calibration geometry law: js/aruco-calibration.js (the homography warp) and js/target-pdf.js (the printed artwork) both derive from this exact object at runtime via the shared TARGET_GEOMETRY global, so if any of these numbers drift, the printed target and the detector drift apart. tests/test-target-geometry.js already covers the geometric PROPERTIES (paper fit, staple-tear safety, marker placement relative to the aim field) — this fixture instead locks the literal exported VALUES so any accidental edit is caught even if it happens to preserve those properties.",
+  "expect": {
+    "GRID_INCHES": 6,
+    "MARKER_SIZE": 0.6,
+    "QUIET_ZONE": 0.22,
+    "MARKER_CENTERS": {
+      "TL": { "x": -0.5, "y": 1 },
+      "TR": { "x": 6.5, "y": 1 },
+      "BL": { "x": -0.5, "y": 5 },
+      "BR": { "x": 6.5, "y": 5 }
+    },
+    "SPAN_X": 7,
+    "SPAN_Y": 4
+  }
+}
