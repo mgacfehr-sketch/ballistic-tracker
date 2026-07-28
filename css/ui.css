@@ -1962,6 +1962,14 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 .v3-link.danger { color: var(--status-problem); }
 .v3-linkrow { text-align: center; }
+/* Contract v4.0 Law 4: "Finish what you started" — a draft that never
+   saved always has a way back in. */
+.v3-draft-banner {
+    display: block; width: calc(100% - 2 * var(--edge)); margin: 0 var(--edge) 10px;
+    min-height: var(--tap-min); padding: 10px 14px; text-align: left;
+    background: var(--brand-subtle); border: 1px solid var(--brand-gold); border-radius: var(--radius-md);
+    color: var(--brand-gold-strong); font: var(--type-body-strong); font-size: 14px;
+}
 
 /* big choices (Paper / Steel / Chronograph) */
 .v3-bigchoice { display: flex; flex-direction: column; gap: 14px; padding: 0 var(--edge); margin-top: 26px; }

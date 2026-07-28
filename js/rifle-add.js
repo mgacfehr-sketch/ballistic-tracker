@@ -43,6 +43,19 @@ var RifleAdd = (function () {
         return (typeof SyncQueue !== 'undefined' && SyncQueue) ? SyncQueue.write(fn, data) : db[fn](data);
     }
 
+    /* Contract v4.0 Law 4 — nothing typed is ever lost. Every fact card
+     * autosaves to FactDraft on every change; cleared only once the
+     * real save has gone through. */
+    function _draftLoad(kind, rifleId) {
+        return (typeof FactDraft !== 'undefined') ? FactDraft.load(kind, rifleId) : null;
+    }
+    function _draftSave(kind, rifleId, S) {
+        if (typeof FactDraft !== 'undefined') FactDraft.save(kind, rifleId, S);
+    }
+    function _draftClear(kind, rifleId) {
+        if (typeof FactDraft !== 'undefined') FactDraft.clear(kind, rifleId);
+    }
+
     /* ══ view 2: what did you shoot? ══════════════════════════ */
 
     function show(app, rifle) {
@@ -73,6 +86,12 @@ var RifleAdd = (function () {
         var container = app.container;
         container.setAttribute('data-screen', 'v3-zero');
         var S = { distanceYd: 100, groupIn: 1.0, shots: 5 };
+        var draft = _draftLoad('zero', rifle.id);
+        if (draft) {
+            if (typeof draft.distanceYd === 'number') S.distanceYd = draft.distanceYd;
+            if (typeof draft.groupIn === 'number') S.groupIn = draft.groupIn;
+            if (typeof draft.shots === 'number') S.shots = draft.shots;
+        }
 
         var html = '<div class="screen">';
         html += '<div class="pagehead"><button class="backline" id="rz-back">&lsaquo; Back</button>' +
@@ -108,6 +127,9 @@ var RifleAdd = (function () {
             else if (window.AppNav) AppNav.go('session');
         });
 
+        function saveDraft() { _draftSave('zero', rifle.id, S); }
+        saveDraft(); // restored (or default) state is itself worth persisting
+
         var distWrap = document.getElementById('rz-dist');
         distWrap.addEventListener('click', function (e) {
             var b = e.target.closest ? e.target.closest('[data-dist]') : null;
@@ -118,16 +140,17 @@ var RifleAdd = (function () {
             var v = b.getAttribute('data-dist');
             var custom = document.getElementById('rz-dist-custom');
             if (v === 'custom') { custom.classList.remove('hidden'); document.getElementById('rz-dist-input').focus(); }
-            else { custom.classList.add('hidden'); S.distanceYd = parseInt(v, 10); }
+            else { custom.classList.add('hidden'); S.distanceYd = parseInt(v, 10); saveDraft(); }
         });
         document.getElementById('rz-dist-input').addEventListener('change', function () {
             var v = parseInt(this.value, 10);
-            if (isFinite(v) && v >= 10 && v <= 1000) S.distanceYd = v;
+            if (isFinite(v) && v >= 10 && v <= 1000) { S.distanceYd = v; saveDraft(); }
         });
 
         _bindV3Stepper('rz-group', function (dir) {
             S.groupIn = Math.max(0.1, Math.round((S.groupIn + dir * 0.25) * 100) / 100);
             document.querySelector('#rz-group .val').innerHTML = S.groupIn.toFixed(2) + '&Prime;<small>center to center</small>';
+            saveDraft();
         });
 
         var shotsWrap = document.getElementById('rz-shots');
@@ -138,6 +161,7 @@ var RifleAdd = (function () {
             for (var i = 0; i < chips.length; i++) chips[i].classList.remove('on');
             b.classList.add('on');
             S.shots = parseInt(b.getAttribute('data-shots'), 10);
+            saveDraft();
         });
 
         document.getElementById('rz-done').addEventListener('click', function () {
@@ -156,6 +180,7 @@ var RifleAdd = (function () {
                     groupData: { groupSizeIn: S.groupIn, groupSizeMOA: groupSizeMOA },
                     lotNumber: load ? (load.lotNumber || null) : null, source: 'manual'
                 }).then(function () {
+                    _draftClear('zero', rifle.id);
                     if (typeof Readiness !== 'undefined') Readiness.invalidate(rifle.id);
                     app.show(rifle.id);
                 }).catch(function (err) {
@@ -174,6 +199,13 @@ var RifleAdd = (function () {
         var step = units === 'MIL' ? 0.1 : (units === 'IN' ? 0.25 : 0.25);
         var last = _last();
         var S = { distanceYd: last.distanceYd || 600, dialed: 0, hits: [0], mv: null };
+        var draft = _draftLoad('steel', rifle.id);
+        if (draft) {
+            if (typeof draft.distanceYd === 'number') S.distanceYd = draft.distanceYd;
+            if (typeof draft.dialed === 'number') S.dialed = draft.dialed;
+            if (Array.isArray(draft.hits) && draft.hits.length) S.hits = draft.hits;
+            if (typeof draft.mv === 'number') S.mv = draft.mv;
+        }
 
         Promise.all([
             app.db.getLoadsByRifle(rifle.id).catch(function () { return []; }),
@@ -225,14 +257,17 @@ var RifleAdd = (function () {
         html += '<div class="v3-linkrow" style="margin-top:10px">' +
             '<button class="v3-link" id="rs-mv-link">add bullet speed</button> &middot; ' +
             '<button class="v3-link" id="rs-advanced">advanced</button></div>';
-        html += '<div id="rs-mv-field" class="hidden edge" style="padding:0 var(--edge)"><div class="field">' +
+        html += '<div id="rs-mv-field" class="' + (S.mv ? '' : 'hidden') + ' edge" style="padding:0 var(--edge)"><div class="field">' +
             '<label for="rs-mv-input">Bullet speed (fps)</label>' +
-            '<input type="number" inputmode="numeric" id="rs-mv-input" placeholder="2950"></div></div>';
+            '<input type="number" inputmode="numeric" id="rs-mv-input" placeholder="2950" value="' + (S.mv || '') + '"></div></div>';
 
         html += '<div class="v3-spacer" style="height:20px"></div>';
         html += '<button class="v3-gold" id="rs-done">Done</button>';
         html += '<div style="height:16px"></div></div>';
         container.innerHTML = html;
+
+        function saveDraft() { _draftSave('steel', rifle.id, S); }
+        saveDraft(); // restored (or default) state is itself worth persisting
 
         document.getElementById('rs-back').addEventListener('click', function () { show(app, rifle); });
         document.getElementById('rs-advanced').addEventListener('click', function () {
@@ -242,6 +277,11 @@ var RifleAdd = (function () {
             var f = document.getElementById('rs-mv-field');
             f.classList.toggle('hidden');
             if (!f.classList.contains('hidden')) document.getElementById('rs-mv-input').focus();
+        });
+        document.getElementById('rs-mv-input').addEventListener('input', function () {
+            var mv = parseFloat(this.value);
+            S.mv = isFinite(mv) ? mv : null;
+            saveDraft();
         });
 
         // distance chips + custom
@@ -255,16 +295,17 @@ var RifleAdd = (function () {
             var v = b.getAttribute('data-dist');
             var custom = document.getElementById('rs-dist-custom');
             if (v === 'custom') { custom.classList.remove('hidden'); document.getElementById('rs-dist-input').focus(); }
-            else { custom.classList.add('hidden'); S.distanceYd = parseInt(v, 10); }
+            else { custom.classList.add('hidden'); S.distanceYd = parseInt(v, 10); saveDraft(); }
         });
         document.getElementById('rs-dist-input').addEventListener('change', function () {
             var v = parseInt(this.value, 10);
-            if (isFinite(v) && v >= 100 && v <= 3000) S.distanceYd = v;
+            if (isFinite(v) && v >= 100 && v <= 3000) { S.distanceYd = v; saveDraft(); }
         });
 
         _bindV3Stepper('rs-dial', function (dir) {
             S.dialed = Math.round((S.dialed + dir * step) * 100) / 100;
             document.querySelector('#rs-dial .val').innerHTML = _fmtDial(S.dialed, units) + '<small>' + units + ' up</small>';
+            saveDraft();
         });
         // Contract v4.0 3b: "add more shots" appends rows to THIS card —
         // one delegated handler so re-painting the rows never re-binds
@@ -278,18 +319,21 @@ var RifleAdd = (function () {
                 var idx = parseInt(parts[0], 10), dir = parseInt(parts[1], 10);
                 S.hits[idx] = (S.hits[idx] || 0) + dir;
                 repaintHits();
+                saveDraft();
                 return;
             }
             var rmBtn = e.target.closest ? e.target.closest('[data-remove-hit]') : null;
             if (rmBtn) {
                 S.hits.splice(parseInt(rmBtn.getAttribute('data-remove-hit'), 10), 1);
                 repaintHits();
+                saveDraft();
                 return;
             }
             var addBtn = e.target.closest ? e.target.closest('#rs-add-shot') : null;
             if (addBtn) {
                 S.hits.push(0);
                 repaintHits();
+                saveDraft();
             }
         });
 
@@ -355,6 +399,7 @@ var RifleAdd = (function () {
                 heldElev: 0, heldWind: 0, mvFps: S.mv, mvSource: S.mv ? 'manual' : null
             });
         }).then(function () {
+            _draftClear('steel', rifle.id); // the shot is saved either way (§3.4)
             if (ctx.load.bulletBC && (ctx.load.muzzleVelocity || ctx.load.truedMv)) {
                 if (typeof RiflePayoff !== 'undefined') {
                     RiflePayoff.run(app, rifle, ctx.load, {
@@ -396,6 +441,7 @@ var RifleAdd = (function () {
                 });
             }));
         }).then(function () {
+            _draftClear('steel', rifle.id); // the string is saved either way (§3.4)
             if (ctx.load.bulletBC && (ctx.load.muzzleVelocity || ctx.load.truedMv)) {
                 if (typeof RiflePayoff !== 'undefined' && RiflePayoff.runMulti) {
                     RiflePayoff.runMulti(app, rifle, ctx.load, {
@@ -459,6 +505,11 @@ var RifleAdd = (function () {
         var container = app.container;
         container.setAttribute('data-screen', 'v3-chrono');
         var S = { value: 2850, count: 10 };
+        var draft = _draftLoad('chrono', rifle.id);
+        if (draft) {
+            if (typeof draft.value === 'number') S.value = draft.value;
+            if (typeof draft.count === 'number' || draft.count === null) S.count = draft.count;
+        }
         var COUNTS = [1, 5, 10];
 
         var html = '<div class="screen">';
@@ -476,6 +527,9 @@ var RifleAdd = (function () {
         html += '<div style="height:16px"></div></div>';
         container.innerHTML = html;
 
+        function saveDraft() { _draftSave('chrono', rifle.id, S); }
+        saveDraft(); // restored (or default) state is itself worth persisting
+
         document.getElementById('rc-back').addEventListener('click', function () { show(app, rifle); });
         document.getElementById('rc-import').addEventListener('click', function () {
             if (window.AppNav) AppNav.go('chrono');
@@ -483,6 +537,7 @@ var RifleAdd = (function () {
         _bindV3Stepper('rc-speed', function (dir) {
             S.value = Math.max(500, Math.min(5000, S.value + dir * 10));
             document.querySelector('#rc-speed .val').innerHTML = S.value + '<small>feet per second</small>';
+            saveDraft();
         });
         var countWrap = document.getElementById('rc-count');
         countWrap.addEventListener('click', function (e) {
@@ -493,6 +548,7 @@ var RifleAdd = (function () {
             b.classList.add('on');
             var v = b.getAttribute('data-count');
             S.count = v === 'guess' ? null : parseInt(v, 10);
+            saveDraft();
         });
 
         document.getElementById('rc-save').addEventListener('click', function () {
@@ -522,8 +578,10 @@ var RifleAdd = (function () {
     function _finishChronoSave(app, rifle, S, load, btn) {
         if (S.count === null) {
             load.muzzleVelocity = Math.round(S.value);
-            app.db.updateLoad(load).then(function () { app.show(rifle.id); })
-                .catch(function (err) {
+            app.db.updateLoad(load).then(function () {
+                _draftClear('chrono', rifle.id);
+                app.show(rifle.id);
+            }).catch(function (err) {
                     if (btn) btn.disabled = false;
                     alert('Could not save: ' + err.message);
                 });
@@ -534,6 +592,7 @@ var RifleAdd = (function () {
             value: Math.round(S.value), shotCount: S.count,
             lotNumber: load ? (load.lotNumber || null) : null, source: 'manual'
         }).then(function () {
+            _draftClear('chrono', rifle.id);
             if (typeof Readiness !== 'undefined') Readiness.invalidate(rifle.id);
             app.show(rifle.id);
         }).catch(function (err) {

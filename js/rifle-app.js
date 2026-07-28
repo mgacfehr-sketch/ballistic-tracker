@@ -118,6 +118,13 @@ RifleApp.prototype._renderRifle = function () {
     html += '<div class="v3-chart tap" id="rf-chart"><div class="cttl"><span>DROP CHART</span>' +
         '<small id="rf-chart-sub">tap for full &rsaquo;</small></div><div id="rf-chart-rows">' +
         '<div class="v3-crow"><span class="d">&nbsp;</span><span class="v">&hellip;</span></div></div></div>';
+    // Contract v4.0 Law 4: a draft that never got saved — a crash, a
+    // dropped connection, a "not now" — always gets a way back in.
+    var draft = (typeof FactDraft !== 'undefined') ? FactDraft.findAny(rifle.id) : null;
+    if (draft) {
+        html += '<button class="v3-draft-banner" id="rf-draft">Finish what you started — ' +
+            UI.esc(draft.label) + ' &rsaquo;</button>';
+    }
     html += '<button class="v3-gold" id="rf-add">＋&nbsp;&nbsp;Add what you shot</button>';
     html += '<div class="v3-feed"><div class="fttl">WHAT\'S HAPPENED</div><div id="rf-feed-rows">' +
         '<div class="v3-fitem-empty">Loading&hellip;</div></div></div>';
@@ -133,6 +140,16 @@ RifleApp.prototype._renderRifle = function () {
     var addBtn = document.getElementById('rf-add');
     if (addBtn) addBtn.addEventListener('click', function () {
         if (window.RifleAdd) RifleAdd.show(self, rifle);
+    });
+    var draftBtn = document.getElementById('rf-draft');
+    if (draftBtn) draftBtn.addEventListener('click', function () {
+        if (!window.RifleAdd) return;
+        var d = FactDraft.findAny(rifle.id);
+        var kind = d ? d.kind : null;
+        if (kind === 'zero' && RifleAdd.showZero) RifleAdd.showZero(self, rifle);
+        else if (kind === 'steel' && RifleAdd.showSteel) RifleAdd.showSteel(self, rifle);
+        else if (kind === 'chrono' && RifleAdd.showChrono) RifleAdd.showChrono(self, rifle);
+        else RifleAdd.show(self, rifle);
     });
     var numBtn = document.getElementById('rf-number');
     if (numBtn) numBtn.addEventListener('click', function () {
