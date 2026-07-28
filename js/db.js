@@ -2,7 +2,7 @@
  * db.js — BallisticDB: Supabase wrapper owning ALL database access.
  *
  * Promise-based CRUD for: Rifle, Barrel, Load, Session, ZeroRecord,
- * ScopeAdjustment, CleaningLog, DopeEntry, ColdBoreShot, VelocityString,
+ * ScopeAdjustment, CleaningLog, ColdBoreShot, VelocityString,
  * AI Conversations/Usage — plus Storage (session images) and admin RPCs.
  *
  * UI modules never touch the Supabase client directly; this file owns
@@ -181,9 +181,6 @@ BallisticDB.prototype.deleteRifle = function (id) {
             self.supabase.from('zero_records').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('scope_adjustments').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('cleaning_logs').delete().eq('rifle_id', id).eq('user_id', self.userId),
-            // v2.4 §4.3: no dope_entries table exists in the live DB (its
-            // migration line was removed at owner review) — deleting from
-            // it here made EVERY rifle deletion throw 42P01.
             self.supabase.from('cold_bore_shots').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('velocity_strings').delete().eq('rifle_id', id).eq('user_id', self.userId),
             self.supabase.from('field_shots').delete().eq('rifle_id', id).eq('user_id', self.userId)
@@ -720,50 +717,6 @@ BallisticDB.prototype.getCleaningLogsByBarrel = function (barrelId) {
 BallisticDB.prototype.deleteCleaningLog = function (id) {
     var self = this;
     return self.supabase.from('cleaning_logs').delete()
-        .eq('id', id).eq('user_id', self.userId)
-        .then(function (res) {
-            if (res.error) throw res.error;
-        });
-};
-
-// ── Dope Entry CRUD ───────────────────────────────────────────
-
-BallisticDB.prototype.addDopeEntry = function (data) {
-    var self = this;
-    var entry = {
-        id: generateUUID(),
-        rifleId: data.rifleId,
-        loadId: data.loadId || null,
-        distanceYards: data.distanceYards || 0,
-        elevationMOA: data.elevationMOA || 0,
-        windageMOA: data.windageMOA || 0,
-        result: data.result || 'hit',
-        notes: data.notes || '',
-        date: data.date || new Date().toISOString(),
-        createdAt: new Date().toISOString()
-    };
-    var row = _jsToRow(entry, self.userId);
-    return self.supabase.from('dope_entries').insert(row).select().single()
-        .then(function (res) {
-            if (res.error) throw res.error;
-            return _rowToJs(res.data);
-        });
-};
-
-BallisticDB.prototype.getDopeEntries = function (rifleId) {
-    var self = this;
-    return self.supabase.from('dope_entries').select()
-        .eq('user_id', self.userId).eq('rifle_id', rifleId)
-        .order('created_at', { ascending: false })
-        .then(function (res) {
-            if (res.error) throw res.error;
-            return (res.data || []).map(_rowToJs);
-        });
-};
-
-BallisticDB.prototype.deleteDopeEntry = function (id) {
-    var self = this;
-    return self.supabase.from('dope_entries').delete()
         .eq('id', id).eq('user_id', self.userId)
         .then(function (res) {
             if (res.error) throw res.error;
