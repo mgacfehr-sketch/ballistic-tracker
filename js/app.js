@@ -44,21 +44,9 @@
                 initBetaFeatures(user.id);
             }
 
-            // Admin lives as a header utility button, never a nav tab —
-            // no feature ever adds a tab. It keeps the .nav-tab class so
-            // the shared view-switch binding drives it.
-            var utility = document.querySelector('#app-header .header-utility');
-
-            if (user.id === ADMIN_USER_ID && utility &&
-                !utility.querySelector('[data-view="admin"]')) {
-                var adminBtn = document.createElement('button');
-                adminBtn.className = 'nav-tab util-btn';
-                adminBtn.setAttribute('data-view', 'admin');
-                adminBtn.setAttribute('title', 'Admin');
-                adminBtn.setAttribute('aria-label', 'Admin');
-                adminBtn.innerHTML = Icon('sliders');
-                utility.insertBefore(adminBtn, utility.firstChild);
-            }
+            // Contract v4.0: admin is a URL-only page (#admin), never a
+            // header icon or any control in the app's chrome — see
+            // initApp below, which checks window.location.hash.
 
             // Wind Call lives inside the Shoot category — never a header
             // control or tab.
@@ -383,6 +371,12 @@
             if (user && user.id === ADMIN_USER_ID) {
                 adminManager = new AdminManager(db);
                 adminManager.init();
+                // URL-only (Contract v4.0): reachable at #admin, nothing
+                // in the chrome points at it. switchView('admin') calls
+                // adminManager.show() itself.
+                if (window.location.hash === '#admin') {
+                    switchView('admin');
+                }
             }
 
             // Beta: Wind Call Helper
