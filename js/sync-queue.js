@@ -86,6 +86,63 @@ var SyncQueueCore = {
     },
 
     /**
+     * Amendment 1 A16: "auth-expiry capture behavior: offline capture
+     * continues bound to the signed-in account, quarantined until safe
+     * upload." A stale/expired Supabase session while nominally online
+     * (token expired overnight, refresh failed) must NOT be treated as
+     * a server rejection (a permanent bug in the data) — it queues and
+     * waits for re-auth, same as a connectivity drop.
+     */
+    isAuthError: function (err) {
+        if (!err) return false;
+        if (typeof err.status === 'number' && (err.status === 401 || err.status === 403)) return true;
+        var msg = String(err.message || err).toLowerCase();
+        return /jwt|refresh_token|invalid token|not authenticated|unauthorized|session expired|expired token/.test(msg);
+    },
+
+    /**
+     * Amendment 1 A16 / Phase A: "detects quota/write failure BEFORE
+     * acknowledging a save." Distinguishes an IndexedDB quota failure
+     * from an ordinary write error so the UI can say something honest
+     * ("local storage is full") instead of a generic failure — and so
+     * a quota error is never silently retried into the same wall.
+     */
+    isQuotaError: function (err) {
+        if (!err) return false;
+        if (err.name === 'QuotaExceededError') return true;
+        var msg = String(err.message || err).toLowerCase();
+        return /quota/.test(msg);
+    },
+
+    /**
+     * Amendment 1 A16: a queued op captured under one account must
+     * never flush under a DIFFERENT account that is now signed in on
+     * the same device — it stays quarantined (pending, untouched)
+     * until the capturing account is signed in again.
+     */
+    isQuarantined: function (op, currentUserId) {
+        return !!(op && op.capturedUserId && currentUserId && op.capturedUserId !== currentUserId);
+    },
+
+    /**
+     * {pending, errored, quarantined} scoped to the CURRENT account.
+     * Unlike opsSummary (table-agnostic raw counts, kept for existing
+     * callers), this separates "waiting to sync" from "waiting for the
+     * capturing account to sign back in on this device."
+     */
+    queueSummary: function (ops, currentUserId) {
+        var pending = 0, errored = 0, quarantined = 0;
+        (ops || []).forEach(function (o) {
+            if (!o) return;
+            if (o.status === 'error') { errored++; return; }
+            if (o.status !== 'pending') return;
+            if (SyncQueueCore.isQuarantined(o, currentUserId)) quarantined++;
+            else pending++;
+        });
+        return { pending: pending, errored: errored, quarantined: quarantined };
+    },
+
+    /**
      * Merge server rows with queued-local rows for one table.
      * Queued rows WIN on id collision (client is source of truth) and
      * are flagged _pending. Pending rows sort to the front (newest
@@ -218,16 +275,30 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
 
     function _notify() {
         _getAllOps().then(function (ops) {
-            var pending = ops.filter(function (o) { return o.status === 'pending'; }).length;
-            var errored = ops.filter(function (o) { return o.status === 'error'; }).length;
+            var s = SyncQueueCore.queueSummary(ops, _db && _db.userId);
             _listeners.forEach(function (fn) {
-                try { fn({ pending: pending, errored: errored }); } catch (e) { /* listener */ }
+                try { fn(s); } catch (e) { /* listener */ }
             });
         }).catch(function () { /* quiet */ });
     }
 
     function _online() {
         return typeof navigator === 'undefined' || navigator.onLine !== false;
+    }
+
+    /**
+     * Amendment 1 A16 / Phase A durability floor: ask the browser not
+     * to silently evict this origin's storage under disk pressure.
+     * Best-effort only — persist() commonly requires an installed PWA
+     * or engagement heuristics the browser controls, not this app; a
+     * denial is not an error and must never block init.
+     */
+    function _requestPersistentStorage() {
+        try {
+            if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist().catch(function () { /* best effort */ });
+            }
+        } catch (e) { /* best effort — never blocks init */ }
     }
 
     function _enqueue(fnName, table, row) {
@@ -238,6 +309,11 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                 fnName: fnName,
                 op: 'upsert',
                 row: row,
+                // A16: bind this op to whoever was signed in when it was
+                // CAPTURED, not whoever happens to be signed in at flush
+                // time — a device shared across accounts must never
+                // attribute one user's shot to another's rifle.
+                capturedUserId: (_db && _db.userId) || null,
                 queuedAt: new Date().toISOString(),
                 attempts: 0,
                 lastError: null,
@@ -281,10 +357,12 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
             flush();
             return saved;
         }).catch(function (err) {
-            if (SyncQueueCore.isNetworkError(err, _online())) {
+            // A16: connectivity drop OR a stale/expired session both
+            // queue and wait — neither is a bug in the data.
+            if (SyncQueueCore.isNetworkError(err, _online()) || SyncQueueCore.isAuthError(err)) {
                 return _enqueue(fnName, table, row);
             }
-            throw err; // real server rejection — the caller must see it
+            throw err; // real server rejection (or quota) — the caller must see it
         });
     }
 
@@ -356,6 +434,12 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
             function step(i) {
                 if (i >= queue.length) return Promise.resolve();
                 var op = queue[i];
+                // A16: never flush an op captured under a different
+                // account than the one currently signed in — leave it
+                // pending and untouched until the right account returns.
+                if (SyncQueueCore.isQuarantined(op, _db.userId)) {
+                    return step(i + 1);
+                }
                 return _db.flushQueuedRow(op.table, op.row).then(function () {
                     flushed++;
                     return _tx('ops', 'readwrite', function (store) { store.delete(op.seq); })
@@ -379,8 +463,11 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                         })
                         .then(function () { return step(i + 1); });
                 }).catch(function (err) {
-                    if (SyncQueueCore.isNetworkError(err, _online())) {
-                        // connectivity dropped mid-flush — stop, keep FIFO order
+                    if (SyncQueueCore.isNetworkError(err, _online()) || SyncQueueCore.isAuthError(err)) {
+                        // connectivity dropped, or the session went stale,
+                        // mid-flush — stop, keep FIFO order. An auth error
+                        // never counts toward MAX_ATTEMPTS: the fix is
+                        // signing back in, not giving up on the row.
                         return null;
                     }
                     // server rejection: count it, park after MAX_ATTEMPTS
@@ -445,6 +532,7 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
 
     function init(db) {
         _db = db;
+        _requestPersistentStorage();
         return _open().then(function (idb) {
             _idb = idb;
             _wrapReads(db);
@@ -472,10 +560,14 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
         });
     }
 
-    /** {pending, errored} for the visible sync state (§3.2). */
+    /** {pending, errored, quarantined} for the visible sync state (§3.2).
+     *  quarantined = captured under a different account than the one
+     *  currently signed in on this device (A16) — never counted toward
+     *  pending, since it will not flush until that account returns. */
     function summary() {
-        return _getAllOps().then(SyncQueueCore.opsSummary)
-            .catch(function () { return { pending: 0, errored: 0 }; });
+        return _getAllOps().then(function (ops) {
+            return SyncQueueCore.queueSummary(ops, _db && _db.userId);
+        }).catch(function () { return { pending: 0, errored: 0, quarantined: 0 }; });
     }
 
     /** Reset parked error ops and flush again — the user's Retry. */
@@ -506,10 +598,11 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
         if (!el) return Promise.resolve();
         return summary().then(function (s) {
             if (!el.isConnected) return;
-            if (!s.pending && !s.errored) { el.innerHTML = ''; return; }
+            if (!s.pending && !s.errored && !s.quarantined) { el.innerHTML = ''; return; }
             var bits = [];
             if (s.pending) bits.push(s.pending + ' save' + (s.pending === 1 ? '' : 's') + ' waiting to sync');
             if (s.errored) bits.push(s.errored + ' failed');
+            if (s.quarantined) bits.push(s.quarantined + ' from another account on this device — sign back in as them to sync');
             el.innerHTML = UI.banner('caution',
                 '<span class="t-label" style="line-height:1.5">' + UI.esc(bits.join(' · ')) +
                 '</span> <button class="btn-utility" id="sync-now-btn" style="padding:4px 14px;margin-left:8px">Sync now</button>',

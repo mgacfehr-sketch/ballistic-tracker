@@ -183,9 +183,32 @@
         });
 
         // ── Logout ────────────────────────────────────────────
+        // Constitution §53 / Amendment 1 A16: logout with unsynced work
+        // must warn and never silently discard. The queue itself is
+        // untouched by sign-out (IndexedDB is not tied to the Supabase
+        // session), but the shooter needs to KNOW work is still local-
+        // only before they walk away or another account signs in here.
+        function _confirmLogout() {
+            if (typeof SyncQueue === 'undefined' || !SyncQueue) return Promise.resolve(true);
+            return SyncQueue.summary().then(function (s) {
+                var waiting = (s.pending || 0) + (s.errored || 0) + (s.quarantined || 0);
+                if (!waiting) return true;
+                return window.confirm(
+                    waiting + ' save' + (waiting === 1 ? '' : 's') + ' on this device ' +
+                    (waiting === 1 ? 'has' : 'have') + ' not synced yet. ' +
+                    'They will stay on this device and sync next time you sign back in as ' +
+                    'yourself with a connection — but signing in as someone else on this ' +
+                    'device before that happens is not safe.\n\nLog out anyway?'
+                );
+            }).catch(function () { return true; }); // never block logout on a status-check failure
+        }
+
         btnLogout.addEventListener('click', function () {
-            client.auth.signOut().then(function () {
-                window.location.reload();
+            _confirmLogout().then(function (ok) {
+                if (!ok) return;
+                client.auth.signOut().then(function () {
+                    window.location.reload();
+                });
             });
         });
     });
