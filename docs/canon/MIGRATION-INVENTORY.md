@@ -39,6 +39,17 @@ needs to know: **the backfill script cannot trust the repo's SQL files
 as a complete schema reference for these seven tables** — it needs an
 actual `information_schema` dump from the live database first.
 
+**This is not hypothetical — it already happened once, mid-Gate-0.**
+SIMPLE-migrations.sql (five `sessions` snapshot columns) existed in the
+repo and was believed applied, but a live check found it had never
+actually landed on production, most likely run against the wrong
+Supabase project at some point. See the `sessions` entry in Section 1
+for the full finding and its Phase B backfill implication. A partial
+live schema check (five columns on `sessions`) is done; a full
+`information_schema` dump across all seven tables was attempted twice
+but the pasted results didn't come through — still open, see the owner-
+review queue.
+
 **Second finding, already named by `docs/canon/PROVEN-Constitutional-Review.md`
 and not re-litigated here:** `sessions` is the aggregate root today, and
 it is session-shaped, not fact-shaped. Every one of the seven
@@ -121,9 +132,43 @@ storage refs, timestamps). Additive columns on record:
 - `rifle_name`, `rifle_caliber`, `load_name`, `load_bullet_name`,
   `load_bullet_weight` (SIMPLE-migrations.sql — snapshot columns
   restoring CLAUDE.md rule 7, "store snapshots not references," after
-  they were silently dropped by an old whitelist bug)
+  they were silently dropped by an old whitelist bug) — **see the
+  landing-gap finding immediately below**
 - `session_type`, `ladder` jsonb (WAVES M6 — ladder test sessions ride
   the same table via a type discriminator rather than a separate table)
+
+**RESOLVED FINDING 2026-07-28 — the SIMPLE migration had never actually
+landed on production, despite existing in the repo.** A targeted
+`information_schema.columns` check (owner-run, read-only) against
+`sessions` for the five SIMPLE-migrations.sql columns returned zero
+rows — the columns did not exist. Given the admin-RPC hardening
+(CROWD-DATA-migrations.sql, a *later* migration) was confirmed applied,
+the most likely explanation is SIMPLE-migrations.sql was originally run
+against the wrong Supabase project. The owner ran it against production
+in this session; a follow-up check confirmed all five columns now exist
+with the correct types (`text` ×4, `numeric` ×1).
+
+**Backfill implication for Phase B (recorded now so it isn't
+rediscovered later):** every `sessions` row written between whenever
+this gap began and 2026-07-28 has these five fields `NULL` — not
+because the data was unknown at capture time, but because `js/db.js`'s
+documented graceful-degradation fallback (SIMPLE-migrations.sql's own
+header comment: "js/db.js now degrades gracefully — strips these
+fields and retries — until this migration runs") silently stripped
+them before every INSERT for the entire gap period. This is a known,
+benign, fully-explained absence with a real cause, not a data-integrity
+mystery. Per Amendment 1 Part B's backfill principle — "BACKFILL script
+maps legacy records to events with explicit 'legacy/unknown'
+provenance (**never invented facts**)" — Phase B's backfill **must
+not** attempt to reconstruct these fields for gap-period sessions by
+looking up the session's `rifle_id`/`load_id` against *current* rifle/
+load records. Doing so would fabricate a value the session never
+actually captured (today's rifle name is not evidence of what it was
+named when a 2026-03 session fired) and would violate both "store
+snapshots not references" (CLAUDE.md rule 7) and the never-invent-facts
+rule simultaneously. The correct treatment: `NULL` on a gap-period
+session is itself the honest fact; encode it as such (`legacy/unknown`
+provenance), do not fill it in.
 
 **Provenance gap:** `sessions.weather` is documented (REORG R2 comment)
 to carry a `source` field (`'measured'|'manual'|'lookup'|'default'`)

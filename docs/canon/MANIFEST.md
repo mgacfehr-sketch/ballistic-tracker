@@ -50,7 +50,7 @@ not because they carry doctrinal authority.
 
 | Document | File | Role | SHA-256 |
 |---|---|---|---|
-| Migration Inventory | `MIGRATION-INVENTORY.md` | Gate 0's read-only schema/provenance analysis (Amendment 1 Part B). Row counts TBD — no live DB access this session. | `10cf0aea937beb080d93a77e12c0f398275690405c24fd826132c9eed4e04e3e` |
+| Migration Inventory | `MIGRATION-INVENTORY.md` | Gate 0's read-only schema/provenance analysis (Amendment 1 Part B). Row counts TBD — no live DB access this session. | `604bde06874f131b969ceabe3788b86dd7f55372fb48ae683e4ea6694c8f232b` |
 
 The `interface-contracts/` subdirectory (one file per protected engine,
 Gate 0) is intentionally NOT enumerated here — `test-canon-manifest.js`

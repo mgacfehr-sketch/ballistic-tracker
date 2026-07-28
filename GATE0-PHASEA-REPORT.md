@@ -152,14 +152,33 @@ it.
    `docs/canon/MIGRATION-INVENTORY.md` §5 for the full finding. No
    further action.
 
-2. **Seven base tables predate schema-as-code** (`rifles`, `barrels`,
-   `loads`, `sessions`, `zero_records`, `scope_adjustments`,
+2. **IN PROGRESS — Seven base tables predate schema-as-code** (`rifles`,
+   `barrels`, `loads`, `sessions`, `zero_records`, `scope_adjustments`,
    `cleaning_logs`) — no `CREATE TABLE` exists anywhere in the repo's
-   SQL files for them, only layered `ALTER TABLE` additions. Their
-   complete column set isn't reconstructable from the repo. **Action:**
-   before Phase B's backfill script is written, pull an
-   `information_schema` dump from the live database rather than
-   trusting this repo as a complete schema reference for those seven.
+   SQL files for them, only layered `ALTER TABLE` additions. A full
+   `information_schema` dump across all seven was requested twice; the
+   pasted results didn't come through either time. **Still open —
+   re-send the dump from the query already provided (see
+   `docs/canon/MIGRATION-INVENTORY.md` for the query and current
+   state) whenever convenient.**
+
+   **Concrete finding along the way, already resolved and folded into
+   the inventory:** a targeted check confirmed SIMPLE-migrations.sql
+   (five `sessions` snapshot columns: `rifle_name`, `rifle_caliber`,
+   `load_name`, `load_bullet_name`, `load_bullet_weight`) had never
+   actually landed on production — despite existing in the repo and
+   being believed applied — most likely run against the wrong Supabase
+   project originally. Applied to production 2026-07-28; verified
+   present with correct types. **Phase B backfill implication:** every
+   `sessions` row written during the gap has these five fields `NULL`
+   because `js/db.js`'s documented fallback silently stripped them
+   before insert until the columns existed — a known, benign, fully
+   explained absence. Per Amendment 1 Part B's own backfill principle
+   ("never invented facts"), the backfill **must not** reconstruct
+   these fields from current `rifle_id`/`load_id` lookups — a session's
+   rifle name as of today is not evidence of what it was named when an
+   old session fired. Gap-period `NULL`s get `legacy/unknown`
+   provenance and stay `NULL`, full stop.
 
 3. **`zero_records` (legacy) vs `zero_events` (new, provenance-aware)**
    — two zero-truth paths with no documented reconciliation.
