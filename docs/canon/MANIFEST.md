@@ -40,6 +40,25 @@ invention — implementation stops and a written amendment is proposed.
 |---|---|---|---|
 | Constitutional Review of the Existing Implementation | `PROVEN-Constitutional-Review.md` | Historical context mapping the pre-rebuild codebase to the Constitution. Superseded as a roadmap by Amendment 1 Part B. Does not govern; kept for the reasoning trail behind Amendment 1. | `a51cb3b0c34bfd13519f60549bd965a52cbf9bc43459ac7b541bc144081e2416` |
 
+## Gate 0 artifacts (non-canon, non-governing)
+
+Not "the canon" — these are read-only analysis outputs Amendment 1
+Part B directs to live in `docs/canon/` anyway. Listed here (with a
+hash, like everything else) purely so `test-canon-manifest.js`'s
+directory-completeness check has nowhere to hide an untracked file —
+not because they carry doctrinal authority.
+
+| Document | File | Role | SHA-256 |
+|---|---|---|---|
+| Migration Inventory | `MIGRATION-INVENTORY.md` | Gate 0's read-only schema/provenance analysis (Amendment 1 Part B). Row counts TBD — no live DB access this session. | `d2f77ee7239239b3c7c08467a3e5357133697682043c243d2350126eb0b4f6ad` |
+
+The `interface-contracts/` subdirectory (one file per protected engine,
+Gate 0) is intentionally NOT enumerated here — `test-canon-manifest.js`
+only scans `docs/canon/`'s direct children, and interface contracts are
+already pinned by their own golden-fixture/hash-lock tests
+(`tests/test-protected-engine-hashes.js` plus each engine's
+`tests/test-golden-*.js`), not by this manifest.
+
 ## Housekeeping note
 
 `PROVEN-Product-Definition (1).md` carries a `(1)` suffix from its
