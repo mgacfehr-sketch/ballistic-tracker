@@ -180,13 +180,20 @@ it.
    old session fired. Gap-period `NULL`s get `legacy/unknown`
    provenance and stay `NULL`, full stop.
 
-3. **`zero_records` (legacy) vs `zero_events` (new, provenance-aware)**
-   — two zero-truth paths with no documented reconciliation.
-   `calibration-status.js` (the PROVEN TO engine) only reads
-   `zero_events` + the live verdict; any surviving write path to
-   `zero_records` would be invisible to the rollup entirely. **Action:**
-   confirm nothing still writes `zero_records` in production, or
-   understand why it's dead if so.
+3. ~~**`zero_records` (legacy) vs `zero_events` (new, provenance-aware)**~~
+   **CLOSED 2026-07-28.** Source audit: `addZeroRecord` has zero
+   callers anywhere in the codebase — every live zero-confirmation flow
+   calls `addZeroEvent` instead. Live check: `zero_records` has 0 rows,
+   always has. Dead code AND an empty table; not a live duplicate-truth
+   risk. Phase B's backfill needs no `zero_records` handling. See
+   `docs/canon/MIGRATION-INVENTORY.md` §1 for the full finding.
+   **Follow-up flagged (not urgent, not a queue item):**
+   `js/ai-assistant.js`'s `getZeroRecordsByRifle` call feeds "Ask
+   yorT" chat context from this same table — harmless while Ask yorT
+   is dormant/out-of-v1-scope, but worth removing or repointing to
+   `zero_events` before that feature ever ships, so a future
+   implementer doesn't wire live AI context to a table nothing writes
+   to. Added to the Ask yorT backlog, not tracked further here.
 
 4. **`dope_entries` referenced in `js/db.js` but doesn't exist live**
    (its migration was removed at owner review). Currently dormant

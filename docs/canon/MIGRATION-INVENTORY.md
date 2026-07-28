@@ -181,15 +181,35 @@ for `measured_velocity`, `impacts`, or `results` — a session's shot data
 carries no marker for photo-measured vs. manually entered vs. imported.
 
 ### `zero_records` (legacy)
-Undocumented core (inferred: `id`, `user_id`, `rifle_id`, fields
-paralleling a zero confirmation). **This table is a duplicate zero-truth
-path alongside the new `zero_events` (Section 2).** REORG R4's own
-comment confirms the split: *"zero_records (legacy) remains untouched;
-zero_events is the new append-only feed."* Two tables can now describe
-"this rifle's zero" with no documented reconciliation rule between them
-— `calibration-status.js` reads only from `zeroEvents` +
-`zeroVerdict`, so `zero_records` rows written by any surviving legacy
-write path would be invisible to the PROVEN TO rollup entirely.
+Undocumented core (inferred from `js/db.js`'s `addZeroRecord`: `id`,
+`user_id`, `rifle_id`, `load_id`, `session_id`, `date`, `range_yards`,
+`weather`, `config`, `notes`).
+
+**RESOLVED 2026-07-28 — dead code AND empty, confirmed two ways.**
+Originally flagged as a duplicate zero-truth path alongside the new
+`zero_events` (REORG R4's own comment: *"zero_records (legacy) remains
+untouched; zero_events is the new append-only feed"*), with the
+concern that `calibration-status.js` — which reads only `zeroEvents` +
+the live verdict — would never see rows written through a surviving
+legacy path.
+
+A source audit found `addZeroRecord` (the only insert path) has **zero
+callers anywhere in the codebase.** Every live zero-confirmation flow
+(`rifle-add.js`, `session-flow.js`, `transfer.js`) calls `addZeroEvent`.
+`zero_records` is touched in exactly three other places, all reads or
+cleanup: `js/admin.js` (a dashboard row-count stat), `js/ai-assistant.js`
+(`getZeroRecordsByRifle`, feeding dormant "Ask yorT" chat context —
+out of v1 scope per Product Definition §10; **flagged for the Ask yorT
+backlog** so a future implementer doesn't wire a frozen legacy table
+into live AI context without noticing), and `js/db.js`'s
+`deleteRifle` cascade (delete-only, no new rows).
+
+A live timing query then confirmed the table isn't just write-dead
+going forward — **it has zero rows and always has**: `zero_records`
+count = 0; `zero_events` has 2 rows (2026-07-25–26), no possible
+overlap. **Phase B implication: the backfill needs no `zero_records`
+handling at all** — there is nothing in it to migrate, merge, or
+reconcile against `zero_events`.
 
 ### `scope_adjustments`
 Undocumented core (inferred: `id`, `user_id`, `rifle_id`, `date`, and
