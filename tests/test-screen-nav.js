@@ -202,14 +202,13 @@ check('Rifle switcher overlay offers "Add a rifle" and "Scan certificate"', func
     if (region.indexOf('data-pick-add') === -1) throw new Error('no "+ Add a rifle" row in the switcher list');
     if (region.indexOf('data-pick-scan') === -1) throw new Error('no "Scan certificate" row in the switcher list');
 });
-check('Rifle switcher gets a search box past a rifle-count threshold (F4)', function () {
+check('Rifle switcher search box is always visible, not gated by rifle count (Contract v4.0 §3)', function () {
     var source = readFile('js/rifle-app.js');
     var region = extractRegion(source, 'RifleApp.prototype._openRifleList = function', 3500);
-    // AUDIT-FINDINGS.md F4: this overlay is the app's designated PRIMARY
-    // switcher — it already scrolled correctly at 50 rifles, but had no
-    // search, unlike profiles.js's own Rifles list (search past 8).
-    if (!/_rifles\.length > \d+/.test(region)) {
-        throw new Error('no rifle-count threshold gating a search input');
+    // Contract v4.0 §3: "search box always visible (not gated at 8)" —
+    // a 50-rifle fleet is real and shouldn't have to grow into search.
+    if (/_rifles\.length > \d+\s*\?/.test(region)) {
+        throw new Error('search input is still gated behind a rifle-count threshold');
     }
     if (region.indexOf('id="rf-switcher-search"') === -1) {
         throw new Error('no search <input> in the switcher overlay');
