@@ -1,0 +1,207 @@
+{
+  "_comment": "Gate 0 golden fixtures for js/truing-core.js. Amendment 1 A1: 'The protected engine's Mach-bracket doctrine is the SOLE authority for choosing velocity vs. drag truing: supersonic trajectory error trues muzzle velocity; transonic-window error trues drag.' The classifyDistance-* cases below pin the exact yard boundaries of that routing using a synthetic machDist object (independent of solver specifics) so the doctrine itself is locked, not just one rifle's numbers. The solveTruing-* cases additionally lock the doctrine's real-world consequence: which correction (mv/bc) gets recommended and why, across all four routing branches described in truing-core.js's own §2.5c comment.",
+  "shared": {
+    "ENV": { "tempF": 59, "pressureInHg": 29.92, "humidity": 50 },
+    "SMK308": { "muzzleVelocity": 2650, "bc": 0.243, "dragModel": "G7", "bulletWeight": 175, "zeroRange": 100, "scopeHeight": 1.5 },
+    "SMK308_machDist": { "mach12Yd": 823, "supersonicYd": 1001, "mach09Yd": 1196 },
+    "syntheticMachDist": { "mach12Yd": 800, "supersonicYd": 950, "mach09Yd": 1150 }
+  },
+  "cases": [
+    {
+      "name": "machDistances: PRC 6.5 143gr G7 @2960fps std atmo",
+      "fn": "machDistances",
+      "args": [{ "muzzleVelocity": 2960, "bc": 0.330, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 }, "$ENV"],
+      "expect": { "mach12Yd": 1337, "supersonicYd": 1579, "mach09Yd": 1846 }
+    },
+    {
+      "name": "machDistances: .308 175gr SMK G7 @2650fps std atmo",
+      "fn": "machDistances",
+      "args": ["$SMK308", "$ENV"],
+      "expect": "$SMK308_machDist"
+    },
+    {
+      "name": "prescribeTruingDistances: PRC 6.5 143gr G7 (MV as far as possible short of Mach 1.2, drag brackets 1.2-0.9)",
+      "fn": "prescribeTruingDistances",
+      "args": [{ "muzzleVelocity": 2960, "bc": 0.330, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 }, "$ENV"],
+      "expect": { "mvTrueYd": 1125, "dragBracket": [1325, 1850], "machDist": { "mach12Yd": 1337, "supersonicYd": 1579, "mach09Yd": 1846 } }
+    },
+    {
+      "name": "prescribeTruingDistances: .308 175gr SMK G7",
+      "fn": "prescribeTruingDistances",
+      "args": ["$SMK308", "$ENV"],
+      "expect": { "mvTrueYd": 700, "dragBracket": [825, 1200], "machDist": "$SMK308_machDist" }
+    },
+
+    { "name": "classifyDistance: at the zero-band edge (1.5x zero range) -> zero", "fn": "classifyDistance", "args": [150, "$syntheticMachDist", 100], "expect": { "band": "zero", "supersonicPct": 0.15789473684210525 } },
+    { "name": "classifyDistance: 1 yd past zero band -> mv", "fn": "classifyDistance", "args": [151, "$syntheticMachDist", 100], "expect": { "band": "mv", "supersonicPct": 0.15894736842105264 } },
+    { "name": "classifyDistance: just inside MV_BAND_EDGE (0.9 x mach12Yd = 720) -> still mv", "fn": "classifyDistance", "args": [719, "$syntheticMachDist", 100], "expect": { "band": "mv", "supersonicPct": 0.7568421052631579 } },
+    { "name": "classifyDistance: AT MV_BAND_EDGE -> routing flips to drag (supersonic error now trues drag, per A1)", "fn": "classifyDistance", "args": [720, "$syntheticMachDist", 100], "expect": { "band": "drag", "supersonicPct": 0.7578947368421053 } },
+    { "name": "classifyDistance: at the +30yd transonic tolerance edge (mach09Yd + 30) -> still drag", "fn": "classifyDistance", "args": [1180, "$syntheticMachDist", 100], "expect": { "band": "drag", "supersonicPct": 1.2421052631578948 } },
+    { "name": "classifyDistance: 1 yd past the transonic tolerance edge -> beyond (unusable for truing)", "fn": "classifyDistance", "args": [1181, "$syntheticMachDist", 100], "expect": { "band": "beyond", "supersonicPct": 1.243157894736842 } },
+    { "name": "classifyDistance: unknown mach12Yd (load never modeled to Mach 1.2) -> always mv, never drag", "fn": "classifyDistance", "args": [500, { "mach12Yd": null, "supersonicYd": null, "mach09Yd": null }, 100], "expect": { "band": "mv", "supersonicPct": null } },
+    { "name": "classifyDistance: unknown mach09Yd (drag floor never reached) -> drag territory has no far edge", "fn": "classifyDistance", "args": [5000, { "mach12Yd": 800, "supersonicYd": 950, "mach09Yd": null }, 100], "expect": { "band": "drag", "supersonicPct": 5.2631578947368425 } },
+    { "name": "classifyDistance: missing zeroRange defaults to 100yd for the zero-band calculation", "fn": "classifyDistance", "args": [150, "$syntheticMachDist", null], "expect": { "band": "zero", "supersonicPct": 0.15789473684210525 } },
+
+    {
+      "name": "solveTruing: MV-band-only data, MV unmeasured -> doctrine recommends MV",
+      "fn": "solveTruing",
+      "args": [
+        [
+          { "rangeYds": 600, "observedComeUpMOA": 8.1, "shotMV": 2635, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.3, "shotMV": 2660, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.2, "shotMV": 2648, "groupId": "g600a" }
+        ],
+        { "profile": "$SMK308", "env": "$ENV", "machDist": "$SMK308_machDist", "latitudeDeg": 45, "azimuthDeg": 90 },
+        { "mvMeasured": false }
+      ],
+      "expect": {
+        "groups": [{ "groupId": "g600a", "rangeYds": 600, "n": 3, "meanNormalizedMOA": 8.2, "band": "mv", "supersonicPct": 0.5994005994005994, "flagged": false }],
+        "ledger": [
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.1, "mvAdjMOA": -0.183, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 7.917, "shotMV": 2635 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.3, "mvAdjMOA": 0.178, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.478, "shotMV": 2660 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.2, "mvAdjMOA": 0.005, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.205, "shotMV": 2648 }
+        ],
+        "avgMV": 2647.7,
+        "machDist": "$SMK308_machDist",
+        "farRangeYds": 600,
+        "farBand": "mv",
+        "supersonicPct": 0.5994005994005994,
+        "mvOption": { "value": 3047, "old": 2650, "residualBeforeMOA": 7.675, "residualAfterMOA": 3.184, "iterations": 1, "capped": true },
+        "bcOption": { "value": 0.316, "old": 0.243, "residualBeforeMOA": 7.675, "residualAfterMOA": 6.168, "iterations": 1, "capped": true },
+        "recommended": "mv",
+        "guidance": "MV is the likely culprit at 600 yd — or better, chronograph it. Drag stays at its published value unless you true at/through the transonic band (823–1196 yd for this rifle)."
+      }
+    },
+    {
+      "name": "solveTruing: MV-band-only data but MV IS measured -> BC recommended, flagged as extrapolated (doctrine: never true drag from short data even when MV is known)",
+      "fn": "solveTruing",
+      "args": [
+        [
+          { "rangeYds": 600, "observedComeUpMOA": 8.1, "shotMV": 2635, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.3, "shotMV": 2660, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.2, "shotMV": 2648, "groupId": "g600a" }
+        ],
+        { "profile": "$SMK308", "env": "$ENV", "machDist": "$SMK308_machDist", "latitudeDeg": 45, "azimuthDeg": 90 },
+        { "mvMeasured": true }
+      ],
+      "expect": {
+        "groups": [{ "groupId": "g600a", "rangeYds": 600, "n": 3, "meanNormalizedMOA": 8.2, "band": "mv", "supersonicPct": 0.5994005994005994, "flagged": false }],
+        "ledger": [
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.1, "mvAdjMOA": -0.183, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 7.917, "shotMV": 2635 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.3, "mvAdjMOA": 0.178, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.478, "shotMV": 2660 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.2, "mvAdjMOA": 0.005, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.205, "shotMV": 2648 }
+        ],
+        "avgMV": 2647.7,
+        "machDist": "$SMK308_machDist",
+        "farRangeYds": 600,
+        "farBand": "mv",
+        "supersonicPct": 0.5994005994005994,
+        "mvOption": { "value": 3047, "old": 2650, "residualBeforeMOA": 7.675, "residualAfterMOA": 3.184, "iterations": 1, "capped": true },
+        "bcOption": { "value": 0.316, "old": 0.243, "residualBeforeMOA": 7.675, "residualAfterMOA": 6.168, "iterations": 1, "capped": true },
+        "recommended": "bc",
+        "guidance": "MV is measured — the honest fix is BC. But your 600-yd data is at 60% of this rifle's supersonic range — that's MV/zero territory, so a BC trued here is extrapolated. True farther for drag you can bet on."
+      }
+    },
+    {
+      "name": "solveTruing: data reaches the transonic band, MV unmeasured -> BC recommended (A1's core routing rule)",
+      "fn": "solveTruing",
+      "args": [
+        [
+          { "rangeYds": 600, "observedComeUpMOA": 8.1, "shotMV": 2635, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.3, "shotMV": 2660, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.2, "shotMV": 2648, "groupId": "g600a" },
+          { "rangeYds": 1150, "observedComeUpMOA": 21.5, "shotMV": 2650, "groupId": "g1150a" },
+          { "rangeYds": 1150, "observedComeUpMOA": 21.8, "shotMV": 2645, "groupId": "g1150a" }
+        ],
+        { "profile": "$SMK308", "env": "$ENV", "machDist": "$SMK308_machDist", "latitudeDeg": 45, "azimuthDeg": 90 },
+        { "mvMeasured": false }
+      ],
+      "expect": {
+        "groups": [
+          { "groupId": "g600a", "rangeYds": 600, "n": 3, "meanNormalizedMOA": 8.201, "band": "mv", "supersonicPct": 0.5994005994005994, "flagged": false },
+          { "groupId": "g1150a", "rangeYds": 1150, "n": 2, "meanNormalizedMOA": 22.03, "band": "drag", "supersonicPct": 1.1488511488511488, "flagged": false }
+        ],
+        "ledger": [
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.1, "mvAdjMOA": -0.182, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 7.918, "shotMV": 2635 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.3, "mvAdjMOA": 0.179, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.479, "shotMV": 2660 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.2, "mvAdjMOA": 0.006, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.206, "shotMV": 2648 },
+          { "rangeYds": 1150, "groupId": "g1150a", "observedMOA": 21.5, "mvAdjMOA": 0.116, "coriolisAdjMOA": 0.384, "aeroJump": "not modeled", "normalizedMOA": 22, "shotMV": 2650 },
+          { "rangeYds": 1150, "groupId": "g1150a", "observedMOA": 21.8, "mvAdjMOA": -0.125, "coriolisAdjMOA": 0.384, "aeroJump": "not modeled", "normalizedMOA": 22.059, "shotMV": 2645 }
+        ],
+        "avgMV": 2647.6,
+        "machDist": "$SMK308_machDist",
+        "farRangeYds": 1150,
+        "farBand": "drag",
+        "supersonicPct": 1.1488511488511488,
+        "mvOption": { "value": 3047, "old": 2650, "residualBeforeMOA": 18.784, "residualAfterMOA": 8.791, "iterations": 1, "capped": true },
+        "bcOption": { "value": 0.316, "old": 0.243, "residualBeforeMOA": 18.784, "residualAfterMOA": 12.83, "iterations": 1, "capped": true },
+        "recommended": "bc",
+        "guidance": "Your 1150-yd data reaches the transonic band — this is drag territory. Correct BC here; chronograph the rifle to lock MV down too."
+      }
+    },
+    {
+      "name": "solveTruing: data reaches the transonic band, MV IS measured -> BC recommended, wording confirms MV already locked",
+      "fn": "solveTruing",
+      "args": [
+        [
+          { "rangeYds": 600, "observedComeUpMOA": 8.1, "shotMV": 2635, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.3, "shotMV": 2660, "groupId": "g600a" },
+          { "rangeYds": 600, "observedComeUpMOA": 8.2, "shotMV": 2648, "groupId": "g600a" },
+          { "rangeYds": 1150, "observedComeUpMOA": 21.5, "shotMV": 2650, "groupId": "g1150a" },
+          { "rangeYds": 1150, "observedComeUpMOA": 21.8, "shotMV": 2645, "groupId": "g1150a" }
+        ],
+        { "profile": "$SMK308", "env": "$ENV", "machDist": "$SMK308_machDist", "latitudeDeg": 45, "azimuthDeg": 90 },
+        { "mvMeasured": true }
+      ],
+      "expect": {
+        "groups": [
+          { "groupId": "g600a", "rangeYds": 600, "n": 3, "meanNormalizedMOA": 8.201, "band": "mv", "supersonicPct": 0.5994005994005994, "flagged": false },
+          { "groupId": "g1150a", "rangeYds": 1150, "n": 2, "meanNormalizedMOA": 22.03, "band": "drag", "supersonicPct": 1.1488511488511488, "flagged": false }
+        ],
+        "ledger": [
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.1, "mvAdjMOA": -0.182, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 7.918, "shotMV": 2635 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.3, "mvAdjMOA": 0.179, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.479, "shotMV": 2660 },
+          { "rangeYds": 600, "groupId": "g600a", "observedMOA": 8.2, "mvAdjMOA": 0.006, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 8.206, "shotMV": 2648 },
+          { "rangeYds": 1150, "groupId": "g1150a", "observedMOA": 21.5, "mvAdjMOA": 0.116, "coriolisAdjMOA": 0.384, "aeroJump": "not modeled", "normalizedMOA": 22, "shotMV": 2650 },
+          { "rangeYds": 1150, "groupId": "g1150a", "observedMOA": 21.8, "mvAdjMOA": -0.125, "coriolisAdjMOA": 0.384, "aeroJump": "not modeled", "normalizedMOA": 22.059, "shotMV": 2645 }
+        ],
+        "avgMV": 2647.6,
+        "machDist": "$SMK308_machDist",
+        "farRangeYds": 1150,
+        "farBand": "drag",
+        "supersonicPct": 1.1488511488511488,
+        "mvOption": { "value": 3047, "old": 2650, "residualBeforeMOA": 18.784, "residualAfterMOA": 8.791, "iterations": 1, "capped": true },
+        "bcOption": { "value": 0.316, "old": 0.243, "residualBeforeMOA": 18.784, "residualAfterMOA": 12.83, "iterations": 1, "capped": true },
+        "recommended": "bc",
+        "guidance": "Your 1150-yd data reaches the transonic band — this is drag territory. MV is measured, so the honest fix is BC."
+      }
+    },
+
+    { "name": "truingConfidence: 24 shots/4 groups, everything measured and tight -> High (5)", "fn": "truingConfidence", "args": [{ "shotCount": 24, "groupCount": 4, "mvMeasuredPct": 1, "windLoggedPct": 1, "groupSpreadMOA": 0.2, "envSource": "measured", "zeroConfirmed": true, "trackingVerified": true, "supersonicPct": 0.95, "correctionType": "bc", "mode": "full" }], "expect": { "segments": 5, "word": "High", "capNotes": [] } },
+    { "name": "truingConfidence: 2 shots, no wind logged, default env -> Thin (1), wind-hedge note", "fn": "truingConfidence", "args": [{ "shotCount": 2, "groupCount": 1, "mvMeasuredPct": 0, "windLoggedPct": 0, "envSource": "default", "zeroConfirmed": true, "trackingVerified": true, "correctionType": "mv", "mode": "full" }], "expect": { "segments": 1, "word": "Thin", "capNotes": ["Wind was logged on under half these shots — deflection may hide in the vertical."] } },
+    { "name": "truingConfidence: otherwise-High inputs but Quick mode caps at Moderate (3)", "fn": "truingConfidence", "args": [{ "shotCount": 20, "groupCount": 3, "mvMeasuredPct": 1, "windLoggedPct": 1, "groupSpreadMOA": 0.1, "envSource": "measured", "zeroConfirmed": true, "trackingVerified": true, "correctionType": "mv", "mode": "quick" }], "expect": { "segments": 3, "word": "Moderate", "capNotes": ["Quick true assumes no wind and your saved MV — good for a rough correction."] } },
+    { "name": "truingConfidence: zero not confirmed caps at Thin (2) regardless of sample size (C22: nothing trues without a confirmed zero)", "fn": "truingConfidence", "args": [{ "shotCount": 20, "groupCount": 3, "mvMeasuredPct": 1, "windLoggedPct": 1, "groupSpreadMOA": 0.1, "envSource": "measured", "zeroConfirmed": false, "trackingVerified": true, "correctionType": "mv", "mode": "full" }], "expect": { "segments": 2, "word": "Thin", "capNotes": ["Zero isn't confirmed — confirm it before trusting any truing."] } },
+    { "name": "truingConfidence: BC correction trued below 85% of supersonic range caps at Moderate (3), extrapolation warning", "fn": "truingConfidence", "args": [{ "shotCount": 20, "groupCount": 3, "mvMeasuredPct": 1, "windLoggedPct": 1, "groupSpreadMOA": 0.1, "envSource": "measured", "zeroConfirmed": true, "trackingVerified": true, "supersonicPct": 0.6, "correctionType": "bc", "mode": "full" }], "expect": { "segments": 3, "word": "Moderate", "capNotes": ["Trued at 60% of supersonic — a drag correction from here is extrapolated."] } },
+
+    { "name": "deviceCompensation: scope tracks true (factor 1.0) -> identity passthrough, no correction needed", "fn": "deviceCompensation", "args": ["$SMK308", "$ENV", 1.0, { "fromYd": 200, "toYd": 1000 }], "expect": { "bcOut": 0.243, "mvOut": 2650, "sweetSpot": { "fromYd": 200, "toYd": 1000, "maxErrMOA": 0 }, "errorCurve": [], "identity": true } },
+    {
+      "name": "deviceCompensation: scope tracks 4% short -> fitted BC/MV pair compensates through the whole working range",
+      "fn": "deviceCompensation",
+      "args": ["$SMK308", "$ENV", 0.96, { "fromYd": 200, "toYd": 1000 }],
+      "expect": {
+        "bcOut": 0.243,
+        "mvOut": 2606,
+        "sweetSpot": { "fromYd": 200, "toYd": 1000, "maxErrMOA": 0.027 },
+        "errorCurve": [
+          { "rangeYds": 200, "errMOA": 0.005 }, { "rangeYds": 250, "errMOA": 0.01 }, { "rangeYds": 300, "errMOA": -0.003 },
+          { "rangeYds": 350, "errMOA": -0.004 }, { "rangeYds": 400, "errMOA": -0.007 }, { "rangeYds": 450, "errMOA": -0.014 },
+          { "rangeYds": 500, "errMOA": -0.024 }, { "rangeYds": 550, "errMOA": -0.019 }, { "rangeYds": 600, "errMOA": -0.017 },
+          { "rangeYds": 650, "errMOA": -0.02 }, { "rangeYds": 700, "errMOA": -0.027 }, { "rangeYds": 750, "errMOA": -0.019 },
+          { "rangeYds": 800, "errMOA": -0.015 }, { "rangeYds": 850, "errMOA": -0.016 }, { "rangeYds": 900, "errMOA": -0.002 },
+          { "rangeYds": 950, "errMOA": 0.007 }, { "rangeYds": 1000, "errMOA": 0.019 }
+        ],
+        "identity": false
+      }
+    }
+  ]
+}
