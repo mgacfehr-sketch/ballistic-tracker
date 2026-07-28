@@ -3,12 +3,11 @@
  *
  * "Proven to 600 — rough" + the four calibration elements in Roy's
  * words, each with a status word and a one-line reason, each tappable
- * straight into its own flow:
- *   Zero            → the paper capture pipeline (SessionLaunch)
- *   Bullet speed    → the chronograph screen (view 3c)
- *   Checked at distance → the full DETAILED truing screen (the fixed
- *                     v2.5 flow — power users; the payoff (view 4) is
- *                     still the everyday path from the steel screen)
+ * straight into its own fact card (Contract v4.0 — no separate doors):
+ *   Zero            → the "I zeroed" fact card (3a)
+ *   Bullet speed    → the "I clocked my speed" card (3c)
+ *   Checked at distance → the "I shot at distance" card (3b) — "add
+ *                     more shots" there IS detailed truing now
  *   Scope check     → the tall-target wizard (unchanged, existing)
  * Bottom: the same gold ＋ button — never a dead end.
  *
@@ -101,12 +100,15 @@ var RifleWhy = (function () {
 
     function _tapRow(app, rifle, key) {
         if (key === 'zero') {
-            if (window.SessionLaunch) SessionLaunch.start({ rifleId: rifle.id });
-            else if (window.AppNav) AppNav.go('session');
+            // Contract v4.0 Law 2: no flow has steps — jump straight to
+            // the "I zeroed" fact card, not the old photo wizard.
+            if (window.RifleAdd && RifleAdd.showZero) RifleAdd.showZero(app, rifle);
         } else if (key === 'speed') {
             if (window.RifleAdd) RifleAdd.showChrono(app, rifle);
         } else if (key === 'trued') {
-            if (window.ToolActions && ToolActions.truing) ToolActions.truing(app.db, rifle.id);
+            // Contract v4.0 3b: no separate truing door — "add more
+            // shots" on the same "I shot at distance" card IS truing now.
+            if (window.RifleAdd && RifleAdd.showSteel) RifleAdd.showSteel(app, rifle);
         } else if (key === 'tracking') {
             if (typeof ScopeCheck !== 'undefined') {
                 ScopeCheck.start(app.db, function () { app.show(rifle.id); });
