@@ -1902,7 +1902,8 @@ button.rowlink:active { background: var(--brand-subtle); }
 }
 
 /* the number */
-.v3-numberbox { text-align: center; margin: 20px 0 4px; background: none; border: none; width: 100%; padding: 6px; }
+.v3-numberbox { text-align: center; margin: 20px 0 4px; width: 100%; padding: 0 6px; }
+.v3-numberbox-tap { display: block; text-align: center; margin: 0; background: none; border: none; width: 100%; padding: 6px; }
 .v3-numberbox .lbl { font: var(--type-fieldlabel); letter-spacing: 0.28em; color: var(--text-secondary); }
 .v3-numberbox .num {
     font: var(--type-mono-hero); color: var(--text-primary);

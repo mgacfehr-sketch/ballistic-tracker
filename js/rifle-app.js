@@ -109,8 +109,12 @@ RifleApp.prototype._renderRifle = function () {
     }
     html += '<button class="v3-details-link" id="rf-details-link">Rifle details &rsaquo;</button>';
     html += '<div id="rf-sync" style="padding:0 var(--edge)"></div>';
-    html += '<button class="v3-numberbox" id="rf-number"><div class="lbl">PROVEN TO</div>' +
-        '<div class="num" id="rf-num-val">&mdash;<em>yd</em></div><div class="conf" id="rf-conf">&nbsp;</div></button>';
+    // The coach line lives in #rf-conf, its own tappable target (Law 3.1)
+    // — it must NOT nest inside the #rf-number button (invalid HTML;
+    // browsers reparent nested buttons and taps bubble to the wrong one).
+    html += '<div class="v3-numberbox"><button class="v3-numberbox-tap" id="rf-number">' +
+        '<div class="lbl">PROVEN TO</div><div class="num" id="rf-num-val">&mdash;<em>yd</em></div></button>' +
+        '<div class="conf" id="rf-conf">&nbsp;</div></div>';
     html += '<div class="v3-chart tap" id="rf-chart"><div class="cttl"><span>DROP CHART</span>' +
         '<small id="rf-chart-sub">tap for full &rsaquo;</small></div><div id="rf-chart-rows">' +
         '<div class="v3-crow"><span class="d">&nbsp;</span><span class="v">&hellip;</span></div></div></div>';
