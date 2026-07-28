@@ -1,0 +1,133 @@
+{
+  "_comment": "Gate 0 golden fixtures for js/simple-true.js — the one-observation 'where did it hit?' path (Contract v2.5 §2.3). Complements tests/test-simple-true.js (which checks round-trip CORRECTNESS: a planted fps error must be recovered) by pinning exact recorded outputs for fixed inputs, so any future behavioral drift in the payoff wording, confidence, or honesty-guard boundaries is caught even if the recovered value stays numerically close. Only the pure top section (simpleToMOA through simpleTruePayoffCopy) is covered — the SimpleTrue DOM flow at the bottom of the file is browser-only and out of scope.",
+  "shared": {
+    "ENV": { "tempF": 59, "pressureInHg": 29.92, "humidity": 50, "source": "default" },
+    "CLAIMED": { "muzzleVelocity": 2960, "bc": 0.315, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 }
+  },
+  "unitConversionCases": [
+    { "name": "simpleToMOA: 1 MIL -> MOA", "fn": "simpleToMOA", "args": [1, "MIL", 600], "expect": 3.43775 },
+    { "name": "simpleToMOA: 6.28in at 600yd -> ~1 MOA", "fn": "simpleToMOA", "args": [6.28, "IN", 600], "expect": 0.999681630054123 },
+    { "name": "simpleToMOA: MOA units pass through unchanged", "fn": "simpleToMOA", "args": [2.5, "MOA", 600], "expect": 2.5 },
+    { "name": "simpleToMOA: unrecognized units string also passes through unchanged (falls to the else branch)", "fn": "simpleToMOA", "args": [2.5, "XYZ", 600], "expect": 2.5 },
+    { "name": "simpleFromMOA: MOA -> MIL", "fn": "simpleFromMOA", "args": [3.43775, "MIL", 600], "expect": 1 },
+    { "name": "simpleFromMOA: MOA -> inches at 600yd", "fn": "simpleFromMOA", "args": [1.0, "IN", 600], "expect": 6.282 },
+    { "name": "simpleFromMOA: MOA units pass through unchanged", "fn": "simpleFromMOA", "args": [2.5, "MOA", 600], "expect": 2.5 }
+  ],
+  "comeUpAtCases": [
+    { "name": "simpleComeUpAt: 600yd lands exactly on a 10yd table step", "args": ["$CLAIMED", "$ENV", 600], "expect": 10.8613 },
+    { "name": "simpleComeUpAt: 587yd interpolates between table steps", "args": ["$CLAIMED", "$ENV", 587], "expect": 10.48801 },
+    { "name": "simpleComeUpAt: null env falls back to the same std-atmosphere default", "args": ["$CLAIMED", null, 600], "expect": 10.8613 },
+    { "name": "simpleComeUpAt: 0F literal survives the falsy-zero guard (becomes 0.001F, not silently std atmo)", "args": ["$CLAIMED", { "tempF": 0, "pressureInHg": 29.92, "humidity": 50 }, 600], "expect": 11.1939 },
+    { "name": "simpleComeUpAt: range far beyond a normal working table still resolves (maxRange auto-extends to rangeYds+50)", "args": ["$CLAIMED", "$ENV", 2000], "expect": 98.0266 },
+    { "name": "simpleComeUpAt: 0yd -> 0 (muzzle row is special-cased to zero come-up)", "args": ["$CLAIMED", "$ENV", 0], "expect": 0 },
+    { "name": "simpleComeUpAt: 10yd, still below the zero — a real (non-guarded) near-muzzle value", "args": ["$CLAIMED", "$ENV", 10], "expect": 13.5909 }
+  ],
+  "observationCases": [
+    {
+      "name": "1. THE ROUND TRIP: planted 15fps-slow bullet, one 600yd hit, MV unmeasured -> doctrine routes to MV, recovers ~2944fps",
+      "input": { "profile": "$CLAIMED", "env": "$ENV", "rangeYds": 600, "dialed": 10.8613, "hitInches": -0.8480699999999987, "units": "MOA", "mvMeasured": false, "zeroConfirmed": true, "trackingVerified": false },
+      "expect": {
+        "picked": "mv",
+        "option": { "value": 2944, "old": 2960, "residualBeforeMOA": -0.135, "residualAfterMOA": 0.017, "iterations": 2, "capped": false },
+        "result": {
+          "groups": [{ "groupId": "simple", "rangeYds": 600, "n": 1, "meanNormalizedMOA": 10.996, "band": "mv", "supersonicPct": 0.3978779840848806, "flagged": false }],
+          "ledger": [{ "rangeYds": 600, "groupId": "simple", "observedMOA": 10.996, "mvAdjMOA": 0, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 10.996, "shotMV": null }],
+          "avgMV": 2960,
+          "machDist": { "mach12Yd": 1276, "supersonicYd": 1508, "mach09Yd": 1762 },
+          "farRangeYds": 600, "farBand": "mv", "supersonicPct": 0.3978779840848806,
+          "mvOption": { "value": 2944, "old": 2960, "residualBeforeMOA": -0.135, "residualAfterMOA": 0.017, "iterations": 2, "capped": false },
+          "bcOption": { "value": 0.304, "old": 0.315, "residualBeforeMOA": -0.135, "residualAfterMOA": -0.014, "iterations": 3, "capped": false },
+          "recommended": "mv",
+          "guidance": "MV is the likely culprit at 600 yd — or better, chronograph it. Drag stays at its published value unless you true at/through the transonic band (1276–1762 yd for this rifle)."
+        },
+        "confidence": { "segments": 1, "word": "Thin", "capNotes": [] },
+        "corrected": { "muzzleVelocity": 2944, "bc": 0.315, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 },
+        "observedComeUpMOA": 10.9963,
+        "payoff": { "rangeYds": 600, "oldDial": 10.9, "newDial": 11, "units": "MOA", "pastYd": 400, "moved": true }
+      },
+      "expectPayoffCopy": "Got it. Your 600-yard dial changes from 10.9 to 11.0. Everything past ~400 just got more accurate."
+    },
+    {
+      "name": "2. Dead-center hit -> engine still solves (no-op correction), payoff honestly says it barely moves",
+      "input": { "profile": "$CLAIMED", "env": "$ENV", "rangeYds": 600, "dialed": 10.8613, "hitInches": 0, "units": "MOA", "mvMeasured": false },
+      "expect": {
+        "picked": "mv",
+        "option": { "value": 2960, "old": 2960, "residualBeforeMOA": 0, "residualAfterMOA": 0, "iterations": 2, "capped": false },
+        "result": {
+          "groups": [{ "groupId": "simple", "rangeYds": 600, "n": 1, "meanNormalizedMOA": 10.861, "band": "mv", "supersonicPct": 0.3978779840848806, "flagged": false }],
+          "ledger": [{ "rangeYds": 600, "groupId": "simple", "observedMOA": 10.861, "mvAdjMOA": 0, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 10.861, "shotMV": null }],
+          "avgMV": 2960,
+          "machDist": { "mach12Yd": 1276, "supersonicYd": 1508, "mach09Yd": 1762 },
+          "farRangeYds": 600, "farBand": "mv", "supersonicPct": 0.3978779840848806,
+          "mvOption": { "value": 2960, "old": 2960, "residualBeforeMOA": 0, "residualAfterMOA": 0, "iterations": 2, "capped": false },
+          "bcOption": { "value": 0.315, "old": 0.315, "residualBeforeMOA": 0, "residualAfterMOA": 0, "iterations": 2, "capped": false },
+          "recommended": "mv",
+          "guidance": "MV is the likely culprit at 600 yd — or better, chronograph it. Drag stays at its published value unless you true at/through the transonic band (1276–1762 yd for this rifle)."
+        },
+        "confidence": { "segments": 1, "word": "Thin", "capNotes": [] },
+        "corrected": { "muzzleVelocity": 2960, "bc": 0.315, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 },
+        "observedComeUpMOA": 10.8613,
+        "payoff": { "rangeYds": 600, "oldDial": 10.9, "newDial": 10.9, "units": "MOA", "pastYd": 400, "moved": false }
+      },
+      "expectPayoffCopy": "Got it. Your 600-yard dial barely moves — your numbers were already close."
+    },
+    {
+      "name": "3. Honesty guard: a hit inside the zero band (120yd, 1.5x a 100yd zero teaches nothing) -> refused, null",
+      "input": { "profile": "$CLAIMED", "env": "$ENV", "rangeYds": 120, "dialed": 0.5, "hitInches": -1, "units": "MOA", "mvMeasured": false },
+      "expect": null
+    },
+    {
+      "name": "4. Honesty guard: a miss too big for a speed/drag explanation -> solver pins at its bracket edge (capped) -> refused, null",
+      "input": { "profile": "$CLAIMED", "env": "$ENV", "rangeYds": 600, "dialed": 10.8613, "hitInches": -60, "units": "MOA", "mvMeasured": false },
+      "expect": null
+    },
+    {
+      "name": "5. Typed shot MV feeds normalization (avgMV becomes the typed value; ledger shotMV populated) without changing which correction is recommended",
+      "input": { "profile": "$CLAIMED", "env": "$ENV", "rangeYds": 600, "dialed": 10.8613, "hitInches": -0.8480699999999987, "units": "MOA", "shotMV": 2952, "mvMeasured": false, "zeroConfirmed": true, "trackingVerified": true },
+      "expect": {
+        "picked": "mv",
+        "option": { "value": 2944, "old": 2960, "residualBeforeMOA": -0.135, "residualAfterMOA": 0.017, "iterations": 2, "capped": false },
+        "result": {
+          "groups": [{ "groupId": "simple", "rangeYds": 600, "n": 1, "meanNormalizedMOA": 10.996, "band": "mv", "supersonicPct": 0.3978779840848806, "flagged": false }],
+          "ledger": [{ "rangeYds": 600, "groupId": "simple", "observedMOA": 10.996, "mvAdjMOA": 0, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 10.996, "shotMV": 2952 }],
+          "avgMV": 2952,
+          "machDist": { "mach12Yd": 1276, "supersonicYd": 1508, "mach09Yd": 1762 },
+          "farRangeYds": 600, "farBand": "mv", "supersonicPct": 0.3978779840848806,
+          "mvOption": { "value": 2944, "old": 2960, "residualBeforeMOA": -0.135, "residualAfterMOA": 0.017, "iterations": 2, "capped": false },
+          "bcOption": { "value": 0.304, "old": 0.315, "residualBeforeMOA": -0.135, "residualAfterMOA": -0.014, "iterations": 3, "capped": false },
+          "recommended": "mv",
+          "guidance": "MV is the likely culprit at 600 yd — or better, chronograph it. Drag stays at its published value unless you true at/through the transonic band (1276–1762 yd for this rifle)."
+        },
+        "confidence": { "segments": 1, "word": "Thin", "capNotes": [] },
+        "corrected": { "muzzleVelocity": 2944, "bc": 0.315, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 },
+        "observedComeUpMOA": 10.9963,
+        "payoff": { "rangeYds": 600, "oldDial": 10.9, "newDial": 11, "units": "MOA", "pastYd": 400, "moved": true }
+      },
+      "expectPayoffCopy": "Got it. Your 600-yard dial changes from 10.9 to 11.0. Everything past ~400 just got more accurate."
+    },
+    {
+      "name": "6. NOTE (see interface contract): MIL display units + MV measured -> doctrine correctly recommends BC (extrapolated warning), but the 1-decimal MIL-rounded payoff shows moved:false even though bc actually changed 0.315->0.304 — real display-rounding nuance, not a bug fixed here",
+      "input": { "profile": "$CLAIMED", "env": "$ENV", "rangeYds": 600, "dialed": 3.1594211330085087, "hitInches": -0.8480699999999987, "units": "MIL", "mvMeasured": true, "zeroConfirmed": true, "trackingVerified": true },
+      "expect": {
+        "picked": "bc",
+        "option": { "value": 0.304, "old": 0.315, "residualBeforeMOA": -0.135, "residualAfterMOA": -0.014, "iterations": 3, "capped": false },
+        "result": {
+          "groups": [{ "groupId": "simple", "rangeYds": 600, "n": 1, "meanNormalizedMOA": 10.996, "band": "mv", "supersonicPct": 0.3978779840848806, "flagged": false }],
+          "ledger": [{ "rangeYds": 600, "groupId": "simple", "observedMOA": 10.996, "mvAdjMOA": 0, "coriolisAdjMOA": 0, "aeroJump": "not modeled", "normalizedMOA": 10.996, "shotMV": null }],
+          "avgMV": 2960,
+          "machDist": { "mach12Yd": 1276, "supersonicYd": 1508, "mach09Yd": 1762 },
+          "farRangeYds": 600, "farBand": "mv", "supersonicPct": 0.3978779840848806,
+          "mvOption": { "value": 2944, "old": 2960, "residualBeforeMOA": -0.135, "residualAfterMOA": 0.017, "iterations": 2, "capped": false },
+          "bcOption": { "value": 0.304, "old": 0.315, "residualBeforeMOA": -0.135, "residualAfterMOA": -0.014, "iterations": 3, "capped": false },
+          "recommended": "bc",
+          "guidance": "MV is measured — the honest fix is BC. But your 600-yd data is at 40% of this rifle's supersonic range — that's MV/zero territory, so a BC trued here is extrapolated. True farther for drag you can bet on."
+        },
+        "confidence": { "segments": 1, "word": "Thin", "capNotes": [] },
+        "corrected": { "muzzleVelocity": 2960, "bc": 0.304, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 },
+        "observedComeUpMOA": 10.9963,
+        "payoff": { "rangeYds": 600, "oldDial": 3.2, "newDial": 3.2, "units": "MIL", "pastYd": 400, "moved": false }
+      },
+      "expectPayoffCopy": "Got it. Your 600-yard dial barely moves — your numbers were already close."
+    }
+  ]
+}
