@@ -651,7 +651,9 @@ BallisticDB.prototype.addScopeAdjustment = function (data) {
     return self.supabase.from('scope_adjustments').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('scope_adjustment', 'scope_adjustments', saved, { provenance: 'manual' });
+            return saved;
         });
 };
 
@@ -690,7 +692,9 @@ BallisticDB.prototype.addCleaningLog = function (data) {
     return self.supabase.from('cleaning_logs').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('cleaning', 'cleaning_logs', saved, { provenance: 'manual' });
+            return saved;
         });
 };
 
@@ -1186,6 +1190,48 @@ BallisticDB.prototype.deleteSuppressor = function (id) {
         });
 };
 
+// ── Phase B fact envelope (Amendment 1 Part B — PHASEB-migrations.sql) ──
+//
+// Best-effort mirror of an already-provenance-aware write into the
+// unified fact_events envelope. NEVER blocks or fails the caller's
+// primary write/promise — a fact_events failure is logged and
+// swallowed here. source_table + source_row_id is the idempotency key
+// (also used by PHASEB-migrations.sql's backfill script), so a retried
+// offline-queue flush can never double-write the same fact twice.
+//
+// savedRow must be the already-_rowToJs'd result of the primary insert
+// (so it carries a real id). eventTime/provenance are read from the
+// row's own known field names where present; callers that need a
+// specific value pass opts to override.
+BallisticDB.prototype._writeFactEvent = function (eventType, sourceTable, savedRow, opts) {
+    var self = this;
+    opts = opts || {};
+    var envelope = {
+        id: generateUUID(),
+        rifleId: typeof opts.rifleId !== 'undefined' ? opts.rifleId : (savedRow.rifleId || null),
+        eventType: eventType,
+        schemaVersion: 1,
+        eventTime: opts.eventTime || savedRow.date || savedRow.appliedAt || savedRow.sessionDate ||
+            savedRow.createdAt || new Date().toISOString(),
+        provenance: opts.provenance || 'manual',
+        sourceTable: sourceTable,
+        sourceRowId: savedRow.id,
+        eligibility: 'eligible',
+        syncState: 'synced',
+        payload: savedRow
+    };
+    var row = _jsToRow(envelope, self.userId);
+    return self.supabase.from('fact_events').insert(row).select().single()
+        .then(function (res) {
+            if (res.error && res.error.code !== '23505') { // unique_violation = already mirrored
+                console.warn('[db] fact_events dual-write failed for ' + sourceTable + '/' + savedRow.id + ':', res.error.message);
+            }
+        })
+        .catch(function (err) {
+            console.warn('[db] fact_events dual-write threw for ' + sourceTable + '/' + savedRow.id + ':', err);
+        });
+};
+
 // ── Calibration event CRUD (§2.10 — append-only, Part 0.6 #2) ──
 
 BallisticDB.prototype.addZeroEvent = function (data) {
@@ -1208,7 +1254,9 @@ BallisticDB.prototype.addZeroEvent = function (data) {
     return self.supabase.from('zero_events').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('zero', 'zero_events', saved, { provenance: saved.source || 'legacy/unknown' });
+            return saved;
         });
 };
 
@@ -1257,7 +1305,9 @@ BallisticDB.prototype.addMvMeasurement = function (data) {
     return self.supabase.from('mv_measurements').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('velocity', 'mv_measurements', saved, { provenance: saved.source || 'legacy/unknown' });
+            return saved;
         });
 };
 
@@ -1297,7 +1347,9 @@ BallisticDB.prototype.addTrackingVerification = function (data) {
     return self.supabase.from('tracking_verifications').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('tracking_verification', 'tracking_verifications', saved, { provenance: 'measured' });
+            return saved;
         });
 };
 
@@ -1338,7 +1390,9 @@ BallisticDB.prototype.addTruingEvent = function (data) {
     return self.supabase.from('truing_events').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('truing', 'truing_events', saved, { provenance: 'derived', eventTime: saved.appliedAt });
+            return saved;
         });
 };
 
@@ -1351,6 +1405,42 @@ BallisticDB.prototype.getTruingEventsByRifle = function (rifleId) {
             if (res.error) throw res.error;
             return (res.data || []).map(_rowToJs);
         });
+};
+
+// Table -> Phase B fact-event mapping for the offline-flush path below.
+// flushQueuedRow upserts directly (bypassing addZeroEvent etc. and
+// their inline _writeFactEvent calls entirely), so an offline-queued-
+// then-flushed fact would never reach fact_events without this —
+// same 8 tables as the online dual-write, same event types/provenance.
+var FLUSH_FACT_EVENT_MAP = {
+    zero_events: { eventType: 'zero', provenanceField: 'source' },
+    mv_measurements: { eventType: 'velocity', provenanceField: 'source' },
+    tracking_verifications: { eventType: 'tracking_verification', provenance: 'measured' },
+    truing_events: { eventType: 'truing', provenance: 'derived' },
+    steel_strings: { eventType: 'steel_string', provenance: 'manual' },
+    steel_shots: { eventType: 'steel_shot', provenance: 'manual', needsRifleLookup: true },
+    cleaning_logs: { eventType: 'cleaning', provenance: 'manual' },
+    scope_adjustments: { eventType: 'scope_adjustment', provenance: 'manual' }
+};
+
+/** Best-effort, fire-and-forget — see FLUSH_FACT_EVENT_MAP above. */
+BallisticDB.prototype._flushFactEventIfMapped = function (table, saved) {
+    var self = this;
+    var mapping = FLUSH_FACT_EVENT_MAP[table];
+    if (!mapping) return;
+    var provenance = mapping.provenance || saved[mapping.provenanceField] || 'legacy/unknown';
+    if (mapping.needsRifleLookup) {
+        self.supabase.from('steel_strings').select('rifle_id').eq('id', saved.stringId).single()
+            .then(function (r) {
+                self._writeFactEvent(mapping.eventType, table, saved,
+                    { provenance: provenance, rifleId: r && r.data ? r.data.rifle_id : null });
+            })
+            .catch(function () {
+                self._writeFactEvent(mapping.eventType, table, saved, { provenance: provenance, rifleId: null });
+            });
+    } else {
+        self._writeFactEvent(mapping.eventType, table, saved, { provenance: provenance });
+    }
 };
 
 // ── Offline sync support (js/sync-queue.js) ───────────────────
@@ -1382,12 +1472,16 @@ BallisticDB.prototype.flushQueuedRow = function (table, record) {
                         .select().single()
                         .then(function (res2) {
                             if (res2.error) throw res2.error;
-                            return _rowToJs(res2.data);
+                            var saved2 = _rowToJs(res2.data);
+                            self._flushFactEventIfMapped(table, saved2);
+                            return saved2;
                         });
                 }
                 throw res.error;
             }
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._flushFactEventIfMapped(table, saved);
+            return saved;
         });
 };
 
@@ -1419,7 +1513,9 @@ BallisticDB.prototype.addSteelString = function (data) {
     return self.supabase.from('steel_strings').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('steel_string', 'steel_strings', saved, { provenance: 'manual' });
+            return saved;
         });
 };
 
@@ -1454,7 +1550,20 @@ BallisticDB.prototype.addSteelShot = function (data) {
     return self.supabase.from('steel_shots').insert(row).select().single()
         .then(function (res) {
             if (res.error) throw res.error;
-            return _rowToJs(res.data);
+            var saved = _rowToJs(res.data);
+            // steel_shots carries no rifle_id column directly — best-effort
+            // lookup through the parent string, fire-and-forget (never
+            // blocks this save; mirrors PHASEB-migrations.sql's backfill
+            // join for the same table).
+            self.supabase.from('steel_strings').select('rifle_id').eq('id', saved.stringId).single()
+                .then(function (strRes) {
+                    var rifleId = (strRes && strRes.data) ? strRes.data.rifle_id : null;
+                    self._writeFactEvent('steel_shot', 'steel_shots', saved, { provenance: 'manual', rifleId: rifleId });
+                })
+                .catch(function () {
+                    self._writeFactEvent('steel_shot', 'steel_shots', saved, { provenance: 'manual', rifleId: null });
+                });
+            return saved;
         });
 };
 
