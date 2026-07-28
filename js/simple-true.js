@@ -169,7 +169,12 @@ function simpleTrueObservation(input) {
             newDial: Math.round(newDial * 10) / 10,
             units: input.units,
             pastYd: Math.max(100, Math.round(input.rangeYds * 2 / 3 / 50) * 50),
-            moved: Math.abs(oldDial - newDial) >= 0.05
+            // Compared in MOA, before display-unit rounding (owner-review
+            // queue #6): a real, doctrine-correct correction must not read
+            // as "didn't move" just because its effect on a coarser display
+            // unit (e.g. MIL) rounds away at 1 decimal. The 1-decimal
+            // display rounding above is unaffected — only this boolean.
+            moved: Math.abs(oldMOA - newMOA) >= 0.05
         }
     };
 }

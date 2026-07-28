@@ -82,26 +82,29 @@ input = {
    caller-configurable), and `mvMeasuredPct` derived from whether
    `shotMV` or `mvMeasured` was supplied.
 5. Computes the payoff by running `simpleComeUpAt` twice (before/after
-   the correction) and converting both to the caller's display `units`,
-   each independently rounded to 1 decimal place via `Math.round(x*10)/10`.
-   `payoff.moved` is `Math.abs(oldDial - newDial) >= 0.05` **in display
-   units, post-rounding** — see the note below.
+   the correction). `oldDial`/`newDial` (the display-facing numbers) are
+   each converted to the caller's display `units` and independently
+   rounded to 1 decimal place via `Math.round(x*10)/10`. `payoff.moved`
+   is computed separately, from the *pre-conversion, pre-rounding* MOA
+   values: `Math.abs(oldMOA - newMOA) >= 0.05` — see the note below.
    `payoff.pastYd = max(100, round25(rangeYds * 2/3))`.
 
-### ⚠ Note: `moved` can read `false` even when a real correction was applied
+### Fixed 2026-07-28 (owner-review queue #6): `moved` is computed in MOA, not display units
 
-Because `oldDial`/`newDial` are each rounded to 1 decimal in the
-*caller's display unit* before the `moved` comparison, a real,
-non-trivial BC or MV correction can still show `moved: false` if its
-effect on the dial at *this specific range* rounds away — most visibly
-in MIL (a coarser unit than MOA at the 1-decimal display precision used
-here). This is real, verified engine behavior (see golden fixture case
-6: a BC correction from 0.315 → 0.304, doctrine-correct and flagged
-"extrapolated," still reports `moved: false` in MIL at 600 yd) — not a
-bug fixed in this Gate 0 pass, since fixing it would edit a protected
-engine. Flagged for the owner-review queue: the payoff copy path
-(`simpleTruePayoffCopy`) will tell the shooter "your dial barely
-moves" in this situation even though a correction was, in fact, kept.
+Previously `moved` compared the already-rounded, already-unit-converted
+`oldDial`/`newDial`, so a real, non-trivial BC or MV correction could
+show `moved: false` if its effect on the dial at *this specific range*
+rounded away in a coarse display unit — most visibly MIL. Golden
+fixture case 6 (a BC correction from 0.315 → 0.304, doctrine-correct
+and flagged "extrapolated") is the fixed case: it now reports
+`moved: true` even though both `oldDial` and `newDial` still separately
+round to the same displayed `3.2` in MIL — the payoff copy path
+(`simpleTruePayoffCopy`) now correctly tells the shooter their dial
+changed ("changes from 3.2 to 3.2") instead of falsely claiming it
+barely moved. The 1-decimal display rounding itself is unchanged; only
+the boolean that decides *which sentence* to show was moved onto the
+un-rounded MOA values. Protected-engine hash lock updated in the same
+commit as this fix.
 
 ## `simpleTruePayoffCopy(payoff)` → `string`
 
@@ -119,5 +122,5 @@ both near-muzzle edges (0yd, 10yd). `simpleTrueObservation` across: the
 full round-trip (mirrors `test-simple-true.js`'s planted-error scenario
 but pins the complete output shape and payoff copy verbatim), a
 dead-center no-op hit, both honesty-guard `null` paths (zero-band,
-capped), a typed-MV case, and the MIL-display `moved:false`-despite-a-
-real-correction nuance documented above.
+capped), a typed-MV case, and the MIL-display case (6) locking in the
+fixed MOA-based `moved` computation documented above.

@@ -106,7 +106,7 @@
       "expectPayoffCopy": "Got it. Your 600-yard dial changes from 10.9 to 11.0. Everything past ~400 just got more accurate."
     },
     {
-      "name": "6. NOTE (see interface contract): MIL display units + MV measured -> doctrine correctly recommends BC (extrapolated warning), but the 1-decimal MIL-rounded payoff shows moved:false even though bc actually changed 0.315->0.304 — real display-rounding nuance, not a bug fixed here",
+      "name": "6. (owner-review #6, fixed) MIL display units + MV measured -> doctrine correctly recommends BC (extrapolated warning); moved is now computed in MOA before display rounding, so this real bc 0.315->0.304 correction correctly reports moved:true even though both 1-decimal MIL dial values happen to round to the same 3.2",
       "input": { "profile": "$CLAIMED", "env": "$ENV", "rangeYds": 600, "dialed": 3.1594211330085087, "hitInches": -0.8480699999999987, "units": "MIL", "mvMeasured": true, "zeroConfirmed": true, "trackingVerified": true },
       "expect": {
         "picked": "bc",
@@ -125,9 +125,9 @@
         "confidence": { "segments": 1, "word": "Thin", "capNotes": [] },
         "corrected": { "muzzleVelocity": 2960, "bc": 0.304, "dragModel": "G7", "bulletWeight": 143, "zeroRange": 100, "scopeHeight": 1.8 },
         "observedComeUpMOA": 10.9963,
-        "payoff": { "rangeYds": 600, "oldDial": 3.2, "newDial": 3.2, "units": "MIL", "pastYd": 400, "moved": false }
+        "payoff": { "rangeYds": 600, "oldDial": 3.2, "newDial": 3.2, "units": "MIL", "pastYd": 400, "moved": true }
       },
-      "expectPayoffCopy": "Got it. Your 600-yard dial barely moves — your numbers were already close."
+      "expectPayoffCopy": "Got it. Your 600-yard dial changes from 3.2 to 3.2. Everything past ~400 just got more accurate."
     }
   ]
 }
