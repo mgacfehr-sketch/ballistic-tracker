@@ -1,15 +1,22 @@
 /**
- * rifle-add.js — ADD: "What did you shoot?" (Contract v3.0 Part 1,
- * views 2 / 3a / 3b / 3c). Three big buttons, nothing else.
+ * rifle-add.js — "WHAT HAPPENED?" (Contract v4.0 Part 2, surfaces
+ * 2 / 3a / 3b / 3c). Three Roy sentences, nothing else — no
+ * paper/steel/chrono jargon on the sheet itself.
  *
- *   PAPER — straight to the existing capture pipeline (SessionLaunch).
- *   STEEL — three things, ONE screen: HOW FAR · I DIALED · IT HIT.
+ *   "I zeroed" (3a)          — one card: distance, group size, shots.
+ *           A confirmation fact, not a re-zeroing wizard — no photo,
+ *           no calibration, no POA taps. "measure it from a photo
+ *           instead" falls back to the existing capture pipeline
+ *           (SessionLaunch) for anyone who wants it.
+ *   "I shot at distance" (3b) — three things, ONE card: HOW FAR ·
+ *           I DIALED · IT HIT. "add more shots" appends rows — that
+ *           IS the detailed truing flow now, no separate door.
  *           "advanced" inline-opens the full existing logger (step 5:
  *           routes to steel-session.js's mature screen — same tap
  *           depth as an inline reveal, far lower risk than refactoring
  *           that screen's rendering to be literally embeddable).
- *   CHRONOGRAPH — type the average speed; "import a file instead"
- *           reuses the existing chrono import screen.
+ *   "I clocked my speed" (3c) — type the average speed; "load a
+ *           Garmin file instead" reuses the existing chrono import.
  *
  * Steel's "Done" always saves a real string+shot first (STANDARDS
  * §6.1 offline-first, Part 2 §3.4 "Save always happens"), THEN runs
@@ -44,21 +51,119 @@ var RifleAdd = (function () {
         var html = '<div class="screen">';
         html += '<div class="pagehead"><button class="backline" id="ra-back">&lsaquo; ' +
             UI.esc(rifle.name || 'Home') + '</button></div>';
-        html += '<h2 style="text-align:center;font:var(--type-title)">What did you shoot?</h2>';
+        html += '<h2 style="text-align:center;font:var(--type-title)">What happened?</h2>';
         html += '<div class="v3-bigchoice">';
-        html += '<button id="ra-paper">Paper<small>photograph your target</small></button>';
-        html += '<button id="ra-steel">Steel<small>tell me one hit at distance</small></button>';
-        html += '<button id="ra-chrono">Chronograph<small>type the speed or import the file</small></button>';
+        html += '<button id="ra-zero">I zeroed<small>confirm your zero at the range</small></button>';
+        html += '<button id="ra-steel">I shot at distance<small>how far, what you dialed, where it hit</small></button>';
+        html += '<button id="ra-chrono">I clocked my speed<small>type it in, or load a file</small></button>';
         html += '</div></div>';
         container.innerHTML = html;
 
         document.getElementById('ra-back').addEventListener('click', function () { app.show(rifle.id); });
-        document.getElementById('ra-paper').addEventListener('click', function () {
+        document.getElementById('ra-zero').addEventListener('click', function () { _zeroScreen(app, rifle); });
+        document.getElementById('ra-steel').addEventListener('click', function () { _steelScreen(app, rifle); });
+        document.getElementById('ra-chrono').addEventListener('click', function () { _chronoScreen(app, rifle); });
+    }
+
+    /* ══ view 3a: "I zeroed" — a confirmation fact, not a wizard ══ */
+
+    var ZERO_DISTANCES = [25, 50, 100, 200];
+
+    function _zeroScreen(app, rifle) {
+        var container = app.container;
+        container.setAttribute('data-screen', 'v3-zero');
+        var S = { distanceYd: 100, groupIn: 1.0, shots: 5 };
+
+        var html = '<div class="screen">';
+        html += '<div class="pagehead"><button class="backline" id="rz-back">&lsaquo; Back</button>' +
+            '<div class="pagetitle">I zeroed</div></div>';
+
+        html += '<div class="v3-fieldlbl">HOW FAR</div><div class="v3-chips" id="rz-dist">';
+        ZERO_DISTANCES.forEach(function (d) {
+            html += '<button class="v3-chip' + (S.distanceYd === d ? ' on' : '') + '" data-dist="' + d + '">' + d + '</button>';
+        });
+        html += '<button class="v3-chip' + (ZERO_DISTANCES.indexOf(S.distanceYd) === -1 ? ' on' : '') + '" data-dist="custom">&hellip;</button></div>';
+        html += '<div class="edge hidden" style="padding:0 var(--edge)" id="rz-dist-custom"><div class="field">' +
+            '<input type="number" inputmode="numeric" id="rz-dist-input" placeholder="Distance (yd)" value="' +
+            (ZERO_DISTANCES.indexOf(S.distanceYd) === -1 ? S.distanceYd : '') + '"></div></div>';
+
+        html += '<div class="v3-fieldlbl">GROUP SIZE</div>' + _v3Stepper('rz-group', S.groupIn.toFixed(2) + '&Prime;', 'center to center');
+        html += '<div class="v3-fieldlbl">SHOTS</div><div class="v3-chips" id="rz-shots">';
+        [3, 5, 10].forEach(function (c) {
+            html += '<button class="v3-chip' + (S.shots === c ? ' on' : '') + '" data-shots="' + c + '">' + c + '</button>';
+        });
+        html += '</div>';
+
+        html += '<div class="v3-linkrow" style="margin-top:10px">' +
+            '<button class="v3-link" id="rz-photo">measure it from a photo instead</button></div>';
+
+        html += '<div class="v3-spacer" style="height:20px"></div>';
+        html += '<button class="v3-gold" id="rz-done">Done</button>';
+        html += '<div style="height:16px"></div></div>';
+        container.innerHTML = html;
+
+        document.getElementById('rz-back').addEventListener('click', function () { show(app, rifle); });
+        document.getElementById('rz-photo').addEventListener('click', function () {
             if (window.SessionLaunch) SessionLaunch.start({ rifleId: rifle.id });
             else if (window.AppNav) AppNav.go('session');
         });
-        document.getElementById('ra-steel').addEventListener('click', function () { _steelScreen(app, rifle); });
-        document.getElementById('ra-chrono').addEventListener('click', function () { _chronoScreen(app, rifle); });
+
+        var distWrap = document.getElementById('rz-dist');
+        distWrap.addEventListener('click', function (e) {
+            var b = e.target.closest ? e.target.closest('[data-dist]') : null;
+            if (!b) return;
+            var chips = distWrap.querySelectorAll('[data-dist]');
+            for (var i = 0; i < chips.length; i++) chips[i].classList.remove('on');
+            b.classList.add('on');
+            var v = b.getAttribute('data-dist');
+            var custom = document.getElementById('rz-dist-custom');
+            if (v === 'custom') { custom.classList.remove('hidden'); document.getElementById('rz-dist-input').focus(); }
+            else { custom.classList.add('hidden'); S.distanceYd = parseInt(v, 10); }
+        });
+        document.getElementById('rz-dist-input').addEventListener('change', function () {
+            var v = parseInt(this.value, 10);
+            if (isFinite(v) && v >= 10 && v <= 1000) S.distanceYd = v;
+        });
+
+        _bindV3Stepper('rz-group', function (dir) {
+            S.groupIn = Math.max(0.1, Math.round((S.groupIn + dir * 0.25) * 100) / 100);
+            document.querySelector('#rz-group .val').innerHTML = S.groupIn.toFixed(2) + '&Prime;<small>center to center</small>';
+        });
+
+        var shotsWrap = document.getElementById('rz-shots');
+        shotsWrap.addEventListener('click', function (e) {
+            var b = e.target.closest ? e.target.closest('[data-shots]') : null;
+            if (!b) return;
+            var chips = shotsWrap.querySelectorAll('[data-shots]');
+            for (var i = 0; i < chips.length; i++) chips[i].classList.remove('on');
+            b.classList.add('on');
+            S.shots = parseInt(b.getAttribute('data-shots'), 10);
+        });
+
+        document.getElementById('rz-done').addEventListener('click', function () {
+            var btn = this;
+            btn.disabled = true;
+            app.db.getLoadsByRifle(rifle.id).catch(function () { return []; }).then(function (loads) {
+                var load = null;
+                (loads || []).forEach(function (l) { if (!load && (l.truedMv || l.truedBc)) load = l; });
+                if (!load) (loads || []).forEach(function (l) { if (!load && l.bulletBC) load = l; });
+                if (!load && loads && loads.length) load = loads[0];
+
+                var groupSizeMOA = inchesToMOA(S.groupIn, S.distanceYd);
+                _write(app.db, 'addZeroEvent', {
+                    rifleId: rifle.id, loadId: load ? load.id : null, sessionId: null,
+                    date: new Date().toISOString(), distanceYards: S.distanceYd, shotCount: S.shots,
+                    groupData: { groupSizeIn: S.groupIn, groupSizeMOA: groupSizeMOA },
+                    lotNumber: load ? (load.lotNumber || null) : null, source: 'manual'
+                }).then(function () {
+                    if (typeof Readiness !== 'undefined') Readiness.invalidate(rifle.id);
+                    app.show(rifle.id);
+                }).catch(function (err) {
+                    btn.disabled = false;
+                    alert('Save failed: ' + err.message + '\n\nStill on screen — try again.');
+                });
+            });
+        });
     }
 
     /* ══ view 3b: steel, three things, one screen ═════════════ */
@@ -398,10 +503,9 @@ var RifleAdd = (function () {
         return Math.abs(v) + '&Prime; ' + (v > 0 ? 'high' : 'low');
     }
 
-    // v3.0 view 5: the Why sheet's "Bullet speed" row jumps straight
-    // to the chrono screen (view 3c), skipping the Paper/Steel/
-    // Chronograph chooser.
-    return { show: show, showChrono: _chronoScreen };
+    // v3.0 view 5 / v4.0 coach line: both jump straight to a fact card,
+    // skipping the "What happened?" chooser.
+    return { show: show, showZero: _zeroScreen, showSteel: _steelScreen, showChrono: _chronoScreen };
 })();
 
 // Launcher (registration seam)
