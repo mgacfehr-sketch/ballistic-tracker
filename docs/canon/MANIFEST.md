@@ -26,7 +26,7 @@ override.
 |---|---|---|---|---|
 | 1 | Amendment 1 (Post-Review Corrections) | `PROVEN-Amendment-1.md` | Governs over the other four wherever it explicitly modifies them. Part B is the build order. | `fbeea9f9b7b17bf3b5179e1a2bef6906e604db53d757207f9d2e7184e44a5df9` |
 | 2 | Product and Interaction Constitution | `PROVEN-Product-and-Interaction-Constitution.md` | Governs HOW the product must think, capture, protect truth, and behave. Its honesty and never-lose rules win any conflict with the Validation Doctrine. | `1ba3f5f7ead9e3b9e1118a0fe2e495b63f33dbdbac0746c8d961f51208833595` |
-| 3 | Product Definition (UI-free) | `PROVEN-Product-Definition (1).md` | Governs WHAT the product is and must do. Co-equal with the Constitution; the Constitution governs behavior, this document governs scope/requirements. | `054a08fad24781d6cf1862e788d51133f4023b179aa5f5697f7b15854cbcc687` |
+| 3 | Product Definition (UI-free) | `PROVEN-Product-Definition.md` | Governs WHAT the product is and must do. Co-equal with the Constitution; the Constitution governs behavior, this document governs scope/requirements. | `054a08fad24781d6cf1862e788d51133f4023b179aa5f5697f7b15854cbcc687` |
 | 4 | Validation Doctrine | `PROVEN-Validation-Doctrine.md` | Adds the validation-cycle state machine and expert-workflow detail. Where it conflicts with the Constitution, the Constitution wins (its own §0 status line). Partly superseded by Amendment 1 Part A (A1, A4–A7, A9–A11). | `61729a9c9521437bdef6e642d6b87ebb3f5cf1a8d27fa64397c5a44cd7a178ef` |
 | 5 | Evidence & History Doctrine | `PROVEN-Evidence-and-History-Doctrine.md` | Closes the doctrine layer: evidence levels (Part A) and historical intelligence (Part B). Partly amended by Amendment 1 Part A (A8, A13). | `ef1c879ca33e4c796de5f0e6acfd117cd76f80f3de99953344cbc3eeb06494eb` |
 
@@ -61,6 +61,6 @@ already pinned by their own golden-fixture/hash-lock tests
 
 ## Housekeeping note
 
-`PROVEN-Product-Definition (1).md` carries a `(1)` suffix from its
-original download — cosmetic only, filename left unchanged to avoid an
-unrequested rename; flagged for the owner to rename at their convenience.
+`PROVEN-Product-Definition.md` (formerly `PROVEN-Product-Definition (1).md`,
+a cosmetic `(1)` suffix left over from its original download) was renamed
+2026-07-28 per owner-review queue item #14. Content and hash unchanged.
