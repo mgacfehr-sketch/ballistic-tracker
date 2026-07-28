@@ -544,6 +544,110 @@ BallisticDB.prototype.deleteSession = function (id) {
     });
 };
 
+// ── Attachment Vault (Amendment 1 Part B — PHASEB-migrations.sql P2) ──
+// Content-hash + upload-state tracking for original files. Addresses
+// owner-review #10 (session-images bucket had neither) and Amendment
+// 1's "vault-first import" principle (original file + hash preserved
+// BEFORE association; unresolved imports park safely).
+
+/**
+ * Register a content hash for a file that is ALREADY being uploaded to
+ * its own conventional path (session/steel images) — no duplicate
+ * storage write, just a hash-tracking row alongside it. Best-effort:
+ * never throws to the caller (CLAUDE.md rule 8 — image upload failure
+ * must never block a session save; the same guarantee extends here).
+ */
+BallisticDB.prototype._registerAttachmentHash = function (kind, blob, storagePath, associatedTable, associatedRowId) {
+    var self = this;
+    return sha256Hex(blob).then(function (hash) {
+        var record = {
+            id: generateUUID(),
+            kind: kind,
+            contentHash: hash,
+            byteSize: blob.size || null,
+            storageBucket: 'session-images',
+            storagePath: storagePath,
+            status: 'associated',
+            associatedTable: associatedTable,
+            associatedRowId: associatedRowId,
+            resolvedAt: new Date().toISOString()
+        };
+        var row = _jsToRow(record, self.userId);
+        return self.supabase.from('attachment_vault').insert(row).select().single();
+    }).then(function (res) {
+        if (res && res.error && res.error.code !== '23505') { // unique_violation = already registered
+            console.warn('[db] attachment_vault hash registration failed for ' + storagePath + ':', res.error.message);
+        }
+    }).catch(function (err) {
+        console.warn('[db] attachment_vault hash registration threw for ' + storagePath + ':', err);
+    });
+};
+
+/**
+ * Vault-first import: hash + upload the ORIGINAL import file to
+ * {userId}/vault/{hash} in the session-images bucket (same bucket +
+ * rules convention this codebase already uses for steel photos — no
+ * new bucket), BEFORE any parsing/association happens. Identical bytes
+ * re-uploaded by the same user return the existing vault row instead
+ * of erroring (unique on user_id+content_hash) — a safe re-import
+ * no-op at the vault layer, independent of js/chrono.js's own per-shot
+ * dedup (owner-review #7).
+ * @returns {Promise<Object>} the vault row (existing or newly created)
+ */
+BallisticDB.prototype.vaultImportFile = function (kind, blob, filename) {
+    var self = this;
+    return sha256Hex(blob).then(function (hash) {
+        var path = self.userId + '/vault/' + hash;
+        return self.supabase.storage.from('session-images')
+            .upload(path, blob, { upsert: true, contentType: blob.type || 'application/octet-stream' })
+            .then(function (upRes) {
+                if (upRes.error) throw upRes.error;
+                var record = {
+                    id: generateUUID(),
+                    kind: kind,
+                    originalFilename: filename || null,
+                    contentHash: hash,
+                    byteSize: blob.size || null,
+                    storageBucket: 'session-images',
+                    storagePath: path,
+                    status: 'unresolved'
+                };
+                var row = _jsToRow(record, self.userId);
+                return self.supabase.from('attachment_vault').insert(row).select().single();
+            })
+            .then(function (res) {
+                if (res.error) {
+                    if (res.error.code === '23505') {
+                        return self.supabase.from('attachment_vault').select()
+                            .eq('user_id', self.userId).eq('content_hash', hash).single()
+                            .then(function (existing) {
+                                if (existing.error) throw existing.error;
+                                return _rowToJs(existing.data);
+                            });
+                    }
+                    throw res.error;
+                }
+                return _rowToJs(res.data);
+            });
+    });
+};
+
+/** Mark a vaulted import resolved once its parsed rows are saved. */
+BallisticDB.prototype.resolveVaultedImport = function (vaultId, associatedTable, associatedRowId) {
+    var self = this;
+    var row = _jsToRow({
+        status: 'associated',
+        associatedTable: associatedTable,
+        associatedRowId: associatedRowId || null,
+        resolvedAt: new Date().toISOString()
+    }, self.userId);
+    return self.supabase.from('attachment_vault').update(row)
+        .eq('id', vaultId).eq('user_id', self.userId)
+        .then(function (res) {
+            if (res.error) throw res.error;
+        });
+};
+
 // ── Session Images (Supabase Storage) ──────────────────────────
 
 BallisticDB.prototype.saveSessionImage = function (sessionId, fullBlob, thumbnailBlob) {
@@ -562,6 +666,7 @@ BallisticDB.prototype.saveSessionImage = function (sessionId, fullBlob, thumbnai
     ]).then(function (results) {
         if (results[0].error) throw results[0].error;
         if (results[1].error) throw results[1].error;
+        self._registerAttachmentHash('session_image', fullBlob, fullPath, 'sessions', sessionId);
         return { sessionId: sessionId, createdAt: new Date().toISOString() };
     });
 };
@@ -1616,6 +1721,7 @@ BallisticDB.prototype.saveSteelPhoto = function (stringId, blob) {
         .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
         .then(function (res) {
             if (res.error) throw res.error;
+            self._registerAttachmentHash('steel_image', blob, path, 'steel_strings', stringId);
             return path;
         });
 };

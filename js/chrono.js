@@ -149,6 +149,16 @@ ChronoManager.prototype._handleFile = function (file) {
 
     var name = (file.name || '').toLowerCase();
 
+    // Vault-first import (Amendment 1 Part B, owner-review #7/#10):
+    // hash + preserve the ORIGINAL file bytes before any parsing or
+    // association happens. Best-effort and runs in parallel with the
+    // parse below — never gates or blocks it; a vaulting failure just
+    // means this particular import isn't vaulted, same as today.
+    this._pendingVault = (this.db && typeof this.db.vaultImportFile === 'function')
+        ? this.db.vaultImportFile(name.slice(-5) === '.xlsx' ? 'garmin_xlsx' : 'garmin_csv', file, file.name)
+            .catch(function () { return null; })
+        : null;
+
     if (name.slice(-4) === '.csv') {
         file.text().then(function (text) {
             // ShotView first; a LabRadar report (§2.2) parses as the
@@ -589,6 +599,16 @@ ChronoManager.prototype._importSelected = function () {
         return chain.then(function () {
             var totalShots = fresh.reduce(function (a, r) { return a + r.shots.length; }, 0);
             var skipNote = skipped ? ' (' + skipped + ' duplicate' + (skipped === 1 ? '' : 's') + ' skipped)' : '';
+            // Resolve the vault entry (if any) now that this file's
+            // contents have been successfully imported. One file can
+            // become several velocity_strings rows, so this marks the
+            // vaulted file resolved as a group rather than pointing at
+            // a single row — best-effort, never blocks the status update.
+            if (self._pendingVault && typeof self.db.resolveVaultedImport === 'function') {
+                self._pendingVault.then(function (vaultRow) {
+                    if (vaultRow) self.db.resolveVaultedImport(vaultRow.id, 'velocity_strings', null).catch(function () {});
+                });
+            }
             // Absolute barrel update from the SAME base as the strings —
             // the two displays can no longer drift apart.
             if (addRounds && self.activeBarrel && base !== null) {

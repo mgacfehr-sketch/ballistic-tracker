@@ -26,6 +26,28 @@ function generateUUID() {
 }
 
 /**
+ * SHA-256 of a Blob/File's bytes, as lowercase hex. Web Crypto
+ * (available in both the browser and a Capacitor WebView — CLAUDE.md
+ * Build Principle #3) — no new dependency. Used by db.js's vault-first
+ * import path (Amendment 1 Part B / PHASEB-migrations.sql's
+ * attachment_vault) to fingerprint an original file BEFORE association.
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+function sha256Hex(blob) {
+    return blob.arrayBuffer().then(function (buf) {
+        return crypto.subtle.digest('SHA-256', buf);
+    }).then(function (hashBuf) {
+        var bytes = new Uint8Array(hashBuf);
+        var hex = '';
+        for (var i = 0; i < bytes.length; i++) {
+            hex += bytes[i].toString(16).padStart(2, '0');
+        }
+        return hex;
+    });
+}
+
+/**
  * Clamp a value between min and max.
  * @param {number} val
  * @param {number} min
