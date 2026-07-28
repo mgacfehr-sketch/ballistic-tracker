@@ -449,14 +449,10 @@ RifleApp.prototype._openRifleList = function () {
     var self = this;
     var overlay = document.createElement('div');
     overlay.className = 'overlay';
-    // AUDIT-FINDINGS.md F4: this is the app's designated PRIMARY rifle
-    // switcher (device feedback: "the list is the primary switcher");
-    // a 50-rifle fleet is real, so it needs the same search-past-a-
-    // threshold pattern profiles.js's own Rifles list already uses.
-    var searchHtml = this._rifles.length > 8
-        ? '<div class="search">' + Icon('search', 18) +
-          '<input type="text" id="rf-switcher-search" placeholder="Search rifles&hellip;" aria-label="Search rifles"></div>'
-        : '';
+    // Contract v4.0 §3: search is always visible, not gated at 8 — a
+    // 50-rifle fleet is real and shouldn't have to grow into search.
+    var searchHtml = '<div class="search">' + Icon('search', 18) +
+        '<input type="text" id="rf-switcher-search" placeholder="Search rifles&hellip;" aria-label="Search rifles"></div>';
     var rows = '';
     this._rifles.forEach(function (r, i) {
         rows += '<button class="option-row' + (i === self._cardIndex ? ' on' : '') + '" data-pick="' + i + '">' +

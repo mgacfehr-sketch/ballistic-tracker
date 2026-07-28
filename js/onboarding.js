@@ -161,13 +161,6 @@ var Onboarding = (function () {
         var el = document.getElementById(id);
         return el ? el.value.trim() : '';
     }
-    function _num(id, min, max) {
-        var v = parseFloat(_val(id));
-        if (!isFinite(v)) return null;
-        if (typeof min === 'number' && v < min) return null;
-        if (typeof max === 'number' && v > max) return null;
-        return v;
-    }
 
     /** Step 1: name + cartridge. Everything else can wait (§1.5). */
     function _mountRifleStep(el, state, api) {
@@ -187,93 +180,25 @@ var Onboarding = (function () {
         });
     }
 
-    /** Step 2: the load essentials — bullet entry supplies the BC.
-     *  Ammo-box OCR appears here as a capture method (§2.8). */
-    function _mountLoadStep(el, state, api) {
-        var prior = state.answers.load || {};
-        var html = scanButtonHtml();
-        html += _fieldHtml('onb-load-name', 'Ammo / load name', null,
-            'type="text" maxlength="80" placeholder="Hornady 143 ELD-X Precision Hunter" value="' + UI.esc(prior.name || '') + '"');
-        html += '<div class="field-row">';
-        html += _fieldHtml('onb-load-weight', 'Bullet weight', 'gr',
-            'type="number" min="10" max="1200" step="1" inputmode="numeric" placeholder="143" value="' + (prior.bulletWeight || '') + '"');
-        html += _fieldHtml('onb-load-bc', 'BC', null,
-            'type="number" min="0" max="2" step="0.001" inputmode="decimal" placeholder="0.315" value="' + (prior.bulletBC || '') + '"');
-        html += '</div>';
-        html += '<div class="field"><label class="field-label">Drag model</label>' +
-            '<div class="segment" id="onb-drag">' +
-            '<button type="button" data-drag="G1"' + (prior.dragModel === 'G1' ? ' class="on"' : '') + '>G1</button>' +
-            '<button type="button" data-drag="G7"' + (prior.dragModel !== 'G1' ? ' class="on"' : '') + '>G7</button>' +
-            '</div></div>';
-        html += _fieldHtml('onb-load-mv', 'Box velocity', 'fps',
-            'type="number" min="500" max="5000" step="1" inputmode="numeric" placeholder="2960" value="' + (prior.muzzleVelocity || '') + '"');
-        html += '<p class="t-micro u-mt-10">The box number is enough to start — your DOPE card ' +
-            'works immediately, marked estimated until you prove it.</p>';
-        html += '<button class="btn-primary u-full u-mt-10" id="onb-load-next">Continue</button>';
-        html += '<button class="btn u-full u-mt-10" id="onb-load-skip">Skip for now</button>';
-        el.innerHTML = html;
-
-        var drag = prior.dragModel === 'G1' ? 'G1' : 'G7';
-        var seg = el.querySelector('#onb-drag');
-        seg.addEventListener('click', function (e) {
-            var btn = e.target.closest ? e.target.closest('[data-drag]') : null;
-            if (!btn) return;
-            drag = btn.getAttribute('data-drag');
-            var btns = seg.querySelectorAll('[data-drag]');
-            for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i] === btn);
-        });
-
-        bindScanButton(function (fields) {
-            if (fields.name) document.getElementById('onb-load-name').value = fields.name;
-            if (fields.bulletWeight) document.getElementById('onb-load-weight').value = fields.bulletWeight;
-            if (fields.bulletBC) document.getElementById('onb-load-bc').value = fields.bulletBC;
-            if (fields.muzzleVelocity) document.getElementById('onb-load-mv').value = fields.muzzleVelocity;
-            if (fields.dragModel) {
-                drag = fields.dragModel;
-                var btns = seg.querySelectorAll('[data-drag]');
-                for (var i = 0; i < btns.length; i++) {
-                    btns[i].classList.toggle('on', btns[i].getAttribute('data-drag') === drag);
-                }
-            }
-        });
-
-        el.querySelector('#onb-load-next').addEventListener('click', function () {
-            var name = _val('onb-load-name');
-            if (!name) { api.error('Name the ammo — the box label works.'); return; }
-            api.submit({
-                name: name,
-                bulletWeight: _num('onb-load-weight', 10, 1200),
-                bulletBC: _num('onb-load-bc', 0.05, 2),
-                dragModel: drag,
-                muzzleVelocity: _num('onb-load-mv', 500, 5000)
-            });
-        });
-        el.querySelector('#onb-load-skip').addEventListener('click', function () {
-            api.submit('__skip__');
-        });
-    }
-
     var ONBOARDING_WIZARD = {
         id: 'onboarding',
-        version: 4, // v3.0 step 9: dropped the suppressor step — two questions, not three
+        version: 5, // Contract v4.0 Law 2/kill-list: ONE question — name the rifle.
+        // Bullet & box velocity is no longer asked up front; it's
+        // resolved inline the first time a fact card needs it (the
+        // "+ New ammo" pattern every fact card already uses).
         steps: [
             {
                 id: 'rifle',
                 prompt: 'Add your rifle',
                 type: 'custom',
                 mount: _mountRifleStep
-            },
-            {
-                id: 'load',
-                prompt: 'Your bullet &amp; box velocity',
-                type: 'custom',
-                mount: _mountLoadStep
             }
         ]
     };
 
-    /** Create the rifle + load from wizard answers, then land on the
-     *  card. Shared by first-run and the Home card's empty state. */
+    /** Create the rifle, then land on the card. Shared by first-run and
+     *  the Home card's empty state. Ammo is resolved on the Card itself
+     *  (Law 3) — never a second onboarding question. */
     function _completeFirstRun(db, answers) {
         // All four doors on by default (§1.5) — More tools can hide
         if (typeof ToolRegistry !== 'undefined') {
@@ -291,22 +216,6 @@ var Onboarding = (function () {
             : Promise.resolve(null);
 
         return pRifle.then(function (rifle) {
-            var pLoad = Promise.resolve(null);
-            if (rifle && answers.load && answers.load !== '__skip__') {
-                pLoad = db.addLoad({
-                    rifleId: rifle.id,
-                    name: answers.load.name,
-                    bulletWeight: answers.load.bulletWeight || 0,
-                    bulletBC: answers.load.bulletBC || 0,
-                    dragModel: answers.load.dragModel || 'G7',
-                    muzzleVelocity: answers.load.muzzleVelocity || 0
-                }).catch(function (e) {
-                    console.warn('[Onboarding] load create failed:', e);
-                    return null;
-                });
-            }
-            return pLoad.then(function () { return rifle; });
-        }).then(function (rifle) {
             // The card opens on this rifle: "Proven to 0 yards · Estimated"
             if (rifle && typeof Recents !== 'undefined') Recents.touchRifle(rifle);
 
