@@ -1,0 +1,76 @@
+{
+  "_comment": "Gate 0 golden fixtures for js/ballistic-solver.js's pure solver section (interpolateCd through computeTrajectory — NOT the BallisticSolverManager UI class, which is DOM-dependent and out of scope for engine fixtures). IMPORTANT: this engine has an undeclared runtime dependency on js/calculations.js's round4() and inchesToMOA() being present as bare globals (true in the browser, where index.html loads calculations.js before ballistic-solver.js as plain <script> tags sharing one global scope). See tests/test-golden-ballistic-solver.js for how the harness replicates that, and docs/canon/interface-contracts/ballistic-solver.md for the finding.",
+  "cases": [
+    { "name": "interpolateCd (G1): exact table point at Mach 0.50", "fn": "interpolateCd", "args": ["$G1_DRAG_TABLE", 0.5], "expect": 0.2032 },
+    { "name": "interpolateCd (G1): interpolated between 0.60 and 0.65", "fn": "interpolateCd", "args": ["$G1_DRAG_TABLE", 0.62], "expect": 0.20543999999999998 },
+    { "name": "interpolateCd (G1): below table range clamps to first entry", "fn": "interpolateCd", "args": ["$G1_DRAG_TABLE", -1], "expect": 0.2629 },
+    { "name": "interpolateCd (G1): above table range clamps to last entry", "fn": "interpolateCd", "args": ["$G1_DRAG_TABLE", 10], "expect": 0.2261 },
+    { "name": "interpolateCd (G7): exact table point at Mach 1.00 (transonic peak)", "fn": "interpolateCd", "args": ["$G7_DRAG_TABLE", 1.0], "expect": 0.3803 },
+
+    { "name": "calculateSpeedOfSound: standard temp (59F)", "fn": "calculateSpeedOfSound", "args": [59], "expect": 1116.4499224539381 },
+    { "name": "calculateSpeedOfSound: cold (0F)", "fn": "calculateSpeedOfSound", "args": [0], "expect": 1051.0339963137703 },
+    { "name": "calculateSpeedOfSound: hot (100F)", "fn": "calculateSpeedOfSound", "args": [100], "expect": 1159.7374923388027 },
+
+    { "name": "calculateAirDensityRatio: standard atmosphere -> ratio 1.0", "fn": "calculateAirDensityRatio", "args": [59, 29.92, 0], "expect": 1 },
+    { "name": "calculateAirDensityRatio: hot + humid -> thinner air", "fn": "calculateAirDensityRatio", "args": [95, 29.92, 80], "expect": 0.932525586253503 },
+    { "name": "calculateAirDensityRatio: cool + altitude pressure + some humidity", "fn": "calculateAirDensityRatio", "args": [50, 24.90, 20], "expect": 0.8467622097665947 },
+
+    { "name": "estimatePressureAtAltitude: sea level", "fn": "estimatePressureAtAltitude", "args": [0], "expect": 29.92 },
+    { "name": "estimatePressureAtAltitude: 5000 ft", "fn": "estimatePressureAtAltitude", "args": [5000], "expect": 24.89484912260263 },
+    { "name": "estimatePressureAtAltitude: 8000 ft", "fn": "estimatePressureAtAltitude", "args": [8000], "expect": 22.223990221524723 },
+
+    { "name": "windComponentsFromClock: 3 o'clock (full crosswind from right) 10mph", "fn": "windComponentsFromClock", "args": [3, 10], "expect": { "windVxFps": -8.980743193747256e-16, "windVzFps": -14.666666666666666 } },
+    { "name": "windComponentsFromClock: 12 o'clock (full headwind) 10mph", "fn": "windComponentsFromClock", "args": [12, 10], "expect": { "windVxFps": -14.666666666666666, "windVzFps": 0 } },
+    { "name": "windComponentsFromClock: 6 o'clock (full tailwind) 10mph", "fn": "windComponentsFromClock", "args": [6, 10], "expect": { "windVxFps": 14.666666666666666, "windVzFps": -1.7961486387494512e-15 } },
+    { "name": "windComponentsFromClock: 9 o'clock (full crosswind from left) 10mph", "fn": "windComponentsFromClock", "args": [9, 10], "expect": { "windVxFps": 2.694222958124177e-15, "windVzFps": 14.666666666666666 } },
+
+    { "name": "solverDerivatives: normal supersonic state (V >= 1 fps)", "fn": "solverDerivatives", "args": [[0, 0, 2700, 5, 0, 0], -5, 0, "$speedOfSoundStd", 0.462, "$G1_DRAG_TABLE", 1], "expect": [2700, 5, -1215.7106624327407, -34.42120464405313, 0, 0] },
+    { "name": "solverDerivatives: sub-1fps velocity short-circuits to gravity-only", "fn": "solverDerivatives", "args": [[100, 50, 0.5, 0.2, 0, 0], 0, 0, "$speedOfSoundStd", 0.462, "$G1_DRAG_TABLE", 1], "expect": [0.5, 0.2, 0, -32.17405, 0, 0] },
+
+    { "name": "rk4Step: one 0.5ms step from muzzle (2700fps, 10mph 3'oclock wind)", "fn": "rk4Step", "args": [[0, 0, 2700, 0, 0, 0], 0.0005, -8.980743193747256e-16, -14.666666666666666, "$speedOfSoundStd", 0.462, "$G1_DRAG_TABLE", 1], "expect": [1.3498483821043403, -0.000004021455125370997, 2699.3935553594056, -0.016085218298670424, -8.236033838301988e-7, -0.0032942671834768947] },
+
+    { "name": "findZeroAngle: .308 168gr G1 .462 @2700fps, 100yd zero, 1.5in scope", "fn": "findZeroAngle", "args": [{ "muzzleVelocity": 2700, "bc": 0.462, "dragTable": "$G1_DRAG_TABLE", "zeroRange": 100, "scopeHeight": 1.5, "speedOfSound": "$speedOfSoundStd", "airDensityRatio": 1 }], "expect": 0.06311659230449566 },
+
+    {
+      "name": "computeTrajectory: .308 168gr G1, 100yd zero, 500yd table, 10mph@3 wind, std atmo",
+      "fn": "computeTrajectory",
+      "args": [{
+        "muzzleVelocity": 2700, "bc": 0.462, "dragModel": "G1", "zeroRange": 100, "scopeHeight": 1.5,
+        "bulletWeight": 168, "maxRange": 500, "rangeStep": 100, "windSpeedMph": 10, "windClockPos": 3,
+        "tempF": 59, "pressureInHg": 29.92, "humidity": 0
+      }],
+      "expect": {
+        "zeroAngleDeg": 0.06311659230449566,
+        "table": [
+          { "rangeYards": 0, "dropInches": -1.5, "dropMOA": 0, "comeUpMOA": 0, "windDriftInches": 0, "windDriftMOA": 0, "velocityFps": 2700, "energyFtLbs": 2719, "timeOfFlightSec": 0, "machNumber": 2.4184 },
+          { "rangeYards": 100, "dropInches": 0, "dropMOA": 0, "comeUpMOA": 0, "windDriftInches": -0.5037, "windDriftMOA": -0.4811, "velocityFps": 2566, "energyFtLbs": 2455, "timeOfFlightSec": 0.114, "machNumber": 2.2982 },
+          { "rangeYards": 200, "dropInches": -3.8092, "dropMOA": -1.8191, "comeUpMOA": 1.8191, "windDriftInches": -2.0879, "windDriftMOA": -0.9971, "velocityFps": 2432, "energyFtLbs": 2206, "timeOfFlightSec": 0.2345, "machNumber": 2.1785 },
+          { "rangeYards": 300, "dropInches": -13.4648, "dropMOA": -4.2868, "comeUpMOA": 4.2868, "windDriftInches": -4.8452, "windDriftMOA": -1.5426, "velocityFps": 2300, "energyFtLbs": 1974, "timeOfFlightSec": 0.361, "machNumber": 2.0605 },
+          { "rangeYards": 400, "dropInches": -29.7451, "dropMOA": -7.1025, "comeUpMOA": 7.1025, "windDriftInches": -8.9305, "windDriftMOA": -2.1324, "velocityFps": 2169, "energyFtLbs": 1755, "timeOfFlightSec": 0.4955, "machNumber": 1.9429 },
+          { "rangeYards": 500, "dropInches": -53.377, "dropMOA": -10.1962, "comeUpMOA": 10.1962, "windDriftInches": -14.4736, "windDriftMOA": -2.7648, "velocityFps": 2039, "energyFtLbs": 1551, "timeOfFlightSec": 0.638, "machNumber": 1.8263 }
+        ]
+      }
+    },
+    {
+      "name": "computeTrajectory: 6.5CM 143gr G7, 100yd zero, 1200yd table crossing into transonic, 15mph@9 wind, altitude+humidity",
+      "fn": "computeTrajectory",
+      "args": [{
+        "muzzleVelocity": 2700, "bc": 0.315, "dragModel": "G7", "zeroRange": 100, "scopeHeight": 1.7,
+        "bulletWeight": 143, "maxRange": 1200, "rangeStep": 200, "windSpeedMph": 15, "windClockPos": 9,
+        "tempF": 45, "pressureInHg": 24.90, "humidity": 30
+      }],
+      "expect": {
+        "zeroAngleDeg": 0.06621193512644907,
+        "table": [
+          { "rangeYards": 0, "dropInches": -1.7, "dropMOA": 0, "comeUpMOA": 0, "windDriftInches": 0, "windDriftMOA": 0, "velocityFps": 2700, "energyFtLbs": 2314, "timeOfFlightSec": 0, "machNumber": 2.4517 },
+          { "rangeYards": 200, "dropInches": -3.5359, "dropMOA": -1.6886, "comeUpMOA": 1.6886, "windDriftInches": 2.8167, "windDriftMOA": 1.3451, "velocityFps": 2459, "energyFtLbs": 1919, "timeOfFlightSec": 0.233, "machNumber": 2.2324 },
+          { "rangeYards": 400, "dropInches": -28.4877, "dropMOA": -6.8022, "comeUpMOA": 6.8022, "windDriftInches": 11.8194, "windDriftMOA": 2.8222, "velocityFps": 2229, "energyFtLbs": 1578, "timeOfFlightSec": 0.4895, "machNumber": 2.0244 },
+          { "rangeYards": 600, "dropInches": -81.4516, "dropMOA": -12.9659, "comeUpMOA": 12.9659, "windDriftInches": 27.9115, "windDriftMOA": 4.4431, "velocityFps": 2013, "energyFtLbs": 1287, "timeOfFlightSec": 0.7725, "machNumber": 1.8279 },
+          { "rangeYards": 800, "dropInches": -168.8782, "dropMOA": -20.1622, "comeUpMOA": 20.1622, "windDriftInches": 52.2887, "windDriftMOA": 6.2427, "velocityFps": 1807, "energyFtLbs": 1037, "timeOfFlightSec": 1.087, "machNumber": 1.6411 },
+          { "rangeYards": 1000, "dropInches": -299.2758, "dropMOA": -28.5841, "comeUpMOA": 28.5841, "windDriftInches": 86.4881, "windDriftMOA": 8.2606, "velocityFps": 1611, "energyFtLbs": 824, "timeOfFlightSec": 1.439, "machNumber": 1.4632 },
+          { "rangeYards": 1200, "dropInches": -483.1849, "dropMOA": -38.4579, "comeUpMOA": 38.4579, "windDriftInches": 132.3032, "windDriftMOA": 10.5303, "velocityFps": 1426, "energyFtLbs": 645, "timeOfFlightSec": 1.8345, "machNumber": 1.2945 }
+        ]
+      }
+    }
+  ]
+}
