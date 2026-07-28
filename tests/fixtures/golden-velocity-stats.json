@@ -1,0 +1,135 @@
+{
+  "_comment": "Gate 0 golden fixtures for js/velocity-stats.js. Complements tests/test-velocity-stats.js (which asserts the math is CORRECT against known values and real Garmin ShotView exports) with exact recorded input/output snapshots for every exported function, so any future behavioral drift — not just a wrong formula — is caught. Convention per the engine's own file header: POPULATION standard deviation (divide by n), matching Garmin ShotView's displayed summary.",
+  "cases": [
+    { "name": "velocityStats: empty array -> all null", "fn": "velocityStats", "args": [[]], "expect": { "n": 0, "avg": null, "sd": null, "es": null } },
+    { "name": "velocityStats: null input -> all null", "fn": "velocityStats", "args": [null], "expect": { "n": 0, "avg": null, "sd": null, "es": null } },
+    { "name": "velocityStats: single plain number -> sd/es are 0, not null", "fn": "velocityStats", "args": [[2650]], "expect": { "n": 1, "avg": 2650, "sd": 0, "es": 0 } },
+    { "name": "velocityStats: single shot object ({fps}) -> same as plain number", "fn": "velocityStats", "args": [[{ "fps": 2650.3 }]], "expect": { "n": 1, "avg": 2650.3, "sd": 0, "es": 0 } },
+    { "name": "velocityStats: all-identical values -> sd/es exactly 0", "fn": "velocityStats", "args": [[2650, 2650, 2650]], "expect": { "n": 3, "avg": 2650, "sd": 0, "es": 0 } },
+    { "name": "velocityStats: mixed plain numbers, shot objects, and unusable entries (non-numeric fps, missing fps) -> unusable entries silently dropped from n", "fn": "velocityStats", "args": [[2650, { "fps": 2648.5 }, 2655.2, { "fps": "bad" }, { "notFps": 1 }]], "expect": { "n": 3, "avg": 2651.233333333333, "sd": 2.870927066684513, "es": 6.699999999999818 } },
+    { "name": "velocityStats: realistic 10-shot string, population SD", "fn": "velocityStats", "args": [[2643.2, 2651.8, 2647.5, 2639.9, 2655.1, 2646.0, 2650.3, 2642.7, 2648.9, 2653.4]], "expect": { "n": 10, "avg": 2647.88, "sd": 4.700595706929116, "es": 15.199999999999818 } },
+
+    { "name": "parseTimeOfDay: 12hr with PM", "fn": "parseTimeOfDay", "args": ["3:09:32 PM"], "expect": 54572 },
+    { "name": "parseTimeOfDay: 12:00:00 AM is midnight (0)", "fn": "parseTimeOfDay", "args": ["12:00:00 AM"], "expect": 0 },
+    { "name": "parseTimeOfDay: 12:00:00 PM is noon", "fn": "parseTimeOfDay", "args": ["12:00:00 PM"], "expect": 43200 },
+    { "name": "parseTimeOfDay: 24hr format, no seconds, no AM/PM", "fn": "parseTimeOfDay", "args": ["15:09"], "expect": 54540 },
+    { "name": "parseTimeOfDay: unparseable text -> null", "fn": "parseTimeOfDay", "args": ["not a time"], "expect": null },
+    { "name": "parseTimeOfDay: non-string input -> null", "fn": "parseTimeOfDay", "args": [12345], "expect": null },
+    { "name": "parseTimeOfDay: hour 13 with AM/PM suffix is invalid -> null", "fn": "parseTimeOfDay", "args": ["13:00:00 PM"], "expect": null },
+
+    { "name": "splitByTimeGap: empty -> empty", "fn": "splitByTimeGap", "args": [[]], "expect": [] },
+    { "name": "splitByTimeGap: single shot -> one group", "fn": "splitByTimeGap", "args": [[{ "fps": 2650, "time": "3:00:00 PM" }]], "expect": [[{ "fps": 2650, "time": "3:00:00 PM" }]] },
+    { "name": "splitByTimeGap: all within default 30min gap -> one group", "fn": "splitByTimeGap", "args": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": "3:05:00 PM" }, { "fps": 2652, "time": "3:10:00 PM" }]], "expect": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": "3:05:00 PM" }, { "fps": 2652, "time": "3:10:00 PM" }]] },
+    { "name": "splitByTimeGap: a 50min gap splits into two groups (default 30min threshold)", "fn": "splitByTimeGap", "args": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": "3:05:00 PM" }, { "fps": 2652, "time": "4:00:00 PM" }, { "fps": 2649, "time": "4:04:00 PM" }]], "expect": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": "3:05:00 PM" }], [{ "fps": 2652, "time": "4:00:00 PM" }, { "fps": 2649, "time": "4:04:00 PM" }]] },
+    { "name": "splitByTimeGap: any shot missing a parseable time -> never guesses, returns the whole list as one group", "fn": "splitByTimeGap", "args": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": null }, { "fps": 2652, "time": "4:00:00 PM" }]], "expect": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": null }, { "fps": 2652, "time": "4:00:00 PM" }]] },
+    { "name": "splitByTimeGap: crossing midnight does not falsely appear as a huge gap", "fn": "splitByTimeGap", "args": [[{ "fps": 2650, "time": "11:50:00 PM" }, { "fps": 2648, "time": "12:05:00 AM" }]], "expect": [[{ "fps": 2650, "time": "11:50:00 PM" }, { "fps": 2648, "time": "12:05:00 AM" }]] },
+    { "name": "splitByTimeGap: custom gapMinutes widens the no-split window", "fn": "splitByTimeGap", "args": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": "3:05:00 PM" }, { "fps": 2652, "time": "4:00:00 PM" }, { "fps": 2649, "time": "4:04:00 PM" }], 90], "expect": [[{ "fps": 2650, "time": "3:00:00 PM" }, { "fps": 2648, "time": "3:05:00 PM" }, { "fps": 2652, "time": "4:00:00 PM" }, { "fps": 2649, "time": "4:04:00 PM" }]] },
+
+    { "name": "clusterStringsByVelocity: empty -> no clusters, no ambiguity", "fn": "clusterStringsByVelocity", "args": [[]], "expect": { "clusters": [], "ambiguous": [] } },
+    { "name": "clusterStringsByVelocity: two close strings merge into one cluster, sorted by avgFps", "fn": "clusterStringsByVelocity", "args": [[{ "avgFps": 2650, "sdFps": 8, "n": 10 }, { "avgFps": 2648, "sdFps": 7, "n": 10 }]], "expect": { "clusters": [{ "members": [{ "avgFps": 2648, "sdFps": 7, "n": 10 }, { "avgFps": 2650, "sdFps": 8, "n": 10 }], "meanFps": 2649, "shotCount": 20 }], "ambiguous": [] } },
+    { "name": "clusterStringsByVelocity: two far-apart strings stay separate clusters", "fn": "clusterStringsByVelocity", "args": [[{ "avgFps": 2650, "sdFps": 8, "n": 10 }, { "avgFps": 2900, "sdFps": 6, "n": 10 }]], "expect": { "clusters": [{ "members": [{ "avgFps": 2650, "sdFps": 8, "n": 10 }], "meanFps": 2650, "shotCount": 10 }, { "members": [{ "avgFps": 2900, "sdFps": 6, "n": 10 }], "meanFps": 2900, "shotCount": 10 }], "ambiguous": [] } },
+    { "name": "clusterStringsByVelocity: a high-SD string near a foreign cluster's mean is flagged ambiguous, not guessed", "fn": "clusterStringsByVelocity", "args": [[{ "avgFps": 2650, "sdFps": 8, "n": 10 }, { "avgFps": 2900, "sdFps": 6, "n": 10 }, { "avgFps": 2775, "sdFps": 100, "n": 5 }]], "expect": { "clusters": [{ "members": [{ "avgFps": 2650, "sdFps": 8, "n": 10 }, { "avgFps": 2775, "sdFps": 100, "n": 5 }], "meanFps": 2691.6666666666665, "shotCount": 15 }, { "members": [{ "avgFps": 2900, "sdFps": 6, "n": 10 }], "meanFps": 2900, "shotCount": 10 }], "ambiguous": [{ "string": { "avgFps": 2775, "sdFps": 100, "n": 5 }, "nearClusterIndices": [1] }] } },
+    { "name": "clusterStringsByVelocity: strings without a numeric avgFps are excluded from clustering entirely", "fn": "clusterStringsByVelocity", "args": [[{ "sdFps": 8, "n": 10 }, { "avgFps": 2650, "sdFps": 8, "n": 10 }]], "expect": { "clusters": [{ "members": [{ "avgFps": 2650, "sdFps": 8, "n": 10 }], "meanFps": 2650, "shotCount": 10 }], "ambiguous": [] } },
+
+    { "name": "stringDedupKey: basic sheet+date key", "fn": "stringDedupKey", "args": ["Sheet1", "2026-06-26T21:07:00.000Z"], "expect": "Sheet1|1782508020000" },
+    { "name": "stringDedupKey: PostgREST offset serialization of the SAME instant produces the SAME key", "fn": "stringDedupKey", "args": ["Sheet1", "2026-06-26T21:07:00+00:00"], "expect": "Sheet1|1782508020000" },
+    { "name": "stringDedupKey: no date -> empty time component", "fn": "stringDedupKey", "args": ["Sheet1", null], "expect": "Sheet1|" },
+    { "name": "stringDedupKey: unparseable date falls back to the raw string", "fn": "stringDedupKey", "args": ["Sheet1", "garbage-date"], "expect": "Sheet1|garbage-date" },
+    { "name": "stringDedupKey: no sheet name -> empty name component", "fn": "stringDedupKey", "args": [null, "2026-06-26T21:07:00.000Z"], "expect": "|1782508020000" },
+
+    { "name": "velocityFingerprint: empty array -> null (no identity)", "fn": "velocityFingerprint", "args": [[]], "expect": null },
+    { "name": "velocityFingerprint: null -> null", "fn": "velocityFingerprint", "args": [null], "expect": null },
+    { "name": "velocityFingerprint: plain numbers canonicalized to 0.1 fps precision, comma-joined", "fn": "velocityFingerprint", "args": [[2650.34, 2648.5, 2655]], "expect": "2650.3,2648.5,2655.0" },
+    { "name": "velocityFingerprint: shot objects; an unusable entry becomes a literal '?' rather than breaking the fingerprint", "fn": "velocityFingerprint", "args": [[{ "fps": 2650.34 }, { "fps": 2648.5 }, { "notFps": 1 }]], "expect": "2650.3,2648.5,?" },
+
+    { "name": "assignRoundCounts: unknown base count -> every count is null, never guessed", "fn": "assignRoundCounts", "args": [null, [{ "shots": [1, 2, 3] }, { "shots": [1, 2] }]], "expect": [null, null] },
+    { "name": "assignRoundCounts: known base 0, AFTER semantics (odometer at end of each string)", "fn": "assignRoundCounts", "args": [0, [{ "shots": [1, 2, 3, 4, 5, 6, 7] }, { "shots": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }, { "shots": [0, 0, 0, 0, 0, 0, 0, 0] }]], "expect": [7, 18, 26] },
+    { "name": "assignRoundCounts: empty sessions -> empty output", "fn": "assignRoundCounts", "args": [100, []], "expect": [] },
+    { "name": "assignRoundCounts: null sessions -> empty output", "fn": "assignRoundCounts", "args": [100, null], "expect": [] },
+
+    { "name": "lotDrift: 40fps drift between two confirmed lots on the same load clears the default 30fps threshold", "fn": "lotDrift", "args": [[{ "loadId": "L1", "lotNumber": "A", "avgFps": 2650, "shots": [1, 2, 3, 4, 5], "date": "2026-05-01", "assignmentStatus": "confirmed" }, { "loadId": "L1", "lotNumber": "B", "avgFps": 2690, "shots": [1, 2, 3, 4, 5], "date": "2026-06-01", "assignmentStatus": "confirmed" }]], "expect": [{ "loadId": "L1", "newLot": "B", "prevLot": "A", "deltaFps": 40 }] },
+    { "name": "lotDrift: same 40fps drift silent under a raised threshold", "fn": "lotDrift", "args": [[{ "loadId": "L1", "lotNumber": "A", "avgFps": 2650, "shots": [1, 2, 3, 4, 5], "date": "2026-05-01", "assignmentStatus": "confirmed" }, { "loadId": "L1", "lotNumber": "B", "avgFps": 2690, "shots": [1, 2, 3, 4, 5], "date": "2026-06-01", "assignmentStatus": "confirmed" }], 100], "expect": [] },
+    { "name": "lotDrift: only one lot on record -> nothing to compare, no alert", "fn": "lotDrift", "args": [[{ "loadId": "L1", "lotNumber": "A", "avgFps": 2650, "shots": [1, 2, 3, 4, 5], "date": "2026-05-01", "assignmentStatus": "confirmed" }]], "expect": [] },
+    { "name": "lotDrift: unconfirmed strings are excluded from the comparison entirely", "fn": "lotDrift", "args": [[{ "loadId": "L1", "lotNumber": "A", "avgFps": 2650, "shots": [1], "date": "2026-05-01", "assignmentStatus": "suggested" }]], "expect": [] },
+
+    { "name": "configShift: both POI and velocity measurable -> suppressed minus bare", "fn": "configShift", "args": [[{ "config": "bare", "results": { "meanElevationMOA": 0.1, "meanWindageMOA": -0.05 } }, { "config": "bare", "results": { "meanElevationMOA": 0.2, "meanWindageMOA": 0.0 } }, { "config": "suppressed", "results": { "meanElevationMOA": 0.6, "meanWindageMOA": 0.1 } }], [{ "config": "bare", "avgFps": 2650, "shots": [1, 2, 3, 4, 5], "assignmentStatus": "confirmed" }, { "config": "suppressed", "avgFps": 2590, "shots": [1, 2, 3, 4, 5], "assignmentStatus": "confirmed" }]], "expect": { "poi": { "elevMOA": 0.44999999999999996, "windMOA": 0.125 }, "velocityDelta": -60 } },
+    { "name": "configShift: only velocity measurable (no session POI data) -> poi null, velocityDelta still returned", "fn": "configShift", "args": [[], [{ "config": "bare", "avgFps": 2650, "shots": [1, 2, 3, 4, 5], "assignmentStatus": "confirmed" }, { "config": "suppressed", "avgFps": 2590, "shots": [1, 2, 3, 4, 5], "assignmentStatus": "confirmed" }]], "expect": { "poi": null, "velocityDelta": -60 } },
+    { "name": "configShift: only POI measurable (no confirmed strings) -> velocityDelta null, poi still returned", "fn": "configShift", "args": [[{ "config": "bare", "results": { "meanElevationMOA": 0.1, "meanWindageMOA": -0.05 } }, { "config": "bare", "results": { "meanElevationMOA": 0.2, "meanWindageMOA": 0.0 } }, { "config": "suppressed", "results": { "meanElevationMOA": 0.6, "meanWindageMOA": 0.1 } }], []], "expect": { "poi": { "elevMOA": 0.44999999999999996, "windMOA": 0.125 }, "velocityDelta": null } },
+    { "name": "configShift: neither measurable -> null (nothing measurable yet)", "fn": "configShift", "args": [[], []], "expect": null },
+    { "name": "configShift: null args -> null", "fn": "configShift", "args": [null, null], "expect": null },
+
+    {
+      "name": "aggregateRifle: full realistic rifle (two loads, mixed assignment statuses, one ineligible small group) -> recommends the smaller-group load",
+      "fn": "aggregateRifle",
+      "args": [{
+        "sessions": [
+          { "id": "S1", "loadId": "L1", "impacts": [1, 2, 3, 4, 5], "results": { "groupSizeMOA": 0.8, "groupSizeInches": 0.84 }, "distanceYards": 100, "date": "2026-06-01" },
+          { "id": "S2", "loadId": "L1", "impacts": [1, 2], "results": { "groupSizeMOA": 0.5, "groupSizeInches": 0.52 }, "distanceYards": 100, "date": "2026-06-05" },
+          { "id": "S3", "loadId": "L2", "impacts": [1, 2, 3, 4, 5, 6], "results": { "groupSizeMOA": 1.1, "groupSizeInches": 1.15 }, "distanceYards": 100, "date": "2026-06-10" }
+        ],
+        "strings": [
+          { "loadId": "L1", "assignmentStatus": "confirmed", "shots": [{ "fps": 2650 }, { "fps": 2648 }, { "fps": 2652 }] },
+          { "loadId": "L2", "assignmentStatus": "confirmed", "shots": [{ "fps": 2900 }, { "fps": 2895 }] },
+          { "loadId": "L1", "assignmentStatus": "suggested", "shots": [{ "fps": 2649 }] }
+        ],
+        "loads": [{ "id": "L1", "name": "Load A" }, { "id": "L2", "name": "Load B" }]
+      }],
+      "expect": {
+        "loads": [
+          { "loadId": "L1", "load": { "id": "L1", "name": "Load A" }, "stringCount": 1, "shotCount": 3, "stats": { "n": 3, "avg": 2650, "sd": 1.632993161855452, "es": 4 }, "sessionCount": 2, "bestGroupMOA": 0.8, "bestGroupSessionId": "S1" },
+          { "loadId": "L2", "load": { "id": "L2", "name": "Load B" }, "stringCount": 1, "shotCount": 2, "stats": { "n": 2, "avg": 2897.5, "sd": 2.5, "es": 5 }, "sessionCount": 1, "bestGroupMOA": 1.1, "bestGroupSessionId": "S3" }
+        ],
+        "bestGroup": { "sessionId": "S1", "loadId": "L1", "moa": 0.8, "inches": 0.84, "shots": 5, "distanceYards": 100, "date": "2026-06-01" },
+        "recommendedLoadId": "L1",
+        "pendingStrings": { "unassigned": 0, "suggested": 1, "ambiguous": 0, "confirmed": 2 }
+      },
+      "note": "S2 (2 impacts) is below MIN_GROUP_SHOTS=3 and is correctly ignored as an eligible group even though it would otherwise look better than S1."
+    },
+    { "name": "aggregateRifle: empty rifle -> all nulls/empties, no throw", "fn": "aggregateRifle", "args": [{ "sessions": [], "strings": [], "loads": [] }], "expect": { "loads": [], "bestGroup": null, "recommendedLoadId": null, "pendingStrings": { "unassigned": 0, "suggested": 0, "ambiguous": 0, "confirmed": 0 } } },
+    { "name": "aggregateRifle: missing sessions/strings/loads keys default to empty, no throw", "fn": "aggregateRifle", "args": [{}], "expect": { "loads": [], "bestGroup": null, "recommendedLoadId": null, "pendingStrings": { "unassigned": 0, "suggested": 0, "ambiguous": 0, "confirmed": 0 } } },
+    {
+      "name": "aggregateRifle: two loads within the 0.01 MOA tie epsilon -> tie broken by lower population velocity SD",
+      "fn": "aggregateRifle",
+      "args": [{
+        "sessions": [
+          { "id": "S1", "loadId": "L1", "impacts": [1, 2, 3], "results": { "groupSizeMOA": 0.8 } },
+          { "id": "S2", "loadId": "L2", "impacts": [1, 2, 3], "results": { "groupSizeMOA": 0.805 } }
+        ],
+        "strings": [
+          { "loadId": "L1", "assignmentStatus": "confirmed", "shots": [{ "fps": 2650 }, { "fps": 2648 }, { "fps": 2652 }] },
+          { "loadId": "L2", "assignmentStatus": "confirmed", "shots": [{ "fps": 2650 }, { "fps": 2600 }, { "fps": 2700 }] }
+        ],
+        "loads": [{ "id": "L1" }, { "id": "L2" }]
+      }],
+      "expect": {
+        "loads": [
+          { "loadId": "L1", "load": { "id": "L1" }, "stringCount": 1, "shotCount": 3, "stats": { "n": 3, "avg": 2650, "sd": 1.632993161855452, "es": 4 }, "sessionCount": 1, "bestGroupMOA": 0.8, "bestGroupSessionId": "S1" },
+          { "loadId": "L2", "load": { "id": "L2" }, "stringCount": 1, "shotCount": 3, "stats": { "n": 3, "avg": 2650, "sd": 40.824829046386306, "es": 100 }, "sessionCount": 1, "bestGroupMOA": 0.805, "bestGroupSessionId": "S2" }
+        ],
+        "bestGroup": { "sessionId": "S1", "loadId": "L1", "moa": 0.8, "inches": null, "shots": 3, "distanceYards": null, "date": null },
+        "recommendedLoadId": "L1",
+        "pendingStrings": { "unassigned": 0, "suggested": 0, "ambiguous": 0, "confirmed": 2 }
+      },
+      "note": "0.800 vs 0.805 MOA is within GROUP_TIE_EPSILON_MOA=0.01, so the tie is broken by L1's much lower velocity SD (1.63 vs 40.8), not by raw group size."
+    },
+    {
+      "name": "aggregateRifle: a 5-shot group with a larger MOA outranks a 3-shot group with a smaller MOA (PREFERRED_GROUP_SHOTS)",
+      "fn": "aggregateRifle",
+      "args": [{
+        "sessions": [
+          { "id": "S1", "loadId": "L1", "impacts": [1, 2, 3], "results": { "groupSizeMOA": 0.5 } },
+          { "id": "S2", "loadId": "L1", "impacts": [1, 2, 3, 4, 5], "results": { "groupSizeMOA": 0.9 } }
+        ],
+        "strings": [],
+        "loads": [{ "id": "L1" }]
+      }],
+      "expect": {
+        "loads": [{ "loadId": "L1", "load": { "id": "L1" }, "stringCount": 0, "shotCount": 0, "stats": { "n": 0, "avg": null, "sd": null, "es": null }, "sessionCount": 2, "bestGroupMOA": 0.9, "bestGroupSessionId": "S2" }],
+        "bestGroup": { "sessionId": "S2", "loadId": "L1", "moa": 0.9, "inches": null, "shots": 5, "distanceYards": null, "date": null },
+        "recommendedLoadId": "L1",
+        "pendingStrings": { "unassigned": 0, "suggested": 0, "ambiguous": 0, "confirmed": 0 }
+      },
+      "note": "The 3-shot 0.5 MOA group (S1) proves less than the 5-shot 0.9 MOA group (S2) per the engine's own documented rule; S2 wins despite the larger MOA."
+    }
+  ]
+}
