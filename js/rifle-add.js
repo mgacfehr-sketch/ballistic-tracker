@@ -173,7 +173,7 @@ var RifleAdd = (function () {
         var units = (rifle.angleUnit === 'MIL' || rifle.angleUnit === 'IN') ? rifle.angleUnit : 'MOA';
         var step = units === 'MIL' ? 0.1 : (units === 'IN' ? 0.25 : 0.25);
         var last = _last();
-        var S = { distanceYd: last.distanceYd || 600, dialed: 0, hitIn: 0, mv: null };
+        var S = { distanceYd: last.distanceYd || 600, dialed: 0, hits: [0], mv: null };
 
         Promise.all([
             app.db.getLoadsByRifle(rifle.id).catch(function () { return []; }),
@@ -220,7 +220,7 @@ var RifleAdd = (function () {
             (DISTANCES.indexOf(S.distanceYd) === -1 ? S.distanceYd : '') + '"></div></div>';
 
         html += '<div class="v3-fieldlbl">I DIALED</div>' + _v3Stepper('rs-dial', _fmtDial(S.dialed, units), units + ' up');
-        html += '<div class="v3-fieldlbl">IT HIT</div>' + _v3Stepper('rs-hit', _fmtHit(S.hitIn), 'tap &minus; if it hit low');
+        html += '<div id="rs-hits-wrap">' + _hitsWrapHtml(S) + '</div>';
 
         html += '<div class="v3-linkrow" style="margin-top:10px">' +
             '<button class="v3-link" id="rs-mv-link">add bullet speed</button> &middot; ' +
@@ -266,9 +266,31 @@ var RifleAdd = (function () {
             S.dialed = Math.round((S.dialed + dir * step) * 100) / 100;
             document.querySelector('#rs-dial .val').innerHTML = _fmtDial(S.dialed, units) + '<small>' + units + ' up</small>';
         });
-        _bindV3Stepper('rs-hit', function (dir) {
-            S.hitIn = S.hitIn + dir;
-            document.querySelector('#rs-hit .val').innerHTML = _fmtHit(S.hitIn) + '<small>tap &minus; if it hit low</small>';
+        // Contract v4.0 3b: "add more shots" appends rows to THIS card —
+        // one delegated handler so re-painting the rows never re-binds
+        // a growing pile of listeners.
+        var hitsWrap = document.getElementById('rs-hits-wrap');
+        function repaintHits() { hitsWrap.innerHTML = _hitsWrapHtml(S); }
+        hitsWrap.addEventListener('click', function (e) {
+            var stepBtn = e.target.closest ? e.target.closest('[data-vstep]') : null;
+            if (stepBtn) {
+                var parts = stepBtn.getAttribute('data-vstep').split(':');
+                var idx = parseInt(parts[0], 10), dir = parseInt(parts[1], 10);
+                S.hits[idx] = (S.hits[idx] || 0) + dir;
+                repaintHits();
+                return;
+            }
+            var rmBtn = e.target.closest ? e.target.closest('[data-remove-hit]') : null;
+            if (rmBtn) {
+                S.hits.splice(parseInt(rmBtn.getAttribute('data-remove-hit'), 10), 1);
+                repaintHits();
+                return;
+            }
+            var addBtn = e.target.closest ? e.target.closest('#rs-add-shot') : null;
+            if (addBtn) {
+                S.hits.push(0);
+                repaintHits();
+            }
         });
 
         document.getElementById('rs-done').addEventListener('click', function () {
@@ -282,13 +304,33 @@ var RifleAdd = (function () {
             if (!ctx.load) {
                 // No ammo on file at all — get just enough to attach the
                 // string to. S already holds everything the user entered
-                // (distance/dial/hit), so nothing is lost going here.
+                // (distance/dial/every shot), so nothing is lost going here.
                 btn.disabled = false;
                 _needsAmmo(app, rifle, S, units, ctx);
                 return;
             }
-            _finishSteelSave(app, rifle, S, units, ctx, btn);
+            if (S.hits.length > 1) _finishSteelSaveMulti(app, rifle, S, units, ctx, btn);
+            else _finishSteelSave(app, rifle, S, units, ctx, btn);
         });
+    }
+
+    /** IT HIT — one row per shot; "add more shots" appends rows (Contract
+     *  v4.0 3b crown jewel: this IS detailed truing now, no separate
+     *  door). Re-rendered wholesale into #rs-hits-wrap on every change;
+     *  the click binding is delegated once in _renderSteel. */
+    function _hitsWrapHtml(S) {
+        var html = '<div class="v3-fieldlbl">IT HIT</div><div id="rs-hits">';
+        S.hits.forEach(function (v, i) {
+            html += '<div class="v3-hitrow"><div class="v3-stepper">' +
+                '<button data-vstep="' + i + ':-1">&minus;</button>' +
+                '<div class="val">' + _fmtHit(v) + '<small>' +
+                (i === 0 ? 'tap &minus; if it hit low' : 'shot ' + (i + 1)) + '</small></div>' +
+                '<button data-vstep="' + i + ':1">＋</button></div>' +
+                (i > 0 ? '<button class="v3-link" data-remove-hit="' + i + '">remove shot ' + (i + 1) + '</button>' : '') +
+                '</div>';
+        });
+        html += '</div><div class="v3-linkrow"><button class="v3-link" id="rs-add-shot">+ add more shots</button></div>';
+        return html;
     }
 
     /** Save always happens (STANDARDS §6.1 / Part 2 §3.4) — the truing
@@ -305,7 +347,8 @@ var RifleAdd = (function () {
             wind: null, directionOfFireDeg: null,
             suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null, notes: 'v3-simple'
         }).then(function () {
-            var elevOffUnits = simpleFromMOA(inchesToMOA(S.hitIn, S.distanceYd), units, S.distanceYd);
+            var hitIn = S.hits[0] || 0;
+            var elevOffUnits = simpleFromMOA(inchesToMOA(hitIn, S.distanceYd), units, S.distanceYd);
             return _write(app.db, 'addSteelShot', {
                 stringId: stringId, seq: 1,
                 elevOff: Math.round(elevOffUnits * 100) / 100, windOff: 0, units: units,
@@ -315,9 +358,50 @@ var RifleAdd = (function () {
             if (ctx.load.bulletBC && (ctx.load.muzzleVelocity || ctx.load.truedMv)) {
                 if (typeof RiflePayoff !== 'undefined') {
                     RiflePayoff.run(app, rifle, ctx.load, {
-                        rangeYds: S.distanceYd, dialed: S.dialed, hitInches: S.hitIn, units: units,
+                        rangeYds: S.distanceYd, dialed: S.dialed, hitInches: S.hits[0] || 0, units: units,
                         shotMV: S.mv, mvMeasured: ctx.mvMeasured, zeroConfirmed: ctx.zeroConfirmed,
                         trackingVerified: ctx.trackingVerified
+                    });
+                } else {
+                    app.show(rifle.id);
+                }
+            } else {
+                _loggedNeedsNumbers(app, rifle, ctx.load);
+            }
+        }).catch(function (err) {
+            if (btn) btn.disabled = false;
+            alert('Save failed: ' + err.message + '\n\nStill on screen — try again.');
+        });
+    }
+
+    /** "add more shots" — the same save, one string, N shots. Save
+     *  always happens first, then RiflePayoff.runMulti (the same
+     *  engine, built for N observations sharing one distance/dial). */
+    function _finishSteelSaveMulti(app, rifle, S, units, ctx, btn) {
+        var suppressorId = (ctx.suppressorEnabled && ctx.lastCan) ? ctx.lastCan : null;
+        var stringId = generateUUID();
+        _write(app.db, 'addSteelString', {
+            id: stringId, rifleId: rifle.id, loadId: ctx.load.id,
+            sessionDate: new Date().toISOString(), distanceYd: S.distanceYd, tier: 'full',
+            dialedElev: S.dialed, dialedWind: 0, units: units,
+            wind: null, directionOfFireDeg: null,
+            suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null, notes: 'v3-simple-multi'
+        }).then(function () {
+            return Promise.all(S.hits.map(function (hitIn, i) {
+                var elevOffUnits = simpleFromMOA(inchesToMOA(hitIn || 0, S.distanceYd), units, S.distanceYd);
+                return _write(app.db, 'addSteelShot', {
+                    stringId: stringId, seq: i + 1,
+                    elevOff: Math.round(elevOffUnits * 100) / 100, windOff: 0, units: units,
+                    heldElev: 0, heldWind: 0, mvFps: S.mv, mvSource: S.mv ? 'manual' : null
+                });
+            }));
+        }).then(function () {
+            if (ctx.load.bulletBC && (ctx.load.muzzleVelocity || ctx.load.truedMv)) {
+                if (typeof RiflePayoff !== 'undefined' && RiflePayoff.runMulti) {
+                    RiflePayoff.runMulti(app, rifle, ctx.load, {
+                        rangeYds: S.distanceYd, dialed: S.dialed, hits: S.hits.slice(), units: units,
+                        shotMV: S.mv, mvMeasured: ctx.mvMeasured, zeroConfirmed: ctx.zeroConfirmed,
+                        trackingVerified: ctx.trackingVerified, groupId: stringId
                     });
                 } else {
                     app.show(rifle.id);
@@ -347,7 +431,8 @@ var RifleAdd = (function () {
         });
         NewAmmoForm.bind('rna', app.db, rifle.id, function (load) {
             ctx.load = load;
-            _finishSteelSave(app, rifle, S, units, ctx, null);
+            if (S.hits.length > 1) _finishSteelSaveMulti(app, rifle, S, units, ctx, null);
+            else _finishSteelSave(app, rifle, S, units, ctx, null);
         });
     }
 

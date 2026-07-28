@@ -1994,6 +1994,9 @@ button.rowlink:active { background: var(--brand-subtle); }
 .v3-stepper button { width: 64px; min-height: 60px; border: none; background: none; font-size: 30px; color: var(--brand-gold-strong); font-weight: 600; }
 .v3-stepper .val { flex: 1; text-align: center; font-family: var(--font-mono); font-weight: 700; font-size: 26px; }
 .v3-stepper .val small { display: block; font: var(--type-body); font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+/* Contract v4.0 3b: "add more shots" stacks a stepper per shot */
+.v3-hitrow { margin-bottom: 10px; }
+.v3-hitrow .v3-link { display: block; text-align: center; padding: 6px; font-size: 13px; }
 
 /* the payoff */
 .v3-payoff { text-align: center; margin-top: 40px; padding: 0 var(--edge); }
