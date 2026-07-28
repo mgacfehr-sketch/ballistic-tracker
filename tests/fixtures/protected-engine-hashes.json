@@ -1,0 +1,34 @@
+{
+  "js/calculations.js": {
+    "sha256": "358defdbefe55ad32da332b77b34a5c793864a39494ec675e7fec8480447b3cd",
+    "bytes": 19767
+  },
+  "js/ballistic-solver.js": {
+    "sha256": "f23ab11748e1a2518c134450ae07546c49e753c9c66e15558f85f60086ab81bb",
+    "bytes": 39861
+  },
+  "js/truing-core.js": {
+    "sha256": "f192c41197d94578128d22054e78fe05fae0a180b507dc721927dd7a3ee374ca",
+    "bytes": 26076
+  },
+  "js/simple-true.js": {
+    "sha256": "8d68df6cae600747edff7d551e64b0cff7b60113739fdaea8571b72325406780",
+    "bytes": 19864
+  },
+  "js/velocity-stats.js": {
+    "sha256": "299926b865a614702e2ceef41ead9dd65107057a2d73fbf4adb3f0c9b41e3808",
+    "bytes": 20368
+  },
+  "js/garmin-import.js": {
+    "sha256": "77d00566f3e2e0c123feb41d9cefbfe0f38a89322a7887e65b563392de47a769",
+    "bytes": 10065
+  },
+  "js/calibration-status.js": {
+    "sha256": "b1425374010c2bcc9dcfd47ebe926fa0498c5beefb5e934326001b7fd5237439",
+    "bytes": 23083
+  },
+  "js/target-geometry.js": {
+    "sha256": "26052682d7fbc097088947c1589089056616a112b4c78fbc089ae033cfcddc16",
+    "bytes": 1809
+  }
+}
