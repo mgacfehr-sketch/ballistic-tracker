@@ -89,15 +89,15 @@ function deriveNextAction(input) {
         var zTitle, zDetail;
         if (zero.state === 'adjust') {
             zTitle = 'Dial the correction, then confirm your zero';
-            zDetail = 'One more photographed group locks it in.';
+            zDetail = 'Confirm your zero — shoot a group at 100.';
         } else if (zero.state === 'stale' || zero.state === 'drifted') {
             zTitle = 'Re-confirm your zero';
             zDetail = zero.state === 'drifted'
-                ? 'It has moved since last time — one group settles it.'
-                : 'It has been a while — one group brings it back.';
+                ? 'Your zero has moved — shoot a group and confirm it.'
+                : 'It has been a while — confirm your zero again.';
         } else {
             zTitle = 'Confirm your zero';
-            zDetail = 'Photograph one group at 100 — Proven measures it.';
+            zDetail = 'Confirm your zero — shoot a group at 100.';
         }
         ladder.push({
             id: 'confirm-zero',
@@ -114,7 +114,7 @@ function deriveNextAction(input) {
         ladder.push({
             id: 'measure-mv',
             title: mv.state === 'stale' ? 'Re-measure your muzzle velocity' : 'Measure your muzzle velocity',
-            detail: 'Type in an average, or import a chrono file.',
+            detail: 'Clock your bullet speed — or type the box speed.',
             payoff: input.mvTrueYd
                 ? 'Extends your proven range to ~' + Number(input.mvTrueYd).toLocaleString() + ' yd.'
                 : 'Measured velocity beats the box number.',
@@ -139,8 +139,8 @@ function deriveNextAction(input) {
         } else {
             ladder.push({
                 id: 'shoot-distance',
-                title: 'Shoot a steel string at distance',
-                detail: 'Log where the shots land — that is the data truing feeds on.',
+                title: 'Check yourself at distance',
+                detail: 'Check yourself at distance — tell me where it hit.',
                 payoff: 'Unlocks truing to that distance.',
                 action: { type: 'steelSession' },
                 dismissible: true
@@ -179,7 +179,9 @@ function deriveNextAction(input) {
         ladder.push({
             id: 're-true',
             title: 'Re-true this rifle',
-            detail: 'The numbers under your truing have changed since it was made.',
+            detail: trued.toYd
+                ? 'Your ' + Number(trued.toYd).toLocaleString() + ' dial moved — true it.'
+                : 'Your dial moved — true it.',
             payoff: 'Keeps ' + (trued.toYd ? Number(trued.toYd).toLocaleString() + ' yd' : 'your proven range') + ' honest.',
             action: { type: 'truing' },
             dismissible: true

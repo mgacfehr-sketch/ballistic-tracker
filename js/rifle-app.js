@@ -282,9 +282,47 @@ RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel,
             confEl.innerHTML = UI.esc(confWord) +
                 ' &middot; <b' + (zeroOk ? '' : ' class="warn"') + '>zero ' + (zeroOk ? '&check;' : '&times;') + '</b>' +
                 ' &middot; <b' + (mvOk ? '' : ' class="warn"') + '>speed ' + (mvOk ? '&check;' : '&times;') + '</b>' +
-                (coach ? ' &middot; <span style="color:var(--text-secondary)">' + UI.esc(coach) + '</span>' : '');
+                (coach ? ' &middot; <button class="v3-coach" id="rf-coach">' + UI.esc(coach) + '</button>' : '');
+            // Contract v4.0 Law 3.1: the coach line is always tappable —
+            // it routes straight to the fact card that fixes the gap,
+            // the rifle already inherited.
+            var coachBtn = document.getElementById('rf-coach');
+            if (coachBtn) coachBtn.addEventListener('click', function () {
+                self._launchCoach(na.action.type, rifle);
+            });
         }
     });
+};
+
+/** Coach-line tap → the fact card that closes the gap (Contract v4.0
+ *  Part 2). "No separate truing door" — both the ready-to-true and
+ *  flagged/drifted rungs land on the same "I shot at distance" card
+ *  the truing engine already reads its data from. */
+RifleApp.prototype._launchCoach = function (type, rifle) {
+    var self = this;
+    switch (type) {
+        case 'addLoad':
+            this._openAmmoForm(rifle);
+            break;
+        case 'rangeSession':
+            if (window.RifleAdd && RifleAdd.showZero) RifleAdd.showZero(this, rifle);
+            break;
+        case 'chrono':
+            if (window.RifleAdd && RifleAdd.showChrono) RifleAdd.showChrono(this, rifle);
+            break;
+        case 'steelSession':
+        case 'truing':
+            if (window.RifleAdd && RifleAdd.showSteel) RifleAdd.showSteel(this, rifle);
+            break;
+        case 'scopeCheck':
+            if (typeof ScopeCheck !== 'undefined') {
+                ScopeCheck.start(this.db, function () { self.show(rifle.id); });
+            }
+            break;
+        case 'cleaningLog':
+            if (window.AppNav) AppNav.openRifle(rifle.id);
+            break;
+    }
 };
 
 /** AUDIT-FINDINGS.md F1: no ammo (or an unsolvable profile) means
