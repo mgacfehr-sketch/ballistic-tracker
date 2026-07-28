@@ -5,16 +5,18 @@ existing table, row counts, which fields lack provenance — written to
 docs/canon/MIGRATION-INVENTORY.md. Read-only analysis; no schema
 changes."*).
 
-**Method:** static analysis only. Every table below is enumerated from
-the 12 `*.sql` migration files in the repo root plus every `.from('...')`
+**Method:** static analysis. Every table below is enumerated from the
+12 `*.sql` migration files in the repo root plus every `.from('...')`
 call site in `js/db.js` (the sole Supabase access point per CLAUDE.md
-rule 2). **No live database query was run to produce this document** —
-this session has no database credentials, and per the rules of
-engagement I do not run SQL or authenticate as the account owner. Row
-counts are therefore marked **TBD**; a read-only counting query is
-provided in the Appendix for the owner to run in the Supabase SQL
-Editor at their convenience. This is a decision the owner made
-explicitly when asked how to handle row counts for this document.
+rule 2) — this session has no database credentials, and per the rules
+of engagement the assistant does not run SQL or authenticate as the
+account owner. **One exception:** Section 5's admin-RPC hardening
+question was resolved when the owner independently ran a read-only
+`pg_get_functiondef()` catalog query (assistant-provided, owner-run) in
+the Supabase SQL Editor and reported the result back — see that section
+for the confirmed finding. Row counts remain **TBD**; a read-only
+counting query is provided in the Appendix for the owner to run and
+report back the same way, at their convenience.
 
 ---
 
@@ -214,16 +216,17 @@ by `calibration-status.js`, not stored.
 | `admin_users` | Server-side admin registry (RLS enabled, no policies — invisible to any client role). Seeded with one hard-coded UUID matching the client-side `ADMIN_USER_ID` constant CLAUDE.md's Known Issues section flags. |
 | `crowd_export_config` | Single-row table holding a server-generated anonymization salt for `crowd_get_data()`. RLS enabled, no policies. |
 
-**Open question this document cannot resolve without live access:**
-CROWD-DATA-migrations.sql Migration 5 (hardening `admin_get_stats` /
-`admin_get_users` / `admin_get_usage_summary` / `admin_export_all` to
-require `is_crowd_admin()`) is explicitly marked **OPTIONAL** in the
-migration file itself. **Whether it has been run against production is
-unknown from the repo alone.** If it has not, CLAUDE.md's Known Issue
-("`admin_*` RPCs are SECURITY DEFINER with no server-side admin
-check — admin gating is client-side only") is still live today, not
-merely historical. This should be confirmed by the owner and is exactly
-the kind of question this document exists to surface, not resolve.
+**RESOLVED 2026-07-28 — confirmed live against production.** The owner
+ran a read-only `pg_get_functiondef()` check against `pg_proc` in the
+Supabase SQL Editor: `is_crowd_admin` exists, and all four RPCs
+(`admin_get_stats`, `admin_get_users`, `admin_get_usage_summary`,
+`admin_export_all`) contain the `is_crowd_admin()` guard. CROWD-DATA-migrations.sql
+Migration 5 (marked OPTIONAL in the file itself) **has been applied.**
+CLAUDE.md's Known Issue ("`admin_*` RPCs are SECURITY DEFINER with no
+server-side admin check") is **historical, not current** — the shipped
+code still contains the pre-hardening comment/context, which is fine
+(it explains why the hardening exists), but the vulnerability itself is
+closed.
 
 ---
 

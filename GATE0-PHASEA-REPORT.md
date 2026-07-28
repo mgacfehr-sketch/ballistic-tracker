@@ -143,14 +143,14 @@ it.
 
 ### Doctrinal / structural (highest attention)
 
-1. **Is the admin-RPC hardening live?** CROWD-DATA-migrations.sql's
-   Migration 5 (requiring `is_crowd_admin()` on `admin_get_stats`/
-   `admin_get_users`/`admin_get_usage_summary`/`admin_export_all`) is
-   explicitly marked OPTIONAL in the migration file. Whether it has
-   been run against production is unknown from the repo alone. If not,
-   CLAUDE.md's Known Issue ("admin_* RPCs... no server-side admin
-   check") is still live today. **Action: confirm directly against
-   Supabase.**
+1. ~~**Is the admin-RPC hardening live?**~~ **CLOSED 2026-07-28.**
+   Owner ran a read-only `pg_get_functiondef()` catalog check against
+   production: `is_crowd_admin` exists and all four RPCs
+   (`admin_get_stats`/`admin_get_users`/`admin_get_usage_summary`/
+   `admin_export_all`) call it. CROWD-DATA-migrations.sql Migration 5
+   is applied. CLAUDE.md's Known Issue is historical, not current — see
+   `docs/canon/MIGRATION-INVENTORY.md` §5 for the full finding. No
+   further action.
 
 2. **Seven base tables predate schema-as-code** (`rifles`, `barrels`,
    `loads`, `sessions`, `zero_records`, `scope_adjustments`,
