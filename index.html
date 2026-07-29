@@ -131,7 +131,15 @@
                         </div>
                     </div>
                     <div id="profile-picker"></div>
-                    <div class="action-row u-mt-10">
+                    <!-- STRIP-DOWN PHASE (owner order): Quick Mode measures a
+                         group without ever assigning it to a rifle, which
+                         can't satisfy "SAVE to that rifle... viewable from
+                         that rifle's page" — HIDDEN. session-flow.js's
+                         _selectQuickMode is untouched, just unreachable
+                         with this button hidden (its own click binding
+                         no-ops safely when the element is absent from the DOM,
+                         same pattern used throughout this phase). -->
+                    <div class="action-row u-mt-10 hidden">
                         <button id="btn-quick-mode" class="action">Just measure this group</button>
                     </div>
                     <div class="action-row u-mt-10">

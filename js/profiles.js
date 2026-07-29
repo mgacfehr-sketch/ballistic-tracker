@@ -950,10 +950,11 @@ ProfileManager.prototype._renderLoadForm = function (rifleId, load) {
     html += '<div class="screen">';
     html += '<form id="load-form">';
 
-    // Ammo-box OCR scan (feature-gated; returns '' when off)
-    if (typeof Onboarding !== 'undefined') {
-        html += Onboarding.scanButtonHtml();
-    }
+    // STRIP-DOWN PHASE (owner order): "exactly two visible functions."
+    // Ammo-box OCR scan is a distinct extra function (photo -> AI-parsed
+    // prefill, a network/AI call) beyond "add/edit ammo with its
+    // details" — HIDDEN this phase. js/onboarding.js's
+    // scanButtonHtml/bindScanButton are untouched, just not called here.
 
     html += '<div class="field">';
     html += '<label class="field-label" for="ld-name">Load name *</label>';
@@ -1133,19 +1134,10 @@ ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {
         }).catch(function () {});
     }
 
-    // Ammo-box OCR: prefill the form fields for the user to review
-    if (typeof Onboarding !== 'undefined') {
-        Onboarding.bindScanButton(function (fields) {
-            if (fields.name) document.getElementById('ld-name').value = fields.name;
-            if (fields.bulletName) document.getElementById('ld-bullet-name').value = fields.bulletName;
-            if (fields.bulletWeight) document.getElementById('ld-bullet-weight').value = fields.bulletWeight;
-            if (fields.bulletDiameter) document.getElementById('ld-bullet-dia').value = fields.bulletDiameter;
-            if (fields.bulletBC) document.getElementById('ld-bullet-bc').value = fields.bulletBC;
-            if (fields.dragModel) document.getElementById('ld-drag-model').value = fields.dragModel;
-            if (fields.muzzleVelocity) document.getElementById('ld-mv').value = fields.muzzleVelocity;
-            if (fields.lotNumber) document.getElementById('ld-lot').value = fields.lotNumber;
-        });
-    }
+    // STRIP-DOWN PHASE: Onboarding.bindScanButton not called — its own
+    // scan input no longer exists in this form's markup (see the
+    // matching comment in _renderLoadForm above). js/onboarding.js
+    // itself is untouched.
 
     document.getElementById('load-form').addEventListener('submit', function (e) {
         e.preventDefault();

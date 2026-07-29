@@ -85,6 +85,30 @@ check('the Range Session button launches the existing session wizard (SessionLau
     assert(body.indexOf('SessionLaunch.start({})') !== -1, 'Range Session button must call SessionLaunch.start({})');
 });
 
+console.log('\n--- doors closed this phase stay closed ---\n');
+
+check('the ammo form no longer offers the OCR scan button (a distinct extra function beyond "add/edit ammo with its details")', function () {
+    var body = slice('js/profiles.js', 'ProfileManager.prototype._renderLoadForm = function (rifleId, load) {', 1000);
+    assert(body.indexOf('scanButtonHtml()') === -1, 'the OCR scan button must not render in the ammo form this phase');
+    var bindBody = slice('js/profiles.js', 'ProfileManager.prototype._bindLoadFormEvents = function (rifleId, load) {', 1000);
+    assert(bindBody.indexOf('bindScanButton(') === -1, 'the OCR scan handler must not be wired this phase');
+});
+
+check('js/onboarding.js itself is untouched — the OCR feature still exists, just unlinked ("code stays, doors close")', function () {
+    var body = source('js/onboarding.js');
+    assert(body.indexOf('function scanButtonHtml()') !== -1 && body.indexOf('function bindScanButton(') !== -1,
+        'onboarding.js\'s OCR functions must still exist, unmodified');
+});
+
+check('Quick Mode ("Just measure this group") is hidden — a rifle-less session can\'t satisfy "SAVE to that rifle"', function () {
+    var html = source('index.html');
+    var idx = html.indexOf('id="btn-quick-mode"');
+    assert(idx !== -1, 'the button markup must still exist ("code stays")');
+    var wrapStart = html.lastIndexOf('<div', idx);
+    var wrapTag = html.slice(wrapStart, idx);
+    assert(wrapTag.indexOf('hidden') !== -1, 'the Quick Mode button\'s wrapper must carry the hidden class');
+});
+
 console.log('\n════════════════════════════════════════');
 console.log('PART B — the complete loop, traced hop by hop through real source');
 console.log('════════════════════════════════════════\n');

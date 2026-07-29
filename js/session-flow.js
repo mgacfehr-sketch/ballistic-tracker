@@ -356,15 +356,19 @@ SessionFlow.prototype._loadProfilePicker = function () {
     var self = this;
     this.db.getAllRifles().then(function (rifles) {
         if (rifles.length === 0) {
+            // STRIP-DOWN PHASE: the "or tap 'Just measure this group'"
+            // half of this copy referenced Quick Mode, now hidden (a
+            // rifle-less session can't satisfy "SAVE to that rifle").
             picker.innerHTML =
                 '<div class="empty-teach">' +
-                '<p>Pick a rifle so this target lands on its record &mdash; or tap &ldquo;Just measure this group&rdquo; below for a one-off measurement.</p>' +
+                '<p>Add a rifle first so this session lands on its record.</p>' +
                 '<button class="action" id="btn-go-profiles">Set up a rifle</button>' +
                 '</div>';
             var goBtn = document.getElementById('btn-go-profiles');
             if (goBtn) {
                 goBtn.addEventListener('click', function () {
-                    if (window.AppNav) AppNav.go('profiles');
+                    if (window.AppNav && AppNav.openRifleList) AppNav.openRifleList();
+                    else if (window.AppNav) AppNav.go('home');
                 });
             }
             return;
