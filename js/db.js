@@ -1788,3 +1788,135 @@ BallisticDB.prototype.saveSteelPhoto = function (stringId, blob) {
             return path;
         });
 };
+
+// ═════════════════════════════════════════════════════════════
+// Amendment 1 Phase C — carry-forward memory + minimal invalidation.
+// PHASECD-migrations.sql adds config_epochs and recurring_targets.
+// See js/config-memory.js for the pure derivation/compatibility core
+// these tables feed.
+// ═════════════════════════════════════════════════════════════
+
+// ── Config epochs (suppressor/lot CHANGE events, not every use) ──
+// Amendment 1 A2: "ammunition/lot" and configuration change are
+// lifecycle facts, equally canonical inputs. Append-only: "current" is
+// derived (js/config-memory.js's deriveCurrentState) from whichever row
+// per (rifle, kind) has the latest started_at -- never an UPDATE here.
+
+BallisticDB.prototype.addConfigEpoch = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        kind: data.kind, // 'suppressor' | 'lot'
+        value: (data.value === undefined) ? null : data.value,
+        startedAt: data.startedAt || new Date().toISOString(),
+        source: data.source || 'manual',
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('config_epochs').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('config_change', 'config_epochs', saved,
+                { provenance: saved.source || 'manual', eventTime: saved.startedAt });
+            return saved;
+        });
+};
+
+BallisticDB.prototype.getConfigEpochsByRifle = function (rifleId, kind) {
+    var self = this;
+    var q = self.supabase.from('config_epochs').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId);
+    if (kind) q = q.eq('kind', kind);
+    return q.order('started_at', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+/**
+ * Recognition-confirmed lot change (Phase C: "recognition confirms
+ * replace questions" -- e.g. "Still shooting the Hornady 143s?" / "New
+ * lot"). Writes the append-only epoch AND keeps the fast-read cache
+ * (loads.lotNumber, what calibration-status.js's `currentLot` input and
+ * every capture screen already reads) in sync -- config_epochs is the
+ * history that makes the compatibility service and freshness checks
+ * possible; loads.lotNumber stays the cheap current-value read.
+ * A no-op when the answer was "still this lot" (nothing changed, so
+ * nothing is written -- an epoch record must mean a real change).
+ */
+BallisticDB.prototype.changeLot = function (rifleId, loadId, newLot) {
+    var self = this;
+    return self.getLoad(loadId).then(function (load) {
+        if (load && (load.lotNumber || null) === (newLot || null)) {
+            return load;
+        }
+        return self.addConfigEpoch({ rifleId: rifleId, kind: 'lot', value: newLot || null, source: 'manual' })
+            .then(function () {
+                if (!load) return null;
+                load.lotNumber = newLot || null;
+                return self.updateLoad(load);
+            });
+    });
+};
+
+// ── Recurring targets (Constitution §35.5 -- remembered places) ──
+// "If a shooter repeatedly uses the same 900-yard or 1,000-yard steel
+// at a known range, PROVEN should remember: target identity, distance,
+// azimuth... target size; and prior observations." v1 scope: distance +
+// optional azimuth/label, ranked by recency then use count (Phase C:
+// "switcher ranked by recency"). Cross-device (a real table, not the
+// device-local yort_steel_last convenience key rifle-add.js already
+// keeps -- that stays as an instant-offline last-value fallback).
+
+BallisticDB.prototype.addRecurringTargetUse = function (rifleId, distanceYd, opts) {
+    var self = this;
+    opts = opts || {};
+    if (!rifleId || typeof distanceYd !== 'number' || distanceYd <= 0) return Promise.resolve(null);
+    var now = new Date().toISOString();
+    return self.supabase.from('recurring_targets').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId).eq('distance_yd', distanceYd)
+        .maybeSingle()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            if (res.data) {
+                var existing = _rowToJs(res.data);
+                var row = _jsToRow({
+                    id: existing.id,
+                    useCount: (existing.useCount || 1) + 1,
+                    lastUsedAt: now,
+                    azimuthDeg: (typeof opts.azimuthDeg === 'number') ? opts.azimuthDeg : (existing.azimuthDeg || null),
+                    label: opts.label || existing.label || null
+                }, self.userId);
+                return self.supabase.from('recurring_targets').update(row)
+                    .eq('id', existing.id).eq('user_id', self.userId)
+                    .select().single();
+            }
+            var record = {
+                id: generateUUID(), rifleId: rifleId, distanceYd: distanceYd,
+                azimuthDeg: typeof opts.azimuthDeg === 'number' ? opts.azimuthDeg : null,
+                label: opts.label || null, useCount: 1, lastUsedAt: now, createdAt: now
+            };
+            var newRow = _jsToRow(record, self.userId);
+            return self.supabase.from('recurring_targets').insert(newRow).select().single();
+        })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return _rowToJs(res.data);
+        });
+};
+
+/** Ranked by recency then use count -- Phase C: "switcher ranked by recency." */
+BallisticDB.prototype.getRecurringTargets = function (rifleId) {
+    var self = this;
+    return self.supabase.from('recurring_targets').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('last_used_at', { ascending: false })
+        .order('use_count', { ascending: false })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};

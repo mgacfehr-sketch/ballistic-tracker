@@ -43,10 +43,32 @@ var Suppressors = (function () {
         }).catch(function () { return null; });
     }
 
+    /**
+     * Amendment 1 Phase C: a suppressor CHANGE (not every use) is a
+     * canonical lifecycle fact (A2), not just a UI convenience default.
+     * Compares against the last remembered value and only writes a
+     * config_epochs row when it actually changed -- an epoch means "this
+     * changed here," never "this was used again." The user_settings
+     * write below is unchanged (still the fast, offline-safe read every
+     * capture screen already uses); the epoch is the new append-only
+     * history the compatibility service (js/config-memory.js) reads.
+     */
     function rememberLastUsed(db, rifleId, suppressorId) {
         if (!rifleId) return Promise.resolve();
-        return db.setUserSetting(lastUsedKey(rifleId), suppressorId || null)
-            .catch(function () { /* best effort */ });
+        var normalized = suppressorId || null;
+        return getLastUsed(db, rifleId).then(function (previous) {
+            var write = db.setUserSetting(lastUsedKey(rifleId), normalized)
+                .catch(function () { /* best effort */ });
+            if (previous === normalized || typeof db.addConfigEpoch !== 'function') {
+                return write;
+            }
+            return write.then(function () {
+                return db.addConfigEpoch({ rifleId: rifleId, kind: 'suppressor', value: normalized, source: 'manual' })
+                    .catch(function () { /* best effort -- never blocks the primary remember */ });
+            });
+        }).catch(function () {
+            return db.setUserSetting(lastUsedKey(rifleId), normalized).catch(function () {});
+        });
     }
 
     /* ── the add-a-can sheet ──────────────────────────────── */
@@ -141,7 +163,9 @@ var Suppressors = (function () {
     };
 })();
 
-// Export for Node unit tests
+// Export for Node unit tests. Was `{ lastUsedKey: ... }` only; widened to
+// the whole module (Phase C's test-suppressors.js needs rememberLastUsed)
+// -- additive, nothing previously destructured a narrower shape.
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { lastUsedKey: Suppressors.lastUsedKey };
+    module.exports = Suppressors;
 }
