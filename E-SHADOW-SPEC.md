@@ -17,11 +17,12 @@ only after live promotion) has a better-quality input. Per Validation
 Doctrine §8: *"per-shot layer is evidence preparation feeding
 truing-core... engines remain the mathematical authority."*
 
-**Version:** 1.0.0 (initial spec, shadow stage). No prior version
-exists — this is Phase E's first and, per Amendment 1's own build
-order, only permitted stage this session (implementation, shadow mode
-on real strings; predeclared real-range validation and live promotion
-are explicitly future work requiring the owner's go-ahead).
+**Version:** 1.1.0 (adversarial hardening, overnight run #2 — extends
+§5's eligibility rules to two integrity checks the 1.0.0 shots schema
+had no fields for; see §5 "Version 1.1.0 additions" below. No math in
+§3/§4 changed. Prior version: 1.0.0, Phase E shadow implementation.
+Both versions are shadow-stage; nothing in this revision changes the
+promotion gate in §10 or wires the engine anywhere new.)
 
 ---
 
@@ -61,6 +62,9 @@ Per shot, in a sequence:
 | `seq` | integer | yes | shot order within the string (association, §5) |
 | `atmosphere` | `{tempF, pressureInHg, humidity, source}` \| null | no | shared across the sequence unless noted otherwise |
 | `dialResolutionMOA` | number | no | the scope's smallest adjustment (e.g. 0.1 mil ≈ 0.34 MOA); defaults per §3.5 |
+| `chronoTimestampMs` | number \| null | no | wall-clock time (epoch ms) the chronograph device logged the velocity reading, if the source records one. **v1.1.0.** |
+| `impactTimestampMs` | number \| null | no | wall-clock time (epoch ms) the impact/target observation was logged, if the capture screen records one. **v1.1.0.** |
+| `impactGroupId` | string \| null | no | caller-supplied identifier the shooter/scorer used to mark "these shots share one physical hole, cannot be individually distinguished." **v1.1.0.** |
 
 Sequence-level:
 
@@ -214,6 +218,26 @@ A sequence is **eligible** only when ALL of the following hold:
   number would be unsound: two different real shots legitimately
   reading the same rounded fps value is ordinary chronograph data, not
   a duplicate. Shots with no `mvSourceId` skip this check;
+- no shot's optional `impactGroupId` (**v1.1.0** — a caller-supplied
+  identifier the shooter/scorer used when two or more rounds landed in
+  one physically indistinguishable hole) is shared by more than one
+  shot record. When two shots cannot be told apart on the target, there
+  is no sound way to say which measured velocity produced which
+  vertical miss — attributing either shotMV to "the" impact would be a
+  guess, not an association. This is the impact-side mirror of the
+  `mvSourceId` check above (one checks the velocity source isn't double
+  counted, this checks the impact observation isn't double counted).
+  Shots with no `impactGroupId` skip this check — the common case of
+  ordinary, individually-legible holes;
+- **v1.1.0.** no two shots' `chronoTimestampMs`/`impactTimestampMs` pair
+  (when BOTH are supplied on a shot) differ by more than
+  `MAX_CLOCK_SKEW_MS` (default 5 minutes — generous enough for normal
+  device-clock drift and capture lag within one string, tight enough to
+  catch a chronograph and a capture screen that are logging two
+  different strings of fire under the same session). A shot supplying
+  only one of the two timestamps (or neither) skips this check entirely
+  — this is a corroboration check for sequences that HAVE both clocks,
+  never a requirement to have them;
 - the sequence has at least `MIN_SAMPLE` shots (§6).
 
 A sequence failing any check is **proposed-only**: the engine returns
@@ -222,6 +246,19 @@ Constitution §17 ("capture validity and analytic eligibility are
 different"), the underlying shots remain fully preserved regardless —
 this engine only judges whether IT may compute on them, never whether
 they are valid history.
+
+**Deliberately NOT an eligibility rule, v1.1.0:** a shot with a missing
+`shotMV` (an unmeasured or dropped chronograph detection mid-string)
+does not, by itself, make the sequence ineligible. §4 point 2 already
+defines the honest fallback (no per-shot velocity compensation for that
+shot; it still contributes a raw residual observation), §6 already
+gates `sufficientSample` on the count of MV-matched shots specifically,
+and §7's `capNotes` already flags "not every shot has a measured
+velocity" whenever this happens. A hard-ineligible rule here would
+throw away a real, partially-informative string over a single dropped
+detection; the existing sample-size and confidence gating already
+prevents the engine from overstating what a thin-MV string supports.
+Confirmed by the golden suite's adversarial case (§11).
 
 ---
 
@@ -365,3 +402,19 @@ never as a side-channel.
   duplicate `shotMV` claim — each confirmed to return
   `eligible: false` with a distinct `reason`, and confirmed to compute
   nothing further.
+- **v1.1.0 adversarial suite** (`tests/test-residual-engine-adversarial.js`):
+  missing chrono detection mid-string (confirmed NOT ineligible per §5's
+  explicit non-rule, confirmed the honest fallback/capNote fires
+  instead); duplicate import (two shot records both claiming the same
+  `mvSourceId`, confirmed ineligible); re-dial within a string (dial
+  changes on a later shot, confirmed ineligible, distinct from a clean
+  string at the new dial); clock skew between chrono and impact logs
+  (two shots whose `chronoTimestampMs`/`impactTimestampMs` disagree by
+  more than `MAX_CLOCK_SKEW_MS`, confirmed ineligible; confirmed a
+  sequence supplying no timestamps at all is unaffected); multi-shot
+  single impact (two shots sharing one `impactGroupId`, confirmed
+  ineligible; confirmed distinct `impactGroupId`s or no `impactGroupId`
+  at all are unaffected). Every case in this suite asserts BOTH
+  `eligible: false` AND that `computeResidualEngine` returns no
+  aggregate (`explainedMOA`/`unresolvedResidualMOA` both `null`) — the
+  engine must refuse to guess, not merely warn.

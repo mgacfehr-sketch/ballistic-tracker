@@ -1,7 +1,8 @@
 /**
  * residual-engine.js — Amendment 1 Phase E, SHADOW STAGE ONLY.
- * Implements E-SHADOW-SPEC.md v1.0.0 exactly. PURE — no DOM, no
+ * Implements E-SHADOW-SPEC.md v1.1.0 exactly. PURE — no DOM, no
  * storage, no Date.now(). Node-tested: tests/test-residual-engine.js,
+ * tests/test-residual-engine-adversarial.js,
  * tests/test-golden-residual-engine.js.
  *
  * SHADOW-ONLY (E-SHADOW-SPEC.md §9): this engine computes and its
@@ -37,6 +38,7 @@ var RESIDUAL_ENGINE = {
     MIN_SAMPLE: 4,
     OUTLIER_SIGMA: 3,
     MAD_FLOOR_MOA: 0.05,
+    MAX_CLOCK_SKEW_MS: 5 * 60 * 1000,
     CHRONOGRAPH_CLASS_PCT_DEFAULT: 0.1,
     DISTANCE_SIGMA_YD_DEFAULT: 1,
     IMPACT_OBSERVATION_MOA_DEFAULT: 0.25,
@@ -191,6 +193,30 @@ function checkEligibility(shots) {
         if (!sourceId) continue;
         if (sourceSeen[sourceId]) return { eligible: false, reason: 'competing shotMV source (' + sourceId + ' claimed by more than one shot)' };
         sourceSeen[sourceId] = true;
+    }
+    // Shared impact (E-SHADOW-SPEC.md v1.1.0 §5) -- two shots that
+    // landed in one physically indistinguishable hole have no sound way
+    // to say which measured velocity produced which vertical miss.
+    // Mirrors the mvSourceId check above on the impact side instead of
+    // the velocity side. Shots with no impactGroupId skip this check.
+    var groupSeen = {};
+    for (var n = 0; n < shots.length; n++) {
+        var groupId = shots[n].impactGroupId;
+        if (!groupId) continue;
+        if (groupSeen[groupId]) return { eligible: false, reason: 'shared impact (impactGroupId ' + groupId + ' claimed by more than one shot) -- cannot attribute per-shot residual to a single hole' };
+        groupSeen[groupId] = true;
+    }
+    // Clock skew (E-SHADOW-SPEC.md v1.1.0 §5) -- corroboration check,
+    // only runs when a shot supplies BOTH timestamps. A shot with only
+    // one (or neither) skips the check entirely -- this never requires
+    // timestamps to be present.
+    for (var p = 0; p < shots.length; p++) {
+        var cs = shots[p].chronoTimestampMs, is = shots[p].impactTimestampMs;
+        if (typeof cs !== 'number' || typeof is !== 'number') continue;
+        var skewMs = Math.abs(cs - is);
+        if (skewMs > RESIDUAL_ENGINE.MAX_CLOCK_SKEW_MS) {
+            return { eligible: false, reason: 'clock skew between chrono and impact logs on shot ' + shots[p].seq + ' exceeds ' + RESIDUAL_ENGINE.MAX_CLOCK_SKEW_MS + 'ms tolerance' };
+        }
     }
     return { eligible: true, reason: null };
 }
