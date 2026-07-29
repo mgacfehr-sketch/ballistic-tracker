@@ -272,8 +272,18 @@
             // views from anywhere (Home, categories, cards, deep links).
             // switchView is hoisted from below.
             window.AppNav = {
+                // UI Consolidation phase, surface budget law: there is
+                // no bare "profiles" destination anymore (the rifle-list
+                // page was retired — see profiles.js's showRifleList
+                // comment). Every caller that used to land there with
+                // nothing specific in mind now lands on the Card, the
+                // app's one resting screen, instead of a page that no
+                // longer exists. AppNav.openRifle/openReport/openSession
+                // below call switchView('profiles') directly (not
+                // through here) immediately followed by their own
+                // specific render, so they are unaffected by this.
                 go: function (viewName) {
-                    switchView(viewName);
+                    switchView(viewName === 'profiles' ? 'home' : viewName);
                 },
                 openRifle: function (rifleId) {
                     switchView('profiles');
@@ -466,10 +476,16 @@
                 }
             }
 
-            // Load profiles content when switching to profiles tab
-            if (viewName === 'profiles' && profileManager) {
-                profileManager.showRifleList();
-            }
+            // UI Consolidation phase: 'profiles' is no longer a
+            // standalone destination with its own default render — it's
+            // only ever activated by AppNav.openRifle/openReport/
+            // openSession immediately below in the same call stack, each
+            // of which renders its own specific content into it. A bare
+            // switchView('profiles') with no follow-up would previously
+            // show the now-retired rifle list; it now shows whatever
+            // #view-profiles last rendered, which callers should not do
+            // — use AppNav.go('profiles') (redirects to the Card) or one
+            // of the AppNav.open* methods instead.
 
             // Ask yorT is DEFERRED in v1 (Contract Part 0.5 — cost
             // control ships with it). The proxy, tables, and assistant

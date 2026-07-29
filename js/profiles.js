@@ -1,8 +1,13 @@
 /**
  * profiles.js — Rifle and Load profile management UI.
  *
- * Manages views: rifle list, rifle form (create/edit), rifle detail
- * (with loads + barrel), load form (create/edit), load detail.
+ * Manages views: rifle detail (Paperwork — loads + barrel + settings),
+ * rifle form (create/edit), load form (create/edit), load detail. The
+ * standalone rifle-LIST view was retired in the UI Consolidation phase
+ * (surface budget law: Card / switcher sheet / details drawer, nothing
+ * else) — showRifleList() is now a compatibility redirect to the Card,
+ * kept under its old name so existing fallback callers don't need
+ * touching; see its own comment.
  *
  * All rendering targets the #view-profiles container and emits the
  * ui.css vocabulary (docs/REDESIGN-SPEC.md Part IV).
@@ -23,238 +28,77 @@ ProfileManager.prototype.init = function () {
 };
 
 /**
- * Show the rifle list (main profiles screen).
+ * showRifleList — RETIRED AS A PAGE (UI Consolidation phase). The
+ * surface budget law: Card, switcher sheet, details drawer — nothing
+ * else. Kept as a compatibility shim under its old name so the many
+ * existing fallback callers (a not-found rifle in certificate.js/
+ * history.js/rifle-report.js, a cancelled create-form, a failed detail
+ * load) don't each need editing — every one of them now correctly
+ * lands on the Card, the app's one resting screen, instead of a page
+ * that no longer exists. Per-rifle status lines this page used to show
+ * now live in the rifle switcher sheet (js/rifle-app.js's
+ * _openRifleList). "Misc sessions" / "Suppressed shooting" / "Account"
+ * moved to _showAccountOverlay, reached from Paperwork's "Settings &
+ * sign-out" row.
  */
 ProfileManager.prototype.showRifleList = function () {
     this.currentRifleId = null;
-    var self = this;
-    Promise.all([
-        this.db.getAllRifles(),
-        this.db.getSetting('workflowCardDismissed')
-    ]).then(function (results) {
-        var rifles = results[0];
-        rifles.sort(function (a, b) {
-            return (a.name || '').localeCompare(b.name || '');
-        });
-        self._renderRifleList(rifles, results[1] === true);
-    });
+    if (window.AppNav) AppNav.go('home');
 };
 
-ProfileManager.prototype._renderRifleList = function (rifles, workflowDismissed) {
+/**
+ * Account overlay (UI Consolidation phase): the three things that used
+ * to live on the killed Rifles-list page with no per-rifle home — Misc
+ * sessions (paper sessions saved without a rifle), Suppressed shooting
+ * (the standing can-tracking toggle), and Account (privacy policy +
+ * delete account). Reached from Paperwork's "Settings & sign-out" row.
+ * An overlay off the details drawer, not a new top-level surface — same
+ * class as the trip-planner/troubleshooting-check overlays already used
+ * elsewhere in this codebase, so it does not add to the rifle-surface
+ * count.
+ */
+ProfileManager.prototype._showAccountOverlay = function () {
     var self = this;
-    var html = '<div class="screen">';
-    html += '<div class="pagehead"><button class="backline" id="btn-rifles-back">&lsaquo; Home</button>' +
-        '<div class="pagetitle">Rifles</div></div>';
+    var overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    var html = '<div class="overlay-card"><div class="overlay-title">Settings &amp; account</div>';
 
-    // Fleet summary chips line ("4 ready · 2 need adjustment · 1 not checked")
-    if (rifles.length > 1) {
-        html += '<div class="fleetline" id="fleet-summary"></div>';
-    }
+    html += UI.card(UI.rowlink({
+        button: true, id: 'ao-misc-sessions',
+        title: 'Misc sessions', sub: 'Sessions saved without a rifle profile', chev: true
+    }));
 
-    // One-time workflow pointer (dismissible, never returns)
-    if (!workflowDismissed && typeof hasFeature === 'function' && hasFeature('certificate')) {
-        html += '<div class="card card-pad u-mb-12" id="workflow-card">';
-        html += '<h4 class="t-head">From ammo box to certificate</h4>';
-        html += '<p class="t-body u-quiet u-mt-10">Create a rifle and load here. Import chrono data and check targets from Home. When a load proves out, generate its certificate from the rifle&rsquo;s performance report.</p>';
-        html += '<button type="button" class="action-ghost u-mt-10" id="workflow-dismiss">Got it</button>';
-        html += '</div>';
-    }
-
-    if (rifles.length === 0) {
-        html += '<div class="empty-teach">';
-        html += '<p>Every target photo, chrono string, and insight lands on a rifle &mdash; add yours to start.</p>';
-        html += '<button type="button" class="btn-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
-        html += '</div>';
-    } else {
-        // Search appears only when the fleet outgrows a screen
-        if (rifles.length > 8) {
-            html += '<div class="search">' + Icon('search', 18) +
-                '<input type="text" id="rifle-search" placeholder="Search rifles&hellip;" aria-label="Search rifles"></div>';
-        }
-        html += '<div class="card" id="rifle-list-card">';
-        for (var i = 0; i < rifles.length; i++) {
-            var r = rifles[i];
-            html += UI.rowlink({
-                button: true,
-                title: r.name || 'Rifle',
-                sub: r.caliber || '',
-                data: { 'rifle-id': r.id },
-                right: '<span class="chip" data-fleet-chip="' + UI.esc(r.id) + '">&hellip;</span>'
-            });
-        }
-        html += '</div>';
-        html += '<p class="t-micro u-mt-10 edge">' + rifles.length + ' / ' + MAX_RIFLES + ' profiles</p>';
-    }
-
-    // Misc sessions link
-    html += UI.sectionHead('More');
-    html += UI.card(
-        UI.rowlink({
-            button: true, id: 'btn-misc-sessions',
-            title: 'Misc sessions', sub: 'Sessions saved without a rifle profile', chev: true
-        })
-    );
-
-    // Suppressed shooting (v3.0 step 9: moved out of onboarding — a
-    // standing toggle here instead of a one-time first-run question).
     if (typeof Suppressors !== 'undefined') {
-        html += '<details class="fold u-mt-14 edge"><summary>Suppressed shooting</summary>';
-        html += '<div class="fold-body" id="sup-fold-body"><p class="t-body u-quiet">Loading&hellip;</p></div>';
+        html += '<details class="fold u-mt-14"><summary>Suppressed shooting</summary>';
+        html += '<div class="fold-body" id="ao-sup-fold-body"><p class="t-body u-quiet">Loading&hellip;</p></div>';
         html += '</details>';
     }
 
-    // Account (privacy + deletion — store compliance)
-    html += '<details class="fold u-mt-14 edge"><summary>Account</summary>';
+    html += '<details class="fold u-mt-14"><summary>Account</summary>';
     html += '<div class="fold-body">';
     html += '<p class="t-body"><a href="privacy-policy.html">Privacy policy</a></p>';
     html += '<p class="t-body u-quiet u-mt-10">Deleting your account permanently removes every rifle, session, photo, and chrono string. This cannot be undone.</p>';
-    html += '<button type="button" class="btn-danger u-mt-10" id="btn-delete-account">Delete account&hellip;</button>';
+    html += '<button type="button" class="btn-danger u-mt-10" id="ao-delete-account">Delete account&hellip;</button>';
     html += '</div></details>';
 
-    html += '</div>'; // close .screen
+    html += '<button class="btn u-full u-mt-10" id="ao-close">Close</button></div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    overlay.querySelector('#ao-close').addEventListener('click', close);
 
-    // Add rifle · Scan certificate, pinned in thumb reach
-    if (rifles.length > 0) {
-        html += '<div class="fab-zone">';
-        html += '<button type="button" class="btn-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
-        html += '<button type="button" class="btn u-full u-mt-10" id="btn-scan-cert">Scan certificate</button>';
-        html += '</div>';
-    }
-
-    this.container.innerHTML = html;
-    this._bindRifleListEvents();
-    this._fillFleetReadiness(rifles);
-    this._fillSuppressorFold();
-};
-
-/** Readiness chips per row + the fleet summary line (async fill). */
-ProfileManager.prototype._fillFleetReadiness = function (rifles) {
-    var self = this;
-    if (!rifles.length || typeof Readiness === 'undefined') return;
-    Promise.all(rifles.map(function (r) {
-        return Readiness.assess(self.db, r).then(function (res) {
-            var chipEl = self.container.querySelector('[data-fleet-chip="' + r.id + '"]');
-            if (chipEl) chipEl.outerHTML = UI.chip(res.chip.kind, res.chip.text);
-            // status one-liner under the name
-            var row = self.container.querySelector('[data-rifle-id="' + r.id + '"] .txt span');
-            if (row) {
-                var status = res.state === 'ready' && res.lastChecked
-                    ? 'zero confirmed ' + res.lastChecked.toLocaleDateString()
-                    : (res.state === 'adjust' && res.correction
-                        ? res.correction.toLowerCase() + ' needed'
-                        : (res.state === 'adjust' ? 'confirm with one more group' : 'never checked'));
-                row.textContent = (r.caliber ? r.caliber + ' · ' : '') + status;
-            }
-            return res.state;
-        }).catch(function () { return null; });
-    })).then(function (states) {
-        var summary = document.getElementById('fleet-summary');
-        if (!summary || !summary.isConnected) return;
-        var counts = { ready: 0, adjust: 0, unchecked: 0 };
-        states.forEach(function (s) { if (s && counts.hasOwnProperty(s)) counts[s]++; });
-        var chips = '';
-        if (counts.ready) chips += UI.chip('ready', counts.ready + ' ready');
-        if (counts.adjust) chips += UI.chip('caution', counts.adjust + ' need adjustment');
-        if (counts.unchecked) chips += UI.chip('problem', counts.unchecked + ' not checked');
-        summary.innerHTML = chips;
-    });
-};
-
-/** Suppressed-shooting fold: standing toggle (v3.0 step 9), replaces
- *  the old one-time onboarding question. */
-ProfileManager.prototype._fillSuppressorFold = function () {
-    var self = this;
-    var body = document.getElementById('sup-fold-body');
-    if (!body || typeof Suppressors === 'undefined') return;
-    Suppressors.isEnabled(this.db).then(function (on) {
-        if (!body.isConnected) return;
-        body.innerHTML = on
-            ? '<p class="t-body u-quiet">On &mdash; sessions ask which can is on.</p>' +
-              '<button type="button" class="action u-full u-mt-10" id="sup-manage">Manage cans</button>' +
-              '<button type="button" class="action u-full u-mt-10" id="sup-turnoff">Turn off</button>'
-            : '<p class="t-body u-quiet">Off &mdash; sessions never ask about a can.</p>' +
-              '<button type="button" class="action u-full u-mt-10" id="sup-turnon">Turn on &amp; add a can</button>';
-
-        var manage = document.getElementById('sup-manage');
-        if (manage) manage.addEventListener('click', function () {
-            Suppressors.addSheet(self.db, { onDone: function () { self._fillSuppressorFold(); } });
-        });
-        var turnoff = document.getElementById('sup-turnoff');
-        if (turnoff) turnoff.addEventListener('click', function () {
-            Suppressors.setEnabled(self.db, false).then(function () { self._fillSuppressorFold(); });
-        });
-        var turnon = document.getElementById('sup-turnon');
-        if (turnon) turnon.addEventListener('click', function () {
-            Suppressors.setEnabled(self.db, true).then(function () {
-                Suppressors.addSheet(self.db, { intro: true, onDone: function () { self._fillSuppressorFold(); } });
-            });
-        });
-    }).catch(function () { /* leave "Loading…" — non-critical setting */ });
-};
-
-ProfileManager.prototype._bindRifleListEvents = function () {
-    var self = this;
-    var backBtn = document.getElementById('btn-rifles-back');
-    if (backBtn) backBtn.addEventListener('click', function () {
-        if (window.AppNav) AppNav.go('home');
-    });
-    var addBtn = document.getElementById('btn-add-rifle');
-    if (addBtn) {
-        addBtn.addEventListener('click', function () {
-            self.showRifleForm(null);
+    var miscBtn = overlay.querySelector('#ao-misc-sessions');
+    if (miscBtn && this.historyManager) {
+        miscBtn.addEventListener('click', function () {
+            close();
+            self.historyManager.showMiscSessionList();
         });
     }
 
-    var workflowDismiss = document.getElementById('workflow-dismiss');
-    if (workflowDismiss) {
-        workflowDismiss.addEventListener('click', function () {
-            self.db.setSetting('workflowCardDismissed', true);
-            var card = document.getElementById('workflow-card');
-            if (card) card.classList.add('hidden');
-        });
-    }
+    this._fillSuppressorFold(overlay);
 
-    var cards = this.container.querySelectorAll('[data-rifle-id]');
-    for (var i = 0; i < cards.length; i++) {
-        cards[i].addEventListener('click', function () {
-            var id = this.getAttribute('data-rifle-id');
-            self.showRifleDetail(id);
-        });
-    }
-
-    // Search filters rows in place (shown only for >8 rifles)
-    var search = document.getElementById('rifle-search');
-    if (search) {
-        search.addEventListener('input', function () {
-            var q = this.value.toLowerCase();
-            var rows = self.container.querySelectorAll('#rifle-list-card [data-rifle-id]');
-            for (var r = 0; r < rows.length; r++) {
-                var text = rows[r].textContent.toLowerCase();
-                rows[r].classList.toggle('hidden', q && text.indexOf(q) === -1);
-            }
-        });
-    }
-
-    // Scan certificate: certificates carry a QR deep link — explain it
-    var scanBtn = document.getElementById('btn-scan-cert');
-    if (scanBtn) {
-        scanBtn.addEventListener('click', function () {
-            var overlay = document.createElement('div');
-            overlay.className = 'overlay';
-            overlay.innerHTML =
-                '<div class="overlay-card">' +
-                '<div class="overlay-title">Scan a certificate</div>' +
-                '<p class="overlay-text">Every Proven certificate carries a QR code. Point your phone&rsquo;s camera at it &mdash; the link opens that rifle right here.</p>' +
-                '<button class="btn u-full" id="scan-cert-close">Got it</button>' +
-                '</div>';
-            document.body.appendChild(overlay);
-            function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
-            overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-            overlay.querySelector('#scan-cert-close').addEventListener('click', close);
-        });
-    }
-
-    var deleteAccountBtn = document.getElementById('btn-delete-account');
+    var deleteAccountBtn = overlay.querySelector('#ao-delete-account');
     if (deleteAccountBtn) {
         deleteAccountBtn.addEventListener('click', function () {
             var typed = prompt('This permanently deletes your account and ALL data — rifles, sessions, photos, chrono strings.\n\nType DELETE to confirm:');
@@ -271,13 +115,42 @@ ProfileManager.prototype._bindRifleListEvents = function () {
             });
         });
     }
+};
 
-    var miscBtn = document.getElementById('btn-misc-sessions');
-    if (miscBtn && this.historyManager) {
-        miscBtn.addEventListener('click', function () {
-            self.historyManager.showMiscSessionList();
+/** Suppressed-shooting fold: standing toggle (v3.0 step 9), replaces
+ *  the old one-time onboarding question. Scoped to an explicit root
+ *  element (the account overlay) rather than a page-level id lookup,
+ *  since this now renders inside a transient overlay, not a persistent
+ *  page container. */
+ProfileManager.prototype._fillSuppressorFold = function (scope) {
+    var self = this;
+    var root = scope || document;
+    var body = root.querySelector('#ao-sup-fold-body');
+    if (!body || typeof Suppressors === 'undefined') return;
+    Suppressors.isEnabled(this.db).then(function (on) {
+        if (!body.isConnected) return;
+        body.innerHTML = on
+            ? '<p class="t-body u-quiet">On &mdash; sessions ask which can is on.</p>' +
+              '<button type="button" class="action u-full u-mt-10" id="sup-manage">Manage cans</button>' +
+              '<button type="button" class="action u-full u-mt-10" id="sup-turnoff">Turn off</button>'
+            : '<p class="t-body u-quiet">Off &mdash; sessions never ask about a can.</p>' +
+              '<button type="button" class="action u-full u-mt-10" id="sup-turnon">Turn on &amp; add a can</button>';
+
+        var manage = body.querySelector('#sup-manage');
+        if (manage) manage.addEventListener('click', function () {
+            Suppressors.addSheet(self.db, { onDone: function () { self._fillSuppressorFold(root); } });
         });
-    }
+        var turnoff = body.querySelector('#sup-turnoff');
+        if (turnoff) turnoff.addEventListener('click', function () {
+            Suppressors.setEnabled(self.db, false).then(function () { self._fillSuppressorFold(root); });
+        });
+        var turnon = body.querySelector('#sup-turnon');
+        if (turnon) turnon.addEventListener('click', function () {
+            Suppressors.setEnabled(self.db, true).then(function () {
+                Suppressors.addSheet(self.db, { intro: true, onDone: function () { self._fillSuppressorFold(root); } });
+            });
+        });
+    }).catch(function () { /* leave "Loading…" — non-critical setting */ });
 };
 
 // ── Rifle Form (Create / Edit) ─────────────────────────────────
@@ -676,7 +549,7 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     var html = '<div class="screen">';
 
     html += '<div class="pagehead">';
-    html += '<button type="button" class="backline" id="btn-detail-back">&lsaquo; Rifles</button>';
+    html += '<button type="button" class="backline" id="btn-detail-back">&lsaquo; Home</button>';
     html += '<div class="pagetitle">' + escapeHtml(rifle.name) + '</div>';
     if (rifle.caliber) html += '<div class="pagesub mono">' + escapeHtml(rifle.caliber) + '</div>';
     html += '</div>';
@@ -766,7 +639,7 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
         self._openTargetPrintChooser();
     });
     document.getElementById('rd-settings').addEventListener('click', function () {
-        self.showRifleList();
+        self._showAccountOverlay();
     });
 };
 

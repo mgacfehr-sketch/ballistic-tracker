@@ -78,7 +78,15 @@ var SCREENS = [
     { file: 'js/rifle-payoff.js', anchor: 'function _couldNotUse(', label: 'RiflePayoff refusal screen' },
     { file: 'js/rifle-payoff.js', anchor: 'function _renderPayoff(', label: 'RiflePayoff Keep/Undo screen' },
 
-    { file: 'js/profiles.js', anchor: 'ProfileManager.prototype._renderRifleList = function', label: 'Rifles list' },
+    // UI Consolidation phase: the standalone Rifles-list PAGE was
+    // retired (surface budget law — Card/switcher sheet/details drawer
+    // only), removed from this SCREENS list entirely rather than
+    // pointed at a replacement anchor, because its replacement is an
+    // OVERLAY (_showAccountOverlay, checked separately below near the
+    // switcher's own bespoke checks — see "Account overlay"), not a
+    // full-page screen this generic full-page exit-pattern check
+    // applies to (same reason existing overlays like the trip planner
+    // and troubleshooting check were never in this list either).
     { file: 'js/profiles.js', anchor: 'ProfileManager.prototype._renderRifleForm = function', label: 'Rifle form' },
     { file: 'js/profiles.js', anchor: 'ProfileManager.prototype._renderRifleDetail = function', label: 'Rifle detail (Paperwork, view 8)' },
     { file: 'js/profiles.js', anchor: 'ProfileManager.prototype.showBarrelForm = function', label: 'Barrel form' },
@@ -215,6 +223,37 @@ check('Rifle switcher search box is always visible, not gated by rifle count (Co
     }
     if (region.indexOf("addEventListener('input'") === -1) {
         throw new Error('the search input has no filter handler wired up');
+    }
+});
+check('UI Consolidation: the rifle switcher shows per-rifle status lines (the retired Rifles-list page\'s job, moved not duplicated)', function () {
+    var source = readFile('js/rifle-app.js');
+    var openRegion = extractRegion(source, 'RifleApp.prototype._openRifleList = function', 3500);
+    if (openRegion.indexOf('data-switcher-status=') === -1) {
+        throw new Error('switcher rows have no status-line placeholder');
+    }
+    if (openRegion.indexOf('data-switcher-chip=') === -1) {
+        throw new Error('switcher rows have no readiness-chip placeholder');
+    }
+    if (openRegion.indexOf('_fillSwitcherReadiness(overlay)') === -1) {
+        throw new Error('_openRifleList never calls the async readiness fill');
+    }
+    var fillRegion = extractRegion(source, 'RifleApp.prototype._fillSwitcherReadiness = function', 1200);
+    if (fillRegion.indexOf('Readiness.assess(') === -1) {
+        throw new Error('the switcher status fill does not use the shared Readiness engine — every other readiness surface in this app must compute the verdict the same way');
+    }
+});
+check('UI Consolidation: the Account overlay (Misc sessions/Suppressed shooting/Account) is closeable and reachable from Paperwork\'s Settings row', function () {
+    var source = readFile('js/profiles.js');
+    var region = extractRegion(source, 'ProfileManager.prototype._showAccountOverlay = function', 3000);
+    if (region.indexOf("id='ao-close'") === -1 && region.indexOf('#ao-close') === -1) {
+        throw new Error('the Account overlay has no explicit close button');
+    }
+    if (region.indexOf('ao-misc-sessions') === -1) throw new Error('Misc sessions did not move into the Account overlay');
+    if (region.indexOf('ao-delete-account') === -1) throw new Error('Delete account did not move into the Account overlay');
+    var bindRegion = readFile('js/profiles.js');
+    var settingsRegion = extractRegion(bindRegion, "document.getElementById('rd-settings').addEventListener", 200);
+    if (settingsRegion.indexOf('_showAccountOverlay()') === -1) {
+        throw new Error('Paperwork\'s "Settings & sign-out" row no longer opens the Account overlay');
     }
 });
 

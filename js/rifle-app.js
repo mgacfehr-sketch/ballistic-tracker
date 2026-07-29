@@ -562,7 +562,15 @@ RifleApp.prototype._bindRifleNav = function () {
  *  Device bug: "add a rifle" had no tap target here at all — a user
  *  looking to add their next rifle naturally opens this list first,
  *  not Paperwork's "Everything else" drawer. "+ Add a rifle" and
- *  "Scan certificate" are always the last two rows. */
+ *  "Scan certificate" are always the last two rows.
+ *
+ *  UI Consolidation phase: this IS the switcher sheet the surface
+ *  budget law names ("tap rifle name -> list shows every rifle with
+ *  its status line"). Per-rifle status lines (ready / needs adjustment
+ *  / not checked) now render here, sourced from the SAME shared
+ *  Readiness.assess engine every other readiness surface already uses
+ *  (readiness.js) — the exact content the now-retired Rifles-list page
+ *  used to show, moved rather than duplicated. */
 RifleApp.prototype._openRifleList = function () {
     var self = this;
     var overlay = document.createElement('div');
@@ -574,7 +582,10 @@ RifleApp.prototype._openRifleList = function () {
     var rows = '';
     this._rifles.forEach(function (r, i) {
         rows += '<button class="option-row' + (i === self._cardIndex ? ' on' : '') + '" data-pick="' + i + '">' +
-            '<span>' + UI.esc(r.name || 'Rifle') + (r.caliber ? '<span class="choice-desc">' + UI.esc(r.caliber) + '</span>' : '') + '</span></button>';
+            '<span>' + UI.esc(r.name || 'Rifle') +
+            '<span class="choice-desc" data-switcher-status="' + UI.esc(r.id) + '">' +
+            UI.esc(r.caliber || '') + '</span></span>' +
+            '<span class="chip" data-switcher-chip="' + UI.esc(r.id) + '"></span></button>';
     });
     overlay.innerHTML = '<div class="overlay-card"><div class="overlay-title">Which rifle?</div>' +
         searchHtml + '<div id="rf-switcher-rows">' + rows + '</div>' +
@@ -614,6 +625,28 @@ RifleApp.prototype._openRifleList = function () {
     if (scanRow) scanRow.addEventListener('click', function () {
         close();
         self._explainScanCertificate();
+    });
+    this._fillSwitcherReadiness(overlay);
+};
+
+/** Per-rifle status line + chip, async-filled after the switcher
+ *  renders — same pattern the retired Rifles-list page used
+ *  (profiles.js's former _fillFleetReadiness), just targeting this
+ *  overlay's own row markup instead of a page. Readiness.assess is
+ *  memoized per rifle (readiness.js's own short TTL), so opening the
+ *  switcher right after the Card's own readiness-driven coach line
+ *  already computed is cheap, not a duplicate fleet-wide query. */
+RifleApp.prototype._fillSwitcherReadiness = function (overlay) {
+    var db = this.db;
+    if (!this._rifles.length || typeof Readiness === 'undefined') return;
+    this._rifles.forEach(function (r) {
+        Readiness.assess(db, r).then(function (res) {
+            if (!overlay.isConnected) return;
+            var chipEl = overlay.querySelector('[data-switcher-chip="' + r.id + '"]');
+            if (chipEl) chipEl.outerHTML = UI.chip(res.chip.kind, res.chip.text);
+            var statusEl = overlay.querySelector('[data-switcher-status="' + r.id + '"]');
+            if (statusEl) statusEl.textContent = (r.caliber ? r.caliber + ' · ' : '') + res.note;
+        }).catch(function () { /* row keeps its plain caliber-only text */ });
     });
 };
 
