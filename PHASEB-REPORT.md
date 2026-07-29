@@ -5,10 +5,16 @@ item that doesn't require the owner's hands, per standing rulings;
 (2) Amendment 1 Part B, Phase B — the fact spine, right-sized;
 (3) all SQL written to one additive migration file, never run.
 
-**Branch:** `redesign`. 8 commits this session, each verified green
-(full 31-file test suite, canon manifest, protected-engine hash lock)
-before the next began. **No SQL was run** — `PHASEB-migrations.sql` is
-written for the owner to review and run in the Supabase SQL Editor.
+**Branch:** `redesign`. Built across multiple commits, each verified
+green (full test suite, canon manifest, protected-engine hash lock)
+before the next began. No SQL was run by the assistant at any point —
+`PHASEB-migrations.sql` was written for owner review and owner-run
+execution only. **Status as of 2026-07-28: the owner has reviewed and
+run P0–P4** (storage policies, `import-vault` bucket, `delete_my_account`
+patch, all three new tables, the backfill) in the Supabase SQL Editor
+and deployed. P5 (parity, clone-only) and P6 (rollback, reference-only)
+remain unexecuted by design — see OWNER-ACTIONS for parity's current
+status.
 
 ---
 
@@ -326,24 +332,10 @@ P4 backfill (owner-review #2 closed — see above). Kept here, struck
 through, so this list's numbering stays stable against anything
 already referencing it.
 
-**2. The zero_records timing recheck, right before you run the P4
-backfill block (not before).** Owner-review #3 confirmed `zero_records`
-had 0 rows on 2026-07-28, so P4 deliberately writes no backfill code
-for it — but time will have passed by the time you actually run
-`PHASEB-migrations.sql`, and it's a live table nothing this session
-re-checked. Run this immediately before backfilling, not now:
-
-```sql
-select
-  (select count(*) from public.zero_records) as zero_records,
-  (select count(*) from public.zero_events) as zero_events;
-```
-
-If `zero_records` is still 0, nothing to do — P4 is correct as
-written. If it's now nonzero (someone/something wrote to the dead
-`addZeroRecord` path, or restored a backup), stop and flag it back —
-that would mean re-auditing #3's "dead code" finding, not just adding
-a backfill block.
+**2. ~~The zero_records timing recheck~~ — DONE, 2026-07-28. Clean.**
+`zero_records` was still 0 immediately before P4 ran — no drift since
+owner-review #3's original check, P4's decision to write no backfill
+code for it stands confirmed, not just assumed.
 
 **3. ~~Confirm the existing event tables' RLS is actually live~~ —
 DONE, 2026-07-28.** All 8 tables, 4 policies each (SELECT/INSERT/
@@ -401,11 +393,19 @@ tracing who's affected:
      Amendment 1 Part B's "right-sized failure-injection suite," now
      covering this race specifically as asked. All 34 checks green.
 
-**5. Review and run `PHASEB-migrations.sql`** (P0/P0b create/fix
-storage policies; P1–P3 create tables; P4 backfills; P5 is read-only,
-meant for a clone, not production — run it there if you want the
-parity guarantee before trusting the live backfill; P6 is rollback,
-reference only). Re-runnable if interrupted.
+**5. ~~Review and run `PHASEB-migrations.sql`~~ — P0–P4 DONE, deployed,
+2026-07-28.** P0/P0b/P0c (storage policies + bucket + delete_my_account
+patch) and P1–P3 (fact_events, attachment_vault, workhorse_packages)
+are live. P4 backfill ran; owner reports the P5 count-parity query
+returned an exact 8/8 match across every backfilled table — **the
+actual result table wasn't received in this conversation** (this
+repo's second known instance of a pasted table not coming through, per
+`docs/canon/MIGRATION-INVENTORY.md`'s own Method note on the same
+failure mode), so this report records the claim as owner-reported, not
+independently verified against real numbers. **Re-paste the P5 output
+to close this out for real** — until then, treat parity as "reported
+clean, not yet confirmed in the written record." P6 (rollback) remains
+reference-only, not run.
 
 **6. ~~Judgment call — dedicated bucket for `attachment_vault` imports?~~
 RULED 2026-07-28: yes, dedicated bucket.** "Original evidence has a
@@ -443,6 +443,14 @@ closed without your hands has been closed. Phase B's fact spine
 (envelope, dual-write, backfill script, vault-first import, Workhorse
 schema, RLS audit) is built and wired into working code where the
 Amendment calls for working code, schema-only where it explicitly
-calls for schema-only. All SQL lives in one additive, never-executed
-file. Full test suite, canon manifest, and protected-engine hash lock
-all green. Waiting for you on OWNER-ACTIONS above before Phase C.
+calls for schema-only. **Update, 2026-07-28: `PHASEB-migrations.sql`
+P0–P4 have been reviewed and run by the owner** (storage policies,
+`import-vault` bucket, `delete_my_account` patch, all three new
+tables, and the backfill) — this file is no longer purely
+hypothetical/never-executed for P0–P4; P5 (parity, clone-only) and P6
+(rollback, reference-only) remain unexecuted by design. Parity is
+owner-reported clean (8/8) but not yet independently confirmed in this
+written record — see OWNER-ACTIONS item 5. Full test suite, canon
+manifest, and protected-engine hash lock all green throughout. One
+open item (re-paste the parity table) before Phase B is fully closed
+out; otherwise waiting on you before Phase C.
