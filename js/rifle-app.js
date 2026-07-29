@@ -44,7 +44,19 @@ RifleApp.prototype.show = function (rifleId) {
     var self = this;
     this.container.setAttribute('data-screen', 'v3-rifle');
 
-    this.db.getAllRifles().catch(function () { return []; }).then(function (rifles) {
+    // UI Consolidation phase, law (3): the gold "Add what you shot"
+    // button must be present at all times. db.js's own getAllRifles
+    // already falls back to the offline cache and only ever resolves
+    // (never rejects) in its ordinary failure paths -- but a REJECTION
+    // here, whatever caused it, must never be silently treated as
+    // "confirmed zero rifles." Doing that used to swap the whole Card
+    // for the onboarding "No rifle yet / Add your rifle" empty state —
+    // for a shooter who actually HAS rifles on file, that state has no
+    // way to start a session at all, which matches the device report
+    // ("could not locate how to start a session") closely enough that
+    // it's worth closing even though db.js's own fallback chain makes
+    // it a narrow, defensive case rather than the common path.
+    this.db.getAllRifles().then(function (rifles) {
         self._rifles = rifles || [];
         if (!self._rifles.length) {
             self._renderNoRifle();
@@ -60,7 +72,27 @@ RifleApp.prototype.show = function (rifleId) {
         }
         if (self._cardIndex >= self._rifles.length) self._cardIndex = 0;
         self._renderRifle();
+    }).catch(function (err) {
+        console.warn('[RifleApp] getAllRifles failed:', err);
+        self._renderLoadError(rifleId);
     });
+};
+
+/** A genuine fetch failure (never "confirmed zero rifles" — see show()'s
+ *  own comment) — distinct from _renderNoRifle so a shooter who has
+ *  real rifles is never told to add their first one. Retry re-runs the
+ *  exact same show() call, same rifle in mind if one was requested. */
+RifleApp.prototype._renderLoadError = function (rifleId) {
+    var self = this;
+    var html = '<div class="screen" style="padding-top:var(--space-lg)">' +
+        '<div class="v3-numberbox"><div class="lbl">PROVEN TO</div>' +
+        '<div class="num">&mdash;<em>yd</em></div><div class="conf">Couldn\'t load your rifles</div></div>' +
+        '<p style="padding:0 var(--edge);color:var(--text-secondary)">Check your connection and try again — nothing on file was lost.</p>' +
+        '<button class="v3-gold" id="rf-retry">Try again</button>' +
+        '</div>';
+    this.container.innerHTML = html;
+    var btn = document.getElementById('rf-retry');
+    if (btn) btn.addEventListener('click', function () { self.show(rifleId); });
 };
 
 RifleApp.prototype._currentRifle = function () {

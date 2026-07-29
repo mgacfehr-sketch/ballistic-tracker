@@ -204,6 +204,52 @@ check('Rifle name (rifle-app.js) always renders and opens the switcher list, reg
         throw new Error('the rifle name no longer opens the switcher list (_openRifleList) — device feedback was explicit that the name, not the dots, is the primary switcher');
     }
 });
+// UI Consolidation phase, law (3): "the gold '+ Add what you shot'
+// button must be present on the Card at all times."
+check('The gold "Add what you shot" button is unconditionally in _renderRifle\'s markup (not behind any if-guard)', function () {
+    var source = readFile('js/rifle-app.js');
+    var region = extractRegion(source, 'RifleApp.prototype._renderRifle = function', 3000);
+    var exactLine = 'html += \'<button class="v3-gold" id="rf-add">＋&nbsp;&nbsp;Add what you shot</button>\';';
+    var idx = region.indexOf(exactLine);
+    if (idx === -1) {
+        throw new Error('the exact unconditional html += line for #rf-add was not found — either removed or rewritten inside a conditional');
+    }
+    // The immediately preceding non-blank line must not open a brace
+    // this line's own indentation sits inside of (i.e. must not be the
+    // single statement inside an `if (...) { ... }` one-liner or block)
+    // — every genuinely optional element in this function (dots, draft
+    // banner) IS wrapped that way; the add button must be a sibling
+    // statement, not nested inside one of those guards.
+    var priorText = region.slice(0, idx);
+    var lines = priorText.split('\n');
+    var priorLine = lines[lines.length - 1].trim();
+    if (/^if\s*\(.*\)\s*\{?\s*$/.test(priorLine) || priorLine.slice(-1) === '{') {
+        throw new Error('the add-button line directly follows an open "if (" block on the prior line — looks conditionally rendered');
+    }
+});
+check('A genuine rifle-fetch FAILURE never renders the "no rifle yet" onboarding empty state (which has no way to start a session for a shooter who actually has rifles)', function () {
+    var source = readFile('js/rifle-app.js');
+    var region = extractRegion(source, 'RifleApp.prototype.show = function (rifleId) {', 2200);
+    if (/\.catch\(function \(\) \{\s*return \[\];\s*\}\)/.test(region)) {
+        throw new Error('show() still swallows a getAllRifles() rejection into an empty array before branching — that treats a fetch failure as "confirmed zero rifles"');
+    }
+    if (region.indexOf('_renderLoadError(rifleId)') === -1) {
+        throw new Error('show() has no distinct load-error state for a genuine rejection');
+    }
+    if (region.indexOf('.then(function (rifles) {') === -1 || region.indexOf('.catch(function (err) {') === -1) {
+        throw new Error('expected a .then(success)/.catch(failure) split, not a single unified success-shaped handler');
+    }
+});
+check('_renderLoadError is a DISTINCT state from _renderNoRifle, with its own retry that re-runs show()', function () {
+    var source = readFile('js/rifle-app.js');
+    var region = extractRegion(source, 'RifleApp.prototype._renderLoadError = function (rifleId) {', 900);
+    if (region.indexOf('_renderNoRifle') !== -1) {
+        throw new Error('_renderLoadError must not fall back into the "no rifle yet" onboarding copy');
+    }
+    if (region.indexOf('self.show(rifleId)') === -1) {
+        throw new Error('the retry button must re-run show(), not dead-end');
+    }
+});
 check('Rifle switcher overlay offers "Add a rifle" and "Scan certificate"', function () {
     var source = readFile('js/rifle-app.js');
     var region = extractRegion(source, 'RifleApp.prototype._openRifleList = function', 3000);
