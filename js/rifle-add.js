@@ -167,18 +167,27 @@ var RifleAdd = (function () {
         document.getElementById('rz-done').addEventListener('click', function () {
             var btn = this;
             btn.disabled = true;
-            app.db.getLoadsByRifle(rifle.id).catch(function () { return []; }).then(function (loads) {
+            Promise.all([
+                app.db.getLoadsByRifle(rifle.id).catch(function () { return []; }),
+                app.db.getBarrelsByRifle ? app.db.getBarrelsByRifle(rifle.id).catch(function () { return []; }) : Promise.resolve([])
+            ]).then(function (res) {
+                var loads = res[0] || [];
                 var load = null;
-                (loads || []).forEach(function (l) { if (!load && (l.truedMv || l.truedBc)) load = l; });
-                if (!load) (loads || []).forEach(function (l) { if (!load && l.bulletBC) load = l; });
-                if (!load && loads && loads.length) load = loads[0];
+                loads.forEach(function (l) { if (!load && (l.truedMv || l.truedBc)) load = l; });
+                if (!load) loads.forEach(function (l) { if (!load && l.bulletBC) load = l; });
+                if (!load && loads.length) load = loads[0];
+                var barrels = res[1] || [];
+                var activeBarrel = null;
+                barrels.forEach(function (b) { if (!activeBarrel && b.isActive) activeBarrel = b; });
+                if (!activeBarrel && barrels.length) activeBarrel = barrels[0];
 
                 var groupSizeMOA = inchesToMOA(S.groupIn, S.distanceYd);
                 _write(app.db, 'addZeroEvent', {
                     rifleId: rifle.id, loadId: load ? load.id : null, sessionId: null,
                     date: new Date().toISOString(), distanceYards: S.distanceYd, shotCount: S.shots,
                     groupData: { groupSizeIn: S.groupIn, groupSizeMOA: groupSizeMOA },
-                    lotNumber: load ? (load.lotNumber || null) : null, source: 'manual'
+                    lotNumber: load ? (load.lotNumber || null) : null,
+                    barrelId: activeBarrel ? activeBarrel.id : null, source: 'manual'
                 }).then(function () {
                     _draftClear('zero', rifle.id);
                     if (typeof Readiness !== 'undefined') Readiness.invalidate(rifle.id);
@@ -213,7 +222,11 @@ var RifleAdd = (function () {
             app.db.getZeroEventsByRifle(rifle.id).catch(function () { return []; }),
             app.db.getTrackingVerificationsByRifle ? app.db.getTrackingVerificationsByRifle(rifle.id).catch(function () { return []; }) : Promise.resolve([]),
             (typeof Suppressors !== 'undefined') ? Suppressors.isEnabled(app.db) : Promise.resolve(false),
-            (typeof Suppressors !== 'undefined') ? Suppressors.getLastUsed(app.db, rifle.id) : Promise.resolve(null)
+            (typeof Suppressors !== 'undefined') ? Suppressors.getLastUsed(app.db, rifle.id) : Promise.resolve(null),
+            app.db.getBarrelsByRifle ? app.db.getBarrelsByRifle(rifle.id).catch(function () { return []; }) : Promise.resolve([]),
+            // Amendment 1 Phase C: recurring targets (Constitution §35.5)
+            // rank the distance chips by recency instead of a fixed list.
+            app.db.getRecurringTargets ? app.db.getRecurringTargets(rifle.id).catch(function () { return []; }) : Promise.resolve([])
         ]).then(function (res) {
             var loads = res[0] || [];
             var load = null;
@@ -226,10 +239,16 @@ var RifleAdd = (function () {
             var trackingVerified = !!tv || typeof rifle.scopeCorrectionFactor === 'number';
             var suppressorEnabled = res[4];
             var lastCan = res[5];
+            var barrels = res[6] || [];
+            var activeBarrel = null;
+            barrels.forEach(function (b) { if (!activeBarrel && b.isActive) activeBarrel = b; });
+            if (!activeBarrel && barrels.length) activeBarrel = barrels[0];
+            var recurringTargets = res[7] || [];
 
             _renderSteel(app, rifle, S, units, step, {
                 load: load, mvMeasured: mvMeasured, zeroConfirmed: zeroConfirmed,
-                trackingVerified: trackingVerified, suppressorEnabled: suppressorEnabled, lastCan: lastCan
+                trackingVerified: trackingVerified, suppressorEnabled: suppressorEnabled, lastCan: lastCan,
+                barrelId: activeBarrel ? activeBarrel.id : null, recurringTargets: recurringTargets
             });
         });
     }
@@ -242,14 +261,21 @@ var RifleAdd = (function () {
         html += '<div class="pagehead"><button class="backline" id="rs-back">&lsaquo; Back</button>' +
             '<div class="pagetitle">Steel</div></div>';
 
+        // Amendment 1 Phase C: recency-ranked distance chips (Constitution
+        // §35.5 "remembered places") once real history exists; falls back
+        // to the fixed starter list for a new rifle (Evidence & History
+        // Doctrine B3 -- no history to rank yet, so don't fake a ranking).
+        var chipDistances = (ctx.recurringTargets && ctx.recurringTargets.length)
+            ? ctx.recurringTargets.slice(0, 5).map(function (t) { return t.distanceYd; })
+            : DISTANCES;
         html += '<div class="v3-fieldlbl">HOW FAR</div><div class="v3-chips" id="rs-dist">';
-        DISTANCES.forEach(function (d) {
+        chipDistances.forEach(function (d) {
             html += '<button class="v3-chip' + (S.distanceYd === d ? ' on' : '') + '" data-dist="' + d + '">' + d + '</button>';
         });
-        html += '<button class="v3-chip' + (DISTANCES.indexOf(S.distanceYd) === -1 ? ' on' : '') + '" data-dist="custom">&hellip;</button></div>';
+        html += '<button class="v3-chip' + (chipDistances.indexOf(S.distanceYd) === -1 ? ' on' : '') + '" data-dist="custom">&hellip;</button></div>';
         html += '<div class="edge hidden" style="padding:0 var(--edge)" id="rs-dist-custom"><div class="field">' +
             '<input type="number" inputmode="numeric" id="rs-dist-input" placeholder="Distance (yd)" value="' +
-            (DISTANCES.indexOf(S.distanceYd) === -1 ? S.distanceYd : '') + '"></div></div>';
+            (chipDistances.indexOf(S.distanceYd) === -1 ? S.distanceYd : '') + '"></div></div>';
 
         html += '<div class="v3-fieldlbl">I DIALED</div>' + _v3Stepper('rs-dial', _fmtDial(S.dialed, units), units + ' up');
         html += '<div id="rs-hits-wrap">' + _hitsWrapHtml(S) + '</div>';
@@ -260,6 +286,21 @@ var RifleAdd = (function () {
         html += '<div id="rs-mv-field" class="' + (S.mv ? '' : 'hidden') + ' edge" style="padding:0 var(--edge)"><div class="field">' +
             '<label for="rs-mv-input">Bullet speed (fps)</label>' +
             '<input type="number" inputmode="numeric" id="rs-mv-input" placeholder="2950" value="' + (S.mv || '') + '"></div></div>';
+
+        // Amendment 1 Phase C: "recognition confirms replace questions" —
+        // a one-tap recognition instead of re-typing the lot every visit
+        // (Constitution §24.2). Only shown when there's a current lot to
+        // recognize; a rifle with no lot on file gets no extra question.
+        if (ctx.load && ctx.load.lotNumber) {
+            html += '<div class="v3-fieldlbl">AMMO</div><div class="v3-chips" id="rs-lot-recog">' +
+                '<span class="t-micro" style="align-self:center;margin-right:8px">Still lot ' +
+                UI.esc(ctx.load.lotNumber) + '?</span>' +
+                '<button class="v3-chip" data-lot="same">Yes</button>' +
+                '<button class="v3-chip" data-lot="new">New lot</button></div>';
+            html += '<div class="edge hidden" style="padding:0 var(--edge)" id="rs-lot-new-wrap"><div class="field">' +
+                '<input type="text" id="rs-lot-new-input" maxlength="40" placeholder="New lot number"></div>' +
+                '<button class="v3-link" id="rs-lot-new-save">Save new lot</button></div>';
+        }
 
         html += '<div class="v3-spacer" style="height:20px"></div>';
         html += '<button class="v3-gold" id="rs-done">Done</button>';
@@ -337,10 +378,50 @@ var RifleAdd = (function () {
             }
         });
 
+        // Amendment 1 Phase C: lot recognition row (Yes = dismiss, no
+        // write -- nothing changed; New lot = recognition-confirmed
+        // change, via db.changeLot so the epoch + loads.lotNumber cache
+        // both update together).
+        var lotRecog = document.getElementById('rs-lot-recog');
+        if (lotRecog) {
+            lotRecog.addEventListener('click', function (e) {
+                var b = e.target.closest ? e.target.closest('[data-lot]') : null;
+                if (!b) return;
+                if (b.getAttribute('data-lot') === 'same') {
+                    lotRecog.innerHTML = '<span class="t-micro">Still lot ' + UI.esc(ctx.load.lotNumber) + '.</span>';
+                } else {
+                    var wrap = document.getElementById('rs-lot-new-wrap');
+                    if (wrap) { wrap.classList.remove('hidden'); document.getElementById('rs-lot-new-input').focus(); }
+                }
+            });
+        }
+        var lotSaveBtn = document.getElementById('rs-lot-new-save');
+        if (lotSaveBtn) {
+            lotSaveBtn.addEventListener('click', function () {
+                var input = document.getElementById('rs-lot-new-input');
+                var v = input ? input.value.trim() : '';
+                if (!v) return;
+                lotSaveBtn.disabled = true;
+                (app.db.changeLot ? app.db.changeLot(rifle.id, ctx.load.id, v) : Promise.resolve(null))
+                    .then(function (updatedLoad) {
+                        if (updatedLoad) ctx.load = updatedLoad;
+                        else ctx.load.lotNumber = v;
+                        var wrap = document.getElementById('rs-lot-new-wrap');
+                        if (wrap) wrap.classList.add('hidden');
+                        var recog = document.getElementById('rs-lot-recog');
+                        if (recog) recog.innerHTML = '<span class="t-micro">Logged as lot ' + UI.esc(v) + '.</span>';
+                    }).catch(function (err) {
+                        lotSaveBtn.disabled = false;
+                        alert('Could not save the new lot: ' + err.message);
+                    });
+            });
+        }
+
         document.getElementById('rs-done').addEventListener('click', function () {
             var btn = this;
             btn.disabled = true;
             _rememberLast({ distanceYd: S.distanceYd });
+            if (app.db.addRecurringTargetUse) app.db.addRecurringTargetUse(rifle.id, S.distanceYd).catch(function () {});
             var mvInput = document.getElementById('rs-mv-input');
             var mv = mvInput && mvInput.value ? parseFloat(mvInput.value) : NaN;
             S.mv = isFinite(mv) && mv >= 500 && mv <= 5000 ? mv : null;
@@ -389,7 +470,8 @@ var RifleAdd = (function () {
             sessionDate: new Date().toISOString(), distanceYd: S.distanceYd, tier: 'full',
             dialedElev: S.dialed, dialedWind: 0, units: units,
             wind: null, directionOfFireDeg: null,
-            suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null, notes: 'v3-simple'
+            suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null,
+            barrelId: ctx.barrelId || null, notes: 'v3-simple'
         }).then(function () {
             var hitIn = S.hits[0] || 0;
             var elevOffUnits = simpleFromMOA(inchesToMOA(hitIn, S.distanceYd), units, S.distanceYd);
@@ -430,7 +512,8 @@ var RifleAdd = (function () {
             sessionDate: new Date().toISOString(), distanceYd: S.distanceYd, tier: 'full',
             dialedElev: S.dialed, dialedWind: 0, units: units,
             wind: null, directionOfFireDeg: null,
-            suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null, notes: 'v3-simple-multi'
+            suppressorId: suppressorId, lotNumber: ctx.load.lotNumber || null,
+            barrelId: ctx.barrelId || null, notes: 'v3-simple-multi'
         }).then(function () {
             return Promise.all(S.hits.map(function (hitIn, i) {
                 var elevOffUnits = simpleFromMOA(inchesToMOA(hitIn || 0, S.distanceYd), units, S.distanceYd);

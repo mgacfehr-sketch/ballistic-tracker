@@ -412,6 +412,33 @@ function _isMissingColumnError(err) {
     return /could not find.*column.*schema cache/i.test(String(err.message || ''));
 }
 
+/**
+ * Generic insert-with-graceful-column-degradation, for additive Phase
+ * C/D columns (barrel_id, etc) that ship in JS/UI code before their
+ * owner-run migration necessarily lands — same idiom as
+ * _insertSessionGraceful above, generalized so every new optional
+ * column doesn't need its own bespoke retry method. If the DB rejects a
+ * row because a not-yet-migrated column doesn't exist, strip exactly
+ * those columns and retry ONCE.
+ */
+function _insertGracefulRow(supabase, table, row, droppableCols, allowRetry) {
+    return supabase.from(table).insert(row).select().single().then(function (res) {
+        if (res.error) {
+            if (allowRetry && _isMissingColumnError(res.error)) {
+                console.warn('[db] ' + table + ' is missing a column (' + droppableCols.join(', ') +
+                    ') — run PHASECD-migrations.sql. Saving without it for now:', res.error.message);
+                var stripped = {};
+                for (var k in row) {
+                    if (row.hasOwnProperty(k) && droppableCols.indexOf(k) === -1) stripped[k] = row[k];
+                }
+                return _insertGracefulRow(supabase, table, stripped, [], false);
+            }
+            throw res.error;
+        }
+        return res;
+    });
+}
+
 BallisticDB.prototype.addSession = function (data) {
     var self = this;
     var session = {
@@ -1415,13 +1442,17 @@ BallisticDB.prototype.addZeroEvent = function (data) {
         groupData: data.groupData || null,
         suppressorId: data.suppressorId || null,
         lotNumber: data.lotNumber || null,
+        // Amendment 1 Phase C: which barrel epoch this zero belongs to
+        // (PHASECD-migrations.sql, additive, nullable) -- see
+        // js/config-memory.js's checkCompatibility, which needs this to
+        // know a barrel change has invalidated a prior zero.
+        barrelId: data.barrelId || null,
         source: data.source || 'session',
         createdAt: new Date().toISOString()
     };
     var row = _jsToRow(record, self.userId);
-    return self.supabase.from('zero_events').insert(row).select().single()
+    return _insertGracefulRow(self.supabase, 'zero_events', row, ['barrel_id'], true)
         .then(function (res) {
-            if (res.error) throw res.error;
             var saved = _rowToJs(res.data);
             self._writeFactEvent('zero', 'zero_events', saved, { provenance: saved.source || 'legacy/unknown' });
             return saved;
@@ -1466,13 +1497,14 @@ BallisticDB.prototype.addMvMeasurement = function (data) {
         shotCount: typeof data.shotCount === 'number' ? data.shotCount : null,
         lotNumber: data.lotNumber || null,
         suppressorId: data.suppressorId || null,
+        // Amendment 1 Phase C: see addZeroEvent's comment -- same additive column.
+        barrelId: data.barrelId || null,
         source: data.source || 'manual',
         createdAt: new Date().toISOString()
     };
     var row = _jsToRow(record, self.userId);
-    return self.supabase.from('mv_measurements').insert(row).select().single()
+    return _insertGracefulRow(self.supabase, 'mv_measurements', row, ['barrel_id'], true)
         .then(function (res) {
-            if (res.error) throw res.error;
             var saved = _rowToJs(res.data);
             self._writeFactEvent('velocity', 'mv_measurements', saved, { provenance: saved.source || 'legacy/unknown' });
             return saved;
@@ -1552,12 +1584,13 @@ BallisticDB.prototype.addTruingEvent = function (data) {
         newValue: typeof data.newValue === 'number' ? data.newValue : null,
         confidence: data.confidence || null,
         appliedAt: data.appliedAt || new Date().toISOString(),
+        // Amendment 1 Phase C: see addZeroEvent's comment -- same additive column.
+        barrelId: data.barrelId || null,
         createdAt: new Date().toISOString()
     };
     var row = _jsToRow(record, self.userId);
-    return self.supabase.from('truing_events').insert(row).select().single()
+    return _insertGracefulRow(self.supabase, 'truing_events', row, ['barrel_id'], true)
         .then(function (res) {
-            if (res.error) throw res.error;
             var saved = _rowToJs(res.data);
             self._writeFactEvent('truing', 'truing_events', saved, { provenance: 'derived', eventTime: saved.appliedAt });
             return saved;
@@ -1673,14 +1706,15 @@ BallisticDB.prototype.addSteelString = function (data) {
         environment: data.environment || null,
         suppressorId: data.suppressorId || null,
         lotNumber: data.lotNumber || null,
+        // Amendment 1 Phase C: see addZeroEvent's comment -- same additive column.
+        barrelId: data.barrelId || null,
         photoRef: data.photoRef || null,
         notes: data.notes || '',
         createdAt: new Date().toISOString()
     };
     var row = _jsToRow(record, self.userId);
-    return self.supabase.from('steel_strings').insert(row).select().single()
+    return _insertGracefulRow(self.supabase, 'steel_strings', row, ['barrel_id'], true)
         .then(function (res) {
-            if (res.error) throw res.error;
             var saved = _rowToJs(res.data);
             self._writeFactEvent('steel_string', 'steel_strings', saved, { provenance: 'manual' });
             return saved;
