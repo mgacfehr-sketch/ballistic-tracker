@@ -22,6 +22,7 @@
 -- Sections:
 --   P0  — session-images bucket: add the missing UPDATE storage policy
 --   P0b — import-vault: a new, dedicated bucket for vaulted originals
+--   P0c — delete_my_account(): teach it to clean up import-vault too
 --   P1  — fact_events            (the minimal event envelope)
 --   P2  — attachment_vault       (vault-first import)
 --   P3  — workhorse_packages     (SCHEMA ONLY — Phase F builds the claim flow)
@@ -108,27 +109,52 @@ CREATE POLICY "Users can delete own import-vault files"
     ON storage.objects FOR DELETE
     USING (bucket_id = 'import-vault' AND auth.uid()::text = (storage.foldername(name))[1]);
 
--- ⚠ REQUIRED FOLLOW-UP, NOT DONE HERE: account deletion. FOUNDATION-,
--- MORNING-, and SIMPLIFY-migrations.sql each define (CREATE OR REPLACE)
--- a public.delete_my_account() function; whichever was run LAST is
--- live, and this session cannot tell which that is without another
--- owner-run query (the exact same "which migration actually landed"
--- risk that owner-review #2's landing-gap finding already surfaced
--- once for SIMPLE-migrations.sql — not guessing again here). Every
--- version found in the repo deletes storage.objects rows for
--- bucket_id = 'session-images' but NONE of them know about
--- 'import-vault' yet, since it didn't exist until this block. Until
--- fixed, deleting an account leaves that user's vaulted import files
--- orphaned in storage (not a data-exposure risk — RLS still scopes
--- them to the now-deleted auth.users id, so nothing else can read
--- them — just an unreclaimed-storage leak). Run this first:
+-- P0c — delete_my_account(): teach it about the new bucket.
 --
---   select pg_get_functiondef('public.delete_my_account'::regproc);
---
--- paste the result back, and the one line
---   DELETE FROM storage.objects WHERE bucket_id = 'import-vault' AND name LIKE uid::text || '/%';
--- (same shape as the existing session-images line) gets added to
--- whichever version is actually live, in a follow-up commit.
+-- Owner ran `select pg_get_functiondef('public.delete_my_account'::regproc);`
+-- 2026-07-28 (OWNER-ACTIONS item 8): the LIVE function is confirmed to
+-- be exactly SIMPLIFY-migrations.sql's version (the dope_entries-free
+-- one — FOUNDATION-/MORNING-migrations.sql's earlier versions are NOT
+-- live). Reproduced verbatim below with exactly one addition: the
+-- import-vault cleanup line, same shape as the existing session-images
+-- one. CREATE OR REPLACE is safe/idempotent/re-runnable like everything
+-- else in this file — this is not a guess at what might be live, it is
+-- the confirmed-live body plus one line.
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.delete_my_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    uid uuid := auth.uid();
+BEGIN
+    IF uid IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    DELETE FROM public.user_settings     WHERE user_id = uid;
+    DELETE FROM public.ai_usage_logs     WHERE user_id = uid;
+    DELETE FROM public.ai_conversations  WHERE user_id = uid;
+    DELETE FROM public.cold_bore_shots   WHERE user_id = uid;
+    DELETE FROM public.velocity_strings  WHERE user_id = uid;
+    DELETE FROM public.cleaning_logs     WHERE user_id = uid;
+    DELETE FROM public.scope_adjustments WHERE user_id = uid;
+    DELETE FROM public.zero_records      WHERE user_id = uid;
+    DELETE FROM public.sessions          WHERE user_id = uid;
+    DELETE FROM public.loads             WHERE user_id = uid;
+    DELETE FROM public.barrels           WHERE user_id = uid;
+    DELETE FROM public.rifles            WHERE user_id = uid;
+
+    DELETE FROM storage.objects
+        WHERE bucket_id = 'session-images' AND name LIKE uid::text || '/%';
+    DELETE FROM storage.objects
+        WHERE bucket_id = 'import-vault' AND name LIKE uid::text || '/%';
+
+    DELETE FROM auth.users WHERE id = uid;
+END;
+$$;
 
 
 -- ────────────────────────────────────────────────────────────
@@ -591,6 +617,10 @@ LIMIT 20;
 --   5. P0's UPDATE policy on session-images is safe to leave in place
 --      even on a full rollback — it only grants what INSERT already
 --      implied (overwrite your own existing file), never widens access.
+--   6. P0c's added DELETE line is also safe to leave in place even if
+--      P0b's bucket is rolled back — deleting zero matching rows from
+--      storage.objects for a bucket_id that no longer exists is a
+--      harmless no-op, not an error.
 --
 -- Partial rollback (keep the tables, undo only a bad backfill run):
 --   DELETE FROM public.fact_events WHERE source_table = '<one table>';

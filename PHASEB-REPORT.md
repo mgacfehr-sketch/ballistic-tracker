@@ -423,26 +423,16 @@ spine now." No further action — owner-review #4 stays closed exactly
 as this session left it (three dead call sites removed from
 `js/db.js`, `js/dope-log.js` untouched and still unreachable).
 
-**8. NEW — required follow-up for account deletion, surfaced by
-ruling 6.** `FOUNDATION-`, `MORNING-`, and `SIMPLIFY-migrations.sql`
-each `CREATE OR REPLACE` a `public.delete_my_account()` function; this
-session cannot tell which version is actually live without another
-owner-run query — the exact same "which migration actually landed"
-risk owner-review #2's SIMPLE-migrations.sql finding already surfaced
-once, not guessed at again here. Every version in the repo cleans up
-`storage.objects` for `bucket_id = 'session-images'` but none of them
-know about the new `import-vault` bucket yet. Not a data-exposure risk
-(RLS still scopes orphaned files to the deleted `auth.users` id) — just
-an unreclaimed-storage leak until fixed. Run this first:
-
-```sql
-select pg_get_functiondef('public.delete_my_account'::regproc);
-```
-
-Paste the result back and the one-line addition (matching the existing
-`session-images` cleanup line's shape) gets added to whichever version
-is actually live, in a follow-up commit. Full detail in
-`PHASEB-migrations.sql`'s P0b comment block.
+**8. ~~Required follow-up for account deletion, surfaced by ruling 6~~
+— DONE, 2026-07-28.** Owner ran `pg_get_functiondef('public.delete_my_account'::regproc)`:
+the live function is confirmed to be exactly `SIMPLIFY-migrations.sql`'s
+version (the `dope_entries`-free one) — `FOUNDATION-`/`MORNING-migrations.sql`'s
+earlier versions are **not** live, resolving the "which one actually
+landed" question rather than guessing. `PHASEB-migrations.sql`'s new
+**P0c** reproduces that confirmed-live body verbatim with exactly one
+addition: a second `DELETE FROM storage.objects` line cleaning up
+`bucket_id = 'import-vault'`, same shape as the existing
+`session-images` line. Account deletion now reaches both buckets.
 
 ---
 
