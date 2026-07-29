@@ -139,7 +139,8 @@ img { max-width: 100%; }
     padding-left: calc(var(--edge) + env(safe-area-inset-left, 0px));
     padding-right: calc(var(--edge) + env(safe-area-inset-right, 0px));
 }
-.shell-brand { display: flex; align-items: center; gap: 8px; }
+.shell-brand { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; margin: -10px; -webkit-tap-highlight-color: transparent; }
+.shell-brand:active { opacity: 0.7; }
 .shell-brand .mark { width: 26px; height: 26px; color: var(--brand-gold); }
 .shell-brand .wordmark { font: 700 17px/1 var(--font-ui); letter-spacing: 0.06em; }
 .shell-utils { display: flex; align-items: center; gap: var(--space-xs); }

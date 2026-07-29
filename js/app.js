@@ -409,6 +409,15 @@
                         .then(function () { sessionFlow._scopedLaunchPending = false; });
                 }
             };
+            // STRIP-DOWN PHASE: the "True your rifle" entry point from
+            // MainMenu. Renders straight into #view-home (already the
+            // active view when launched from the menu) — TruingWizard
+            // owns the container from here through Keep/Undo.
+            window.TruingLaunch = {
+                start: function () {
+                    if (window.TruingWizard) TruingWizard.start(db);
+                }
+            };
             // TargetSheet: the blank calibration target's two real handlers
             window.TargetSheet = {
                 print: function () { sessionFlow._printBlankTarget(); },
@@ -606,6 +615,18 @@
             if (bg) meta.setAttribute('content', bg);
         }
         syncThemeColorMeta();
+        // Logo/wordmark: always a home button, from anywhere in the app.
+        var logoHomeBtn = document.getElementById('app-logo-home');
+        if (logoHomeBtn) {
+            logoHomeBtn.addEventListener('click', function () { switchView('home'); });
+            logoHomeBtn.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    switchView('home');
+                }
+            });
+        }
+
         var themeBtn = document.getElementById('btn-sunlight-mode');
         if (themeBtn) {
             themeBtn.addEventListener('click', function () {

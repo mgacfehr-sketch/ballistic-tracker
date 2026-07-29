@@ -1,11 +1,13 @@
 # STRIPDOWN-REPORT.md — Strip-Down Phase build record
 
-**Scope:** owner order. The app now has exactly two visible functions
-— RIFLES and RANGE SESSION. Everything else built in this codebase
-stays fully in place ("code stays, doors close"): no file was deleted,
-no engine touched, no data-layer schema changed. Three commits, branch
-`redesign`, pushed after every commit, `sw.js` `CACHE_VERSION` bumped
-on every app-shell-touching commit (160 → 163).
+**Scope:** owner order. The app now has exactly **three** visible
+functions — RIFLES, RANGE SESSION, and **True your rifle** (unhidden
+2026-07-29, see Addendum below; the original phase shipped with
+exactly two). Everything else built in this codebase stays fully in
+place ("code stays, doors close"): no file was deleted, no protected
+engine touched, no data-layer schema changed. `sw.js` `CACHE_VERSION`
+bumped on every app-shell-touching commit (160 → 165 across the
+original phase and the addendum).
 
 **Canon data layer untouched.** No new database column, no migration,
 no change to `db.js`'s dual-write into `fact_events`. The one new
@@ -208,9 +210,85 @@ clickable ids and nothing else.
 
 ---
 
+## Addendum (2026-07-29) — third function unhidden: True your rifle + logo-as-home
+
+Two owner-specified additions on top of the two-function build above.
+
+### (1) The header logo is always a home button
+
+`index.html`'s `.shell-brand` (the PROVEN/Workhorse mark + wordmark in
+the persistent header) now carries `id="app-logo-home"`,
+`role="button"`, and `tabindex="0"`. `app.js` (`initApp`, next to the
+sunlight-mode toggle binding) wires `click` and `keydown`
+(Enter/Space) to `switchView('home')` — the exact same destination
+`AppNav.go('home')` has always resolved to since the original
+strip-down phase. Works from anywhere in the app, one tap, no
+exceptions. `css/ui.css` gives it a larger effective tap target
+(padding + negative margin, matching the ≥44px touch-target rule)
+without shifting its visual position, plus a pressed-state affordance.
+
+### (2) True your rifle — the third MainMenu button
+
+`js/main-menu.js` now renders a third button, `id="mm-true-rifle"`,
+below Rifles and Range Session. Tapping it calls the new
+`TruingLaunch.start()` (wired in `app.js` next to `SessionLaunch`,
+same pattern — a thin launcher closed over `db`), which hands off to
+the new `js/truing-wizard.js` (`TruingWizard.start(db)`).
+
+**The wizard — one question per screen, Roy's words, in order:**
+
+1. Which rifle are you using? (`db.getAllRifles()`, same picker style
+   as Range Session's screen 1)
+2. Which ammo are you using? (`db.getLoadsByRifle(rifleId)` — that
+   rifle's ammo only). Ammo missing a BC or a base velocity dead-ends
+   here with "Add BC & speed" (mirrors `rifle-add.js`'s
+   `_loggedNeedsNumbers` — there's nothing to true without those
+   numbers on file) instead of asking questions that can't be answered.
+3. "How far is the target?" — distance, yards.
+4. "What did you dial?" — elevation, in the rifle's own turret unit
+   (MOA or MIL, `rifle.angleUnit`).
+5. "What was your muzzle velocity?" — average from the chrono, typed.
+6. "Where did it hit?" — magnitude + HIGH/LOW + a unit toggle
+   (Inches / Clicks). Clicks convert through `DEFAULT_CLICK_MOA = 0.25`
+   — the same click-value convention `calculations.js`'s `zeroVerdict`
+   already established, not a new invented constant.
+
+**Routing — the untouched protected engine, nothing new.** The six
+answers assemble the exact `simpleTrueObservation()` input shape
+`js/rifle-payoff.js` already builds from the steel flow (same
+`_profileFor`-style profile: `truedBc||bulletBC`,
+`truedMv||muzzleVelocity`, `dragModel||'G7'`, etc.). `simple-true.js`
+and `truing-core.js` were not touched — the doctrine (Amendment 1 A1)
+still routes silently to `mv` or `bc` on its own authority, never
+forced by this flow having asked for a measured velocity. A `null`
+return (the same honesty guard every caller gets — zero-band hit or a
+bracket-capped correction) shows a plain "couldn't use that, nothing
+was changed" screen, never a fake result.
+
+**Result screen** states the corrected number plainly, with the drag
+model labeled when it's a BC correction (`"Your G7 BC: 0.297 — was
+0.311"`) or in fps when it's a velocity correction, PLUS the same
+dial-change sentence the steel payoff already uses
+(`"Your 900-yard dial changes from 7.2 to 7.5"`). **Keep it** writes
+through `SimpleTrue.keep` — the identical append-only
+`addTruingEvent` + `load.truedBc`/`truedMv` write path every other
+truing caller in this codebase shares, so this flow doesn't introduce
+a second way to persist a correction. **Undo** is a bare return to the
+main menu — no write happens. Both land on `AppNav.go('home')`.
+
+Covered by `tests/test-stripdown-loop.js` Part C (11 checks, traced
+hop-by-hop against current source, same rigor as Part B) plus updated
+Part A checks (three buttons, not two; the logo-home wiring).
+`tests/test-protected-engine-hashes.js` stayed green — `simple-true.js`
+and `truing-core.js` are byte-identical to before this addendum.
+
+---
+
 ## STOP
 
-The app has exactly two visible functions. Every other surface built
+The app had exactly two visible functions at the end of the original
+phase; the Addendum above unhid a third, owner-specified one (True
+your rifle) with its own hop-by-hop test coverage. Every other surface built
 in this codebase — the Card, all seven fact-card screens, both truing
 UIs, the detailed steel logger, Categories, ladder, field analytics,
 DOPE cards/log, wind call, the solver, chrono import, Ask yorT, device
@@ -224,8 +302,7 @@ layer underneath every save in this build is the identical `db.js`
 code path every other flow in this app has always used — dual-write
 into `fact_events`, the memory tables, all of it keeps running exactly
 as before, silently, because nothing about how a save actually happens
-was changed, only what UI can trigger one. Full suite green throughout
-(45 files, including 27 new checks proving the complete loop and the
-two-destination law), protected-engine hashes and the canon data-layer
-schema both untouched, `sw.js` `CACHE_VERSION` 160 → 163 across three
-commits.
+was changed, only what UI can trigger one. Full suite green throughout,
+protected-engine hashes and the canon data-layer schema both untouched
+by either the original phase or the addendum, `sw.js` `CACHE_VERSION`
+160 → 165 across both.

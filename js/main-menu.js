@@ -27,7 +27,7 @@ var MainMenu = (function () {
     // plain hardcoded string (not read from sw.js, a separate worker
     // context app.js has no synchronous access to) — simplest, most
     // robust source of truth for a value a human eyeballs.
-    var BUILD_STAMP = 'Build 161 · 2026-07-29';
+    var BUILD_STAMP = 'Build 165 · 2026-07-29';
 
     function init() {
         _container = document.getElementById('view-home');
@@ -41,7 +41,8 @@ var MainMenu = (function () {
         var html = '<div class="screen" style="padding-top:var(--space-xl,64px);display:flex;flex-direction:column;min-height:80vh">';
         html += '<div style="flex:1"></div>';
         html += '<button class="v3-gold" id="mm-rifles" style="margin:0 var(--edge) 16px">Rifles</button>';
-        html += '<button class="v3-gold" id="mm-range-session" style="margin:0 var(--edge)">Range Session</button>';
+        html += '<button class="v3-gold" id="mm-range-session" style="margin:0 var(--edge) 16px">Range Session</button>';
+        html += '<button class="v3-gold" id="mm-true-rifle" style="margin:0 var(--edge)">True your rifle</button>';
         html += '<div style="flex:2"></div>';
         html += '<div id="mm-build-stamp" style="text-align:center;color:var(--text-secondary,#888);font:var(--type-label,12px sans-serif);padding-bottom:20px">' +
             UI.esc(BUILD_STAMP) + '</div>';
@@ -56,6 +57,10 @@ var MainMenu = (function () {
         if (sBtn) sBtn.addEventListener('click', function () {
             if (window.SessionLaunch) SessionLaunch.start({});
             else if (window.AppNav) AppNav.go('session');
+        });
+        var tBtn = document.getElementById('mm-true-rifle');
+        if (tBtn) tBtn.addEventListener('click', function () {
+            if (window.TruingLaunch) TruingLaunch.start();
         });
     }
 

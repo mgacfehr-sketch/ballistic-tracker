@@ -46,7 +46,7 @@ function slice(relPath, anchor, len) {
 }
 
 console.log('\n════════════════════════════════════════');
-console.log('PART A — exactly two top-level destinations from the resting screen');
+console.log('PART A — exactly three top-level destinations from the resting screen');
 console.log('════════════════════════════════════════\n');
 
 check('app.js boots into MainMenu, not RifleApp\'s Card', function () {
@@ -59,14 +59,15 @@ check('app.js\'s switchView(\'home\') renders MainMenu, not the Card', function 
     assert(body.indexOf('MainMenu.show();') !== -1, "switchView('home') must render MainMenu");
 });
 
-check('MainMenu renders EXACTLY two action buttons (id="mm-rifles", id="mm-range-session") and nothing else clickable', function () {
+check('MainMenu renders EXACTLY three action buttons (id="mm-rifles", id="mm-range-session", id="mm-true-rifle") and nothing else clickable', function () {
     var body = source('js/main-menu.js');
     var clickableIds = body.match(/id="mm-[a-z-]+"/g) || [];
     // build stamp div isn't a button; count only button/anchor-style ids
     var actionIds = clickableIds.filter(function (id) { return id !== 'id="mm-build-stamp"'; });
-    assert(actionIds.length === 2, 'expected exactly 2 clickable ids in main-menu.js, found ' + actionIds.length + ': ' + actionIds.join(','));
+    assert(actionIds.length === 3, 'expected exactly 3 clickable ids in main-menu.js, found ' + actionIds.length + ': ' + actionIds.join(','));
     assert(actionIds.indexOf('id="mm-rifles"') !== -1, 'missing the Rifles button');
     assert(actionIds.indexOf('id="mm-range-session"') !== -1, 'missing the Range Session button');
+    assert(actionIds.indexOf('id="mm-true-rifle"') !== -1, 'missing the True your rifle button');
 });
 
 check('MainMenu has a visible build stamp (version + date)', function () {
@@ -83,6 +84,25 @@ check('the Rifles button opens AppNav.openRifleList (not any other destination)'
 check('the Range Session button launches the existing session wizard (SessionLaunch.start) with no rifle preselected', function () {
     var body = slice('js/main-menu.js', "var sBtn = document.getElementById('mm-range-session');", 400);
     assert(body.indexOf('SessionLaunch.start({})') !== -1, 'Range Session button must call SessionLaunch.start({})');
+});
+
+check('the True your rifle button launches TruingLaunch.start (the standalone truing wizard)', function () {
+    var body = slice('js/main-menu.js', "var tBtn = document.getElementById('mm-true-rifle');", 300);
+    assert(body.indexOf('TruingLaunch.start()') !== -1, 'True your rifle button must call TruingLaunch.start()');
+});
+
+console.log('\n--- the header logo is a home button from anywhere ---\n');
+
+check('the header logo/wordmark carries a stable id and is marked as an interactive control', function () {
+    var body = slice('index.html', '<div class="shell-brand" id="app-logo-home"', 200);
+    assert(/role="button"/.test(body), 'logo element must have role="button"');
+    assert(/tabindex="0"/.test(body), 'logo element must be keyboard-focusable');
+});
+
+check('app.js wires the header logo to switchView(\'home\') — the same MainMenu destination as AppNav.go(\'home\') — on click and Enter/Space', function () {
+    var body = slice('js/app.js', "document.getElementById('app-logo-home');", 500);
+    assert(body.indexOf("switchView('home')") !== -1, 'logo click must call switchView(\'home\')');
+    assert(/keydown/.test(body), 'logo must also respond to keyboard activation (Enter/Space)');
 });
 
 console.log('\n--- doors closed this phase stay closed ---\n');
@@ -304,6 +324,87 @@ check('editing an existing rifle calls db.updateRifle and returns to its (now-up
     var body = slice('js/profiles.js', 'if (rifle) {\n            // Update rifle', 3000);
     assert(body.indexOf('self.db.updateRifle(rifle)') !== -1, 'edit path must call db.updateRifle');
     assert(body.indexOf('self.showRifleDetail(rifle.id)') !== -1, 'must return to the rifle detail after save');
+});
+
+console.log('\n════════════════════════════════════════');
+console.log('PART C — "True your rifle": standalone truing wizard, hop by hop');
+console.log('════════════════════════════════════════\n');
+
+check('TruingLaunch.start (app.js) hands off straight to TruingWizard.start(db)', function () {
+    var body = slice('js/app.js', 'window.TruingLaunch = {', 200);
+    assert(body.indexOf('TruingWizard.start(db)') !== -1, 'TruingLaunch.start must call TruingWizard.start(db)');
+});
+
+check('screen 1 asks which rifle, scoped to db.getAllRifles, before anything else', function () {
+    var body = slice('js/truing-wizard.js', 'function _screenRifle(container, db, S) {', 900);
+    assert(body.indexOf('Which rifle are you using?') !== -1, 'must ask which rifle');
+    assert(body.indexOf('db.getAllRifles()') !== -1, 'must list all rifles');
+});
+
+check('tapping a rifle moves to screen 2, which ammo — scoped to THAT rifle\'s loads only', function () {
+    var body = slice('js/truing-wizard.js', 'function _screenAmmo(container, db, S) {', 900);
+    assert(body.indexOf('Which ammo are you using?') !== -1, 'must ask which ammo');
+    assert(body.indexOf('db.getLoadsByRifle(S.rifle.id)') !== -1, 'must scope ammo to the selected rifle');
+});
+
+check('ammo missing BC or a base velocity is refused BEFORE the distance question — no correction possible with no numbers on file', function () {
+    var body = slice('js/truing-wizard.js', "S.load = loads.filter(function (l) { return l.id === id; })[0];", 300);
+    assert(body.indexOf('_needsNumbers(container, S)') !== -1, 'must route to the needs-numbers dead end');
+    assert(body.indexOf('!S.load.bulletBC') !== -1, 'must check for a BC on file');
+});
+
+check('the remaining questions are one at a time: distance, then dial, then muzzle velocity (average, typed), each a single field', function () {
+    var distBody = slice('js/truing-wizard.js', 'function _screenDistance(container, db, S) {', 500);
+    assert(distBody.indexOf('How far is the target?') !== -1, 'distance screen wording');
+    assert(distBody.indexOf('_screenDial(container, db, S)') !== -1, 'distance must advance to dial');
+
+    var dialBody = slice('js/truing-wizard.js', 'function _screenDial(container, db, S) {', 600);
+    assert(dialBody.indexOf('What did you dial?') !== -1, 'dial screen wording');
+    assert(dialBody.indexOf('_screenMV(container, db, S)') !== -1, 'dial must advance to muzzle velocity');
+
+    var mvBody = slice('js/truing-wizard.js', 'function _screenMV(container, db, S) {', 600);
+    assert(mvBody.indexOf('What was your muzzle velocity?') !== -1, 'MV screen wording');
+    assert(mvBody.indexOf('Average from the chrono') !== -1, 'MV screen must say it wants the chrono average');
+    assert(mvBody.indexOf('_screenHit(container, db, S)') !== -1, 'MV must advance to the hit question');
+});
+
+check('the hit screen asks where it landed, high/low, in inches or clicks', function () {
+    var body = slice('js/truing-wizard.js', 'function _screenHit(container, db, S) {', 3000);
+    assert(body.indexOf('Where did it hit?') !== -1, 'hit screen wording');
+    assert(body.indexOf('data-dir="high"') !== -1 && body.indexOf('data-dir="low"') !== -1, 'must offer HIGH/LOW');
+    assert(body.indexOf('data-unit="in"') !== -1 && body.indexOf('data-unit="clicks"') !== -1, 'must offer inches/clicks');
+    assert(body.indexOf('DEFAULT_CLICK_MOA') !== -1, 'clicks must convert through the one click-value convention already in calculations.js');
+});
+
+check('the observation routes through the SAME protected engine every other truing caller uses — simpleTrueObservation, honesty guard intact', function () {
+    var body = slice('js/truing-wizard.js', 'function _compute(container, db, S, hitInches) {', 900);
+    assert(body.indexOf('simpleTrueObservation(') !== -1, 'must call the protected simple-true.js engine');
+    assert(body.indexOf('mvMeasured: true') !== -1, 'a typed chrono average must be passed through as measured');
+    assert(body.indexOf('_couldNotUse(container, S)') !== -1, 'a null (refused) result must show the honest refusal screen, not a fake correction');
+});
+
+check('a refused observation changes nothing and says so plainly', function () {
+    var body = slice('js/truing-wizard.js', 'function _couldNotUse(container, S) {', 900);
+    assert(body.indexOf('Nothing was changed.') !== -1, 'refusal screen must say nothing changed');
+});
+
+check('the result screen states the corrected number plainly with its drag model labeled (BC) or in fps (MV), PLUS the dial change in shooter terms', function () {
+    var body = slice('js/truing-wizard.js', 'function _renderResult(container, db, S, out, profile, hitInches) {', 1600);
+    assert(body.indexOf('profile.dragModel') !== -1, 'BC correction must label the drag model (e.g. G7)');
+    assert(body.indexOf('was \' + Number(oldBc)') !== -1 || body.indexOf('was ') !== -1, 'must state the prior value for comparison');
+    assert(body.indexOf('fps</b> — was') !== -1, 'MV correction must state prior fps for comparison');
+    assert(body.indexOf('dial changes from') !== -1, 'must state the dial change in shooter terms, same wording as the steel payoff');
+});
+
+check('Undo\'s entire handler is a bare return-home — no write call anywhere in it', function () {
+    var undoLine = slice('js/truing-wizard.js', "document.getElementById('tw-undo').addEventListener('click', _home);", 70);
+    assert(undoLine.indexOf("addEventListener('click', _home);") !== -1, 'Undo must be wired directly to _home with no wrapper function that could sneak in a write');
+});
+
+check('Keep it saves via SimpleTrue.keep (the one append-only write path every truing caller shares) and returns home on success', function () {
+    var body = slice('js/truing-wizard.js', "document.getElementById('tw-keep').addEventListener('click', function () {", 900);
+    assert(body.indexOf('SimpleTrue.keep(ctx, keepS, out)') !== -1, 'Keep must call SimpleTrue.keep');
+    assert(body.indexOf('_home()') !== -1, 'Keep must return to the main menu on success');
 });
 
 console.log('\nResults: ' + passed + ' passed, ' + failed + ' failed');
