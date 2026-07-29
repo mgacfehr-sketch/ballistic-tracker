@@ -233,8 +233,20 @@
                                     <input type="number" id="input-rounds-fired" min="1" max="999" step="1" inputmode="numeric" placeholder="5">
                                 </div>
                                 <div class="field">
-                                    <label class="field-label" for="input-velocity">Velocity <span class="field-unit">fps</span></label>
+                                    <label class="field-label" for="input-velocity">Velocity (avg) <span class="field-unit">fps</span></label>
                                     <input type="number" id="input-velocity" min="0" max="5000" step="1" inputmode="numeric" placeholder="2650">
+                                </div>
+                            </div>
+                            <!-- STRIP-DOWN PHASE (owner order): "enter average muzzle
+                                 velocity (plus optional high/low)" -->
+                            <div class="field-row">
+                                <div class="field">
+                                    <label class="field-label" for="input-velocity-high">Velocity high <span class="field-unit">fps</span></label>
+                                    <input type="number" id="input-velocity-high" min="0" max="5000" step="1" inputmode="numeric" placeholder="optional">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="input-velocity-low">Velocity low <span class="field-unit">fps</span></label>
+                                    <input type="number" id="input-velocity-low" min="0" max="5000" step="1" inputmode="numeric" placeholder="optional">
                                 </div>
                             </div>
                             <div class="field-row">

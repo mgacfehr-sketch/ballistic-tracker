@@ -225,7 +225,14 @@ HistoryManager.prototype._sessionDetailBodyHtml = function (session) {
         detailRows += this._specRow('Rounds fired', session.roundsFired);
     }
     if (session.measuredVelocity) {
-        detailRows += this._specRow('Measured velocity', session.measuredVelocity + ' fps');
+        detailRows += this._specRow('Measured velocity (avg)', session.measuredVelocity + ' fps');
+    }
+    // STRIP-DOWN PHASE: optional high/low MV, stored in results (no
+    // schema change — see session-flow.js's own comment at the write site).
+    if (session.results && (session.results.velocityHigh || session.results.velocityLow)) {
+        var vh = session.results.velocityHigh, vl = session.results.velocityLow;
+        detailRows += this._specRow('Velocity high/low',
+            (vh ? vh + ' fps' : '—') + ' / ' + (vl ? vl + ' fps' : '—'));
     }
     var w = session.weather;
     if (w) {

@@ -36,6 +36,13 @@ function SessionFlow(canvasManager, db) {
     // Optional session data
     this.roundsFired = 0;
     this.measuredVelocity = null;
+    // STRIP-DOWN PHASE (owner order): "enter average muzzle velocity
+    // (plus optional high/low)". measuredVelocity above IS the
+    // average; these two are optional supplements, stored inside the
+    // session's own results blob at save time (no schema change —
+    // canon data layer untouched, see _saveSession's own comment).
+    this.velocityHigh = null;
+    this.velocityLow = null;
     this.weather = null;
     this.savedSessionId = null;
 
@@ -79,6 +86,8 @@ SessionFlow.prototype.init = function () {
         dataValidationHint: document.getElementById('data-validation-hint'),
         inputRoundsFired: document.getElementById('input-rounds-fired'),
         inputVelocity: document.getElementById('input-velocity'),
+        inputVelocityHigh: document.getElementById('input-velocity-high'),
+        inputVelocityLow: document.getElementById('input-velocity-low'),
         inputTemp: document.getElementById('input-temp'),
         inputHumidity: document.getElementById('input-humidity'),
         inputWindMph: document.getElementById('input-wind-mph'),
@@ -145,6 +154,8 @@ SessionFlow.prototype.reset = function () {
     // Clear optional fields
     this.roundsFired = 0;
     this.measuredVelocity = null;
+    this.velocityHigh = null;
+    this.velocityLow = null;
     this.weather = null;
     this.savedSessionId = null;
 
@@ -167,6 +178,8 @@ SessionFlow.prototype.reset = function () {
     if (this.els.inputBulletDia) this.els.inputBulletDia.value = '';
     if (this.els.inputRoundsFired) this.els.inputRoundsFired.value = '';
     if (this.els.inputVelocity) this.els.inputVelocity.value = '';
+    if (this.els.inputVelocityHigh) this.els.inputVelocityHigh.value = '';
+    if (this.els.inputVelocityLow) this.els.inputVelocityLow.value = '';
     if (this.els.inputTemp) this.els.inputTemp.value = '';
     if (this.els.inputHumidity) this.els.inputHumidity.value = '';
     if (this.els.inputWindMph) this.els.inputWindMph.value = '';
@@ -1062,6 +1075,8 @@ SessionFlow.prototype._confirmData = function () {
     // Collect optional fields
     this.roundsFired = parseInt(this.els.inputRoundsFired.value, 10) || 0;
     this.measuredVelocity = parseFloat(this.els.inputVelocity.value) || null;
+    this.velocityHigh = (this.els.inputVelocityHigh && parseFloat(this.els.inputVelocityHigh.value)) || null;
+    this.velocityLow = (this.els.inputVelocityLow && parseFloat(this.els.inputVelocityLow.value)) || null;
 
     // Collect weather snapshot
     var tempF = parseFloat(this.els.inputTemp.value);
@@ -1341,8 +1356,15 @@ SessionFlow.prototype._saveSession = function () {
         },
         bulletDiameter: this.bulletDiameter,
         poaPoint: this.poa,
+        // STRIP-DOWN PHASE: optional high/low MV, folded into the
+        // existing free-form results blob rather than new columns —
+        // canon data layer (schema) stays untouched. this.results
+        // itself (the protected calculations.js engine's own output)
+        // is never mutated; a shallow copy carries the two extra keys.
         impacts: this.impacts.slice(),
-        results: this.results,
+        results: (this.velocityHigh || this.velocityLow)
+            ? Object.assign({}, this.results, { velocityHigh: this.velocityHigh, velocityLow: this.velocityLow })
+            : this.results,
         coldBore: this.coldBore,
         // Zero Guardian: a confirmed verdict marks this as a zero session
         isZeroSession: typeof ZeroGuardian !== 'undefined' && this.poa
