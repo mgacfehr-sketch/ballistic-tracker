@@ -1997,3 +1997,31 @@ BallisticDB.prototype.getTroubleshootingChecksByRifle = function (rifleId) {
             return (res.data || []).map(_rowToJs);
         });
 };
+
+// ═════════════════════════════════════════════════════════════
+// Amendment 1 Phase E — per-shot residual engine, SHADOW STAGE ONLY.
+// js/residual-engine.js computes; this ONLY logs the output. Nothing
+// in this codebase reads residual_shadow_log back (E-SHADOW-SPEC.md
+// §9) -- that is the literal enforcement of "shadow." Best-effort,
+// fire-and-forget: a logging failure must never surface to the
+// shooter or affect the real save it rides alongside.
+// ═════════════════════════════════════════════════════════════
+
+BallisticDB.prototype.logResidualShadow = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        loadId: data.loadId || null,
+        rangeYds: data.rangeYds,
+        engineVersion: data.engineVersion || '1.0.0',
+        output: data.output,
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return _insertGracefulRow(self.supabase, 'residual_shadow_log', row, [], true)
+        .then(function (res) { return _rowToJs(res.data); })
+        .catch(function (err) {
+            console.warn('[db] residual_shadow_log write failed (shadow-only, no impact):', err);
+        });
+};

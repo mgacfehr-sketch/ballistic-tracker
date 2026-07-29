@@ -1,6 +1,9 @@
 -- ════════════════════════════════════════════════════════════
 -- PHASECD-migrations.sql — Amendment 1 Phase C (memory + minimal
--- invalidation) and Phase D (validation statuses + coach brain).
+-- invalidation), Phase D (validation statuses + coach brain), and
+-- Phase E's shadow-stage logging table (all SQL for this session's
+-- three phases accumulates in this one file, per the owner's own
+-- instruction -- the filename predates Phase E being added to scope).
 --
 -- NEVER RUN AUTOMATICALLY. Written for owner review and owner-initiated
 -- execution in the Supabase SQL Editor, exactly like PHASEB-migrations.sql
@@ -18,6 +21,8 @@
 --     PC3 — barrel_id columns    (additive, nullable, on 4 existing tables)
 --   Phase D:
 --     PD1 — troubleshooting_checks (Validation Doctrine §7 ladder)
+--   Phase E:
+--     PE1 — residual_shadow_log  (SHADOW-ONLY logging, E-SHADOW-SPEC.md §9)
 --   Parity / rollback:
 --     P9  — Parity check queries (run on a database CLONE, not production)
 --     P10 — Rollback
@@ -178,6 +183,48 @@ CREATE INDEX IF NOT EXISTS idx_troubleshooting_checks_rifle
 
 
 -- ────────────────────────────────────────────────────────────
+-- PE1 — residual_shadow_log (Amendment 1 Phase E, SHADOW STAGE ONLY;
+-- E-SHADOW-SPEC.md §9). js/residual-engine.js computes; js/db.js's
+-- logResidualShadow only WRITES here. Nothing in this codebase reads
+-- this table back this phase -- that is the literal enforcement of
+-- "shadow": the data exists, honestly computed, but the application
+-- does not act on it. output is the engine's full documented output
+-- shape (E-SHADOW-SPEC.md §8) as jsonb, so a future promotion phase can
+-- re-analyze already-logged shadow computations without recomputing
+-- them, and so the exact engine_version that produced each row is
+-- always inspectable.
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.residual_shadow_log (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    rifle_id       uuid NOT NULL REFERENCES public.rifles(id) ON DELETE CASCADE,
+    load_id        uuid REFERENCES public.loads(id) ON DELETE SET NULL,
+    range_yds      integer,
+    engine_version text NOT NULL DEFAULT '1.0.0',
+    output         jsonb NOT NULL,
+    created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.residual_shadow_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can read own residual shadow log" ON public.residual_shadow_log;
+CREATE POLICY "Users can read own residual shadow log"
+    ON public.residual_shadow_log FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own residual shadow log" ON public.residual_shadow_log;
+CREATE POLICY "Users can insert own residual shadow log"
+    ON public.residual_shadow_log FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own residual shadow log" ON public.residual_shadow_log;
+CREATE POLICY "Users can update own residual shadow log"
+    ON public.residual_shadow_log FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own residual shadow log" ON public.residual_shadow_log;
+CREATE POLICY "Users can delete own residual shadow log"
+    ON public.residual_shadow_log FOR DELETE USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_residual_shadow_log_rifle
+    ON public.residual_shadow_log(user_id, rifle_id, created_at);
+
+
+-- ────────────────────────────────────────────────────────────
 -- P9 — Parity / sanity queries. RUN ON A DATABASE CLONE, NOT PRODUCTION.
 -- Unlike Phase B, Phase C/D introduce no backfill (config_epochs,
 -- recurring_targets, and troubleshooting_checks are all NEW facts with
@@ -190,7 +237,8 @@ CREATE INDEX IF NOT EXISTS idx_troubleshooting_checks_rifle
 SELECT
     (SELECT count(*) FROM public.config_epochs)          AS config_epochs,
     (SELECT count(*) FROM public.recurring_targets)       AS recurring_targets,
-    (SELECT count(*) FROM public.troubleshooting_checks)  AS troubleshooting_checks;
+    (SELECT count(*) FROM public.troubleshooting_checks)  AS troubleshooting_checks,
+    (SELECT count(*) FROM public.residual_shadow_log)     AS residual_shadow_log;
 
 -- 9b. Every zero_events/mv_measurements/truing_events/steel_strings row
 -- written going forward should carry a barrel_id once a barrel exists
@@ -207,24 +255,29 @@ LIMIT 20;
 -- ────────────────────────────────────────────────────────────
 -- P10 — Rollback.
 --
--- config_epochs, recurring_targets, troubleshooting_checks are purely
--- additive new tables -- nothing else depends on them existing. The
--- js/db.js code that writes to them is best-effort/fire-and-forget in
--- every call site except changeLot/addConfigEpoch/addTroubleshootingCheck
--- themselves (which are the direct point of a user action, e.g. tapping
--- "New lot" or entering a troubleshooting check -- those DO surface an
--- error to the user if the write fails, same as any other explicit save).
+-- config_epochs, recurring_targets, troubleshooting_checks, and
+-- residual_shadow_log are purely additive new tables -- nothing else
+-- depends on them existing (residual_shadow_log is written but NEVER
+-- read by any application code this phase, so dropping it is strictly
+-- lower-risk than any of the other three). The js/db.js code that
+-- writes to them is best-effort/fire-and-forget in every call site
+-- except changeLot/addConfigEpoch/addTroubleshootingCheck themselves
+-- (which are the direct point of a user action, e.g. tapping "New lot"
+-- or entering a troubleshooting check -- those DO surface an error to
+-- the user if the write fails, same as any other explicit save).
 --
 -- To fully roll back:
 --   1. Revert the js/db.js/js/rifle-add.js/js/rifle-payoff.js/
 --      js/next-action.js code from this phase (redeploy the previous
 --      commit), or accept that the UI surfaces (lot recognition,
---      recency-ranked chips, troubleshooting hold) will silently no-op
---      against a database missing these tables/columns (all writes are
---      wrapped in _insertGracefulRow or best-effort .catch()).
+--      recency-ranked chips, troubleshooting hold, shadow logging) will
+--      silently no-op against a database missing these tables/columns
+--      (all writes are wrapped in _insertGracefulRow or best-effort
+--      .catch()).
 --   2. DROP TABLE IF EXISTS public.config_epochs CASCADE;
 --      DROP TABLE IF EXISTS public.recurring_targets CASCADE;
 --      DROP TABLE IF EXISTS public.troubleshooting_checks CASCADE;
+--      DROP TABLE IF EXISTS public.residual_shadow_log CASCADE;
 --   3. Barrel_id columns are harmless to leave in place even on a full
 --      rollback (nullable, unreferenced by any other object); if
 --      removing them anyway:
