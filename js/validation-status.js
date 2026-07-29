@@ -111,11 +111,18 @@ function oneShotCheckCopy(outcome) {
 /**
  * The troubleshooting hold (Validation Doctrine §7 + A10's "do NOT
  * true. Invalidate, route to the troubleshooting ladder"). Entry: an
- * alarm outcome with no resolving check since. Exit: a check logged
- * AFTER the alarm reporting 'resolved' or 'ok'. While in hold, the
- * caller must not propose a ballistic correction (Commandment 32) --
- * this function only reports the state; enforcing the "don't true"
- * rule is the caller's job (next-action.js / rifle-payoff.js).
+ * alarm outcome with no resolving check since. Walking the ladder:
+ * a check result of 'ok' or 'issue_found' at one rung ADVANCES to the
+ * next rung but stays in hold -- checking the zero and finding it fine
+ * means "check the mount next," not "problem solved." Exit: ONLY a
+ * 'resolved' result clears the hold, at any rung (a fix was confirmed,
+ * or -- at the final 'builder' rung -- there is nothing further a range
+ * check can do, so the caller maps that rung's clean result to
+ * 'resolved' too, closing the ladder rather than looping forever).
+ * While in hold, the caller must not propose a ballistic correction
+ * (Commandment 32) -- this function only reports the state; enforcing
+ * the "don't true" rule is the caller's job (next-action.js /
+ * rifle-payoff.js).
  * input = { alarmAt: iso|null, checks: [{step, result, at}], now }
  * → { inHold, ladderStep, nextCheck }
  */
@@ -126,7 +133,7 @@ function deriveTroubleshootingHold(input) {
     var lastStepDone = null;
     (input.checks || []).forEach(function (c) {
         if (!c || !c.at || String(c.at) < String(input.alarmAt)) return;
-        if (c.result === 'resolved' || c.result === 'ok') resolved = true;
+        if (c.result === 'resolved') resolved = true;
         lastStepDone = c.step;
     });
     if (resolved) return { inHold: false, ladderStep: null, nextCheck: null };

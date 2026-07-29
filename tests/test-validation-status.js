@@ -116,10 +116,28 @@ check('a "resolved" check after the alarm clears the hold entirely',
     }),
     { inHold: false, ladderStep: null, nextCheck: null });
 
-check('an "ok" result (not just "resolved") also clears the hold',
+check('an "ok" result (checked, nothing wrong) ADVANCES the ladder but does NOT clear the hold -- only "resolved" does',
     VS.deriveTroubleshootingHold({
         alarmAt: '2026-07-01T00:00:00Z',
         checks: [{ step: 'zero', result: 'ok', at: '2026-07-02T00:00:00Z' }]
+    }),
+    { inHold: true, ladderStep: 'mount', nextCheck: 'mount' });
+
+check('walking all four rungs "ok" without ever resolving stays in hold at "builder"',
+    VS.deriveTroubleshootingHold({
+        alarmAt: '2026-07-01T00:00:00Z',
+        checks: [
+            { step: 'zero', result: 'ok', at: '2026-07-02T00:00:00Z' },
+            { step: 'mount', result: 'ok', at: '2026-07-03T00:00:00Z' },
+            { step: 'velocity', result: 'ok', at: '2026-07-04T00:00:00Z' }
+        ]
+    }),
+    { inHold: true, ladderStep: 'builder', nextCheck: 'builder' });
+
+check('"resolved" at the FIRST rung clears the hold immediately (no need to walk the whole ladder)',
+    VS.deriveTroubleshootingHold({
+        alarmAt: '2026-07-01T00:00:00Z',
+        checks: [{ step: 'zero', result: 'resolved', at: '2026-07-02T00:00:00Z' }]
     }).inHold,
     false);
 

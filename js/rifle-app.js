@@ -357,7 +357,7 @@ RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel,
             // the rifle already inherited.
             var coachBtn = document.getElementById('rf-coach');
             if (coachBtn) coachBtn.addEventListener('click', function () {
-                self._launchCoach(na.action.type, rifle);
+                self._launchCoach(na.action.type, rifle, na.action);
             });
         }
     });
@@ -367,7 +367,7 @@ RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel,
  *  Part 2). "No separate truing door" — both the ready-to-true and
  *  flagged/drifted rungs land on the same "I shot at distance" card
  *  the truing engine already reads its data from. */
-RifleApp.prototype._launchCoach = function (type, rifle) {
+RifleApp.prototype._launchCoach = function (type, rifle, action) {
     var self = this;
     switch (type) {
         case 'addLoad':
@@ -391,7 +391,56 @@ RifleApp.prototype._launchCoach = function (type, rifle) {
         case 'cleaningLog':
             if (window.AppNav) AppNav.openRifle(rifle.id);
             break;
+        case 'troubleshootingCheck':
+            this._openTroubleshootingCheck(rifle, action && action.step);
+            break;
     }
+};
+
+/** Amendment 1 Phase D: the troubleshooting hold's own entry/exit UI
+ *  (Validation Doctrine §7 -- "recording each check as a fact"). Without
+ *  a way to LOG a check, the hold this coach line surfaces could never
+ *  clear -- this is the missing other half of it. Deliberately plain: a
+ *  ladder step is either checked-and-fine, checked-and-found-something,
+ *  or the rifle needs its builder; nothing here proposes a correction. */
+RifleApp.prototype._openTroubleshootingCheck = function (rifle, step) {
+    var self = this;
+    var STEP_COPY = {
+        zero: { title: 'Re-check your zero', body: 'Shoot a confirming group at 100. Did it land where you expect?' },
+        mount: { title: 'Check your scope mount and action fasteners', body: 'Torque check the mount, rings, and action screws. Anything loose?' },
+        velocity: { title: 'Re-measure muzzle velocity', body: 'Chronograph this load again. Does it still match what\'s on file?' },
+        builder: { title: 'Send it to your builder', body: 'This is past what a range check can diagnose.' }
+    };
+    var copy = STEP_COPY[step] || { title: 'Troubleshooting check', body: 'Work through this before truing again.' };
+    var overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.innerHTML = '<div class="overlay-card">' +
+        '<div class="overlay-title">' + UI.esc(copy.title) + '</div>' +
+        '<p class="overlay-text">' + UI.esc(copy.body) + '</p>' +
+        '<button class="btn-primary u-full" id="tc-ok">Checked it — no issue found</button>' +
+        '<button class="btn u-full u-mt-10" id="tc-issue">Found something — note it</button>' +
+        '<button class="btn u-full u-mt-10" id="tc-close">Not yet</button>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+    function record(result, notes) {
+        if (!self.db.addTroubleshootingCheck) { close(); return; }
+        self.db.addTroubleshootingCheck({ rifleId: rifle.id, step: step, result: result, notes: notes || null })
+            .then(function () { close(); self.show(rifle.id); })
+            .catch(function (err) { close(); alert('Could not save: ' + err.message); });
+    }
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    document.getElementById('tc-close').addEventListener('click', close);
+    document.getElementById('tc-ok').addEventListener('click', function () {
+        // The FINAL ladder step ("builder") checked-clean still means
+        // "sent it, nothing more this app can check" -- treat as resolved
+        // so the hold doesn't loop forever; every earlier step reporting
+        // clean just advances to the next rung (Validation Doctrine §7).
+        record(step === 'builder' ? 'resolved' : 'ok');
+    });
+    document.getElementById('tc-issue').addEventListener('click', function () {
+        record('issue_found');
+    });
 };
 
 /** AUDIT-FINDINGS.md F1: no ammo (or an unsolvable profile) means
