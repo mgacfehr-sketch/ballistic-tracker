@@ -81,11 +81,34 @@ function formatFixed(n, decimals) {
 }
 
 /**
- * Load an image from a File object and return a promise that resolves to an HTMLImageElement.
- * Handles EXIF orientation by drawing to a temporary canvas if needed.
- * Modern browsers (2024+) auto-apply EXIF orientation via createImageBitmap, so we use that.
+ * Load an image from a File object and return a promise that resolves
+ * to a CanvasImageSource (an ImageBitmap when the browser supports it,
+ * an HTMLImageElement otherwise) — every caller in this codebase only
+ * ever reads .width/.height and passes the result straight into
+ * ctx.drawImage(), both of which ImageBitmap and HTMLImageElement
+ * support identically, so this substitution is transparent to callers.
+ *
+ * UI Consolidation phase, item (4): this fixes the rotated/twisted
+ * target-photo bug. The PRIOR implementation's own comment claimed
+ * "modern browsers auto-apply EXIF orientation via createImageBitmap,
+ * so we use that" — but the code never actually called
+ * createImageBitmap at all; it only ever loaded through a plain
+ * `new Image(); img.src = objectURL`. A browser's CSS-level "auto-
+ * rotate an <img> for on-screen DISPLAY" behavior (which IS broadly
+ * supported) is a DIFFERENT code path from what `ctx.drawImage()`
+ * decodes when painting that same <img> onto a canvas — canvas
+ * drawing has long been documented (and inconsistent across engines,
+ * especially WebView/iOS Safari, which is exactly what a phone
+ * camera's portrait photo goes through) to NOT reliably inherit that
+ * same correction. Explicitly requesting
+ * `{ imageOrientation: 'from-image' }` from createImageBitmap forces
+ * EXIF-correct pixel orientation in the decoded bitmap itself,
+ * independent of any engine's on-screen-display default — the
+ * correct, spec-defined fix for this exact bug class, not a
+ * workaround.
+ *
  * @param {File} file
- * @returns {Promise<HTMLImageElement>}
+ * @returns {Promise<ImageBitmap|HTMLImageElement>}
  */
 function loadImageFromFile(file) {
     return new Promise(function (resolve, reject) {
@@ -94,17 +117,32 @@ function loadImageFromFile(file) {
             return;
         }
 
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = function () {
-            URL.revokeObjectURL(url);
-            resolve(img);
-        };
-        img.onerror = function () {
-            URL.revokeObjectURL(url);
-            reject(new Error('Failed to load image'));
-        };
-        img.src = url;
+        function loadViaImgElement() {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = function () {
+                URL.revokeObjectURL(url);
+                resolve(img);
+            };
+            img.onerror = function () {
+                URL.revokeObjectURL(url);
+                reject(new Error('Failed to load image'));
+            };
+            img.src = url;
+        }
+
+        if (typeof createImageBitmap === 'function') {
+            createImageBitmap(file, { imageOrientation: 'from-image' })
+                .then(resolve)
+                .catch(function () {
+                    // Some engines implement createImageBitmap but reject
+                    // the imageOrientation option (older WebKit) — fall
+                    // back rather than fail the whole capture over it.
+                    loadViaImgElement();
+                });
+        } else {
+            loadViaImgElement();
+        }
     });
 }
 
