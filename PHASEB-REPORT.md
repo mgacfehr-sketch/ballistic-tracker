@@ -446,6 +446,21 @@ addition: a second `DELETE FROM storage.objects` line cleaning up
 `bucket_id = 'import-vault'`, same shape as the existing
 `session-images` line. Account deletion now reaches both buckets.
 
+**8a. FK-cascade confirmation (owner-run, read-only, 2026-07-28) —
+CONFIRMED.** `SIMPLIFY-migrations.sql`'s own comment claims the six
+v2.3 event tables "cascade via their `auth.users` FKs when the user
+row deletes, so no new lines are needed" in `delete_my_account` — a
+claim this session had no way to check without database access, and
+`delete_my_account` depends on it being true (it never `DELETE`s from
+these six explicitly). A live `information_schema`/`pg_constraint`
+check confirms `delete_rule = 'CASCADE'` on `user_id` for all six:
+`zero_events`, `mv_measurements`, `tracking_verifications`,
+`truing_events`, `steel_strings`, `steel_shots`. The comment's claim
+was correct — account deletion fully reaches these tables even though
+`delete_my_account`'s body never mentions them by name. Not something
+this session altered; recorded here because it was asserted, never
+previously verified, and now is.
+
 ---
 
 ## STOP
