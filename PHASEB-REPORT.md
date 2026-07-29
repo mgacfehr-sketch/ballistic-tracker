@@ -247,15 +247,53 @@ two tables' RLS was set up separately, outside this repo's migration
 history. No action needed — this closes clean, just corrects an
 inference this report made before the query came back.
 
-**`session-images` Storage bucket:** no `CREATE POLICY` / bucket-setup
-SQL exists anywhere in the twelve pre-existing `*.sql` files (checked
-by grep across the whole repo) — this bucket's policies were
-apparently configured entirely through the Supabase dashboard,
-untracked in code. This is a genuine, standalone audit gap, distinct
-from and not solved by Phase B's attachment-vault work (which adds
-hash tracking, not bucket policy verification). **Owner action below**
-gives a read-only query against `pg_policies` for `storage.objects`,
-the only way to see what's actually enforced.
+**`session-images` Storage bucket — CONFIRMED 2026-07-28, one real gap
+found.** No `CREATE POLICY`/bucket-setup SQL exists anywhere in the
+twelve pre-existing `*.sql` files (checked by grep) — this bucket's
+policies were configured entirely through the Supabase dashboard,
+untracked in code, same pattern as `cleaning_logs`/`scope_adjustments`
+above. The owner ran the `pg_policies` query (OWNER-ACTIONS item 4):
+3 policies exist — INSERT ("Users can upload own images"), SELECT
+("...view own images"), DELETE ("...delete own images") — all
+correctly scoped by folder prefix
+(`bucket_id = 'session-images' AND auth.uid()::text =
+(storage.foldername(name))[1]`). **No cross-user access risk** — the
+scoping itself is sound.
+
+**But there is no UPDATE policy.** Supabase Storage's
+`upload(..., {upsert: true})` needs UPDATE permission when the target
+path already exists (INSERT alone only covers a genuinely new path);
+without it, re-uploading to an existing path fails under RLS. Two
+consequences, found by tracing every caller:
+
+1. **This bit Phase B's own `vaultImportFile`** (this session's new
+   code): re-importing an identical file always targets the same
+   hash-keyed path, so the second upload would fail — silently, since
+   `js/chrono.js`'s `_pendingVault` catches vaulting errors and
+   resolves `null`, quietly contradicting the documented "safe no-op"
+   behavior. **Fixed in the same commit as the SQL below:**
+   `vaultImportFile` now checks `attachment_vault` for the content hash
+   BEFORE ever calling Storage, so the common case no longer depends on
+   this policy at all.
+2. **Pre-existing, NOT fixed by the code change above:**
+   `js/sync-queue.js`'s offline image-retry path. `writeImage()` tries
+   `saveSessionImage`/`saveSteelPhoto` immediately; if the upload
+   actually succeeds server-side but the client reads the response as
+   a network failure (a real race on a flaky range connection, not
+   hypothetical), it queues the image and retries later via `flush()`'s
+   `_pendingImage` handler — which re-calls the same upload against the
+   now-already-existing path. That retry would fail the same way, and
+   per `js/sync-queue.js`'s own comment ("image failure never blocks
+   the flush"), the failure is silently swallowed — a photo could be
+   stranded forever with no user-visible error. **Left open, not fixed
+   this session** — it's a real reliability gap but a materially
+   separate, non-trivial change to the sync-queue retry logic, outside
+   what this owner-action turn asked for. See OWNER-ACTIONS item 4.
+
+`PHASEB-migrations.sql` P0 adds the missing UPDATE policy — closes the
+gap at the policy level for BOTH cases above (the vault fix no longer
+needs it, but adding it is still correct and closes the sync-queue.js
+risk too, without requiring a code change there).
 
 ### Test suite / hash locks / cache
 
@@ -321,24 +359,31 @@ order by tablename, cmd;
 Expect 4 rows per table (SELECT/INSERT/UPDATE/DELETE). Any table with
 fewer is a live RLS gap, independent of anything Phase B added.
 
-**4. Check the `session-images` Storage bucket's actual policies** —
-untracked in any repo SQL file, confirmed only by dashboard/catalog:
+**4. ~~Check the `session-images` Storage bucket's actual policies~~ —
+DONE, 2026-07-28. Found one real gap, one thing to decide.** The 3
+existing policies (INSERT/SELECT/DELETE) are correctly scoped by
+folder prefix — no cross-user access risk. But there's **no UPDATE
+policy**, which breaks re-uploading to an existing storage path.
+`PHASEB-migrations.sql`'s new P0 block adds it. Two things came out of
+tracing who's affected:
+   - Phase B's own `vaultImportFile` hit this (re-importing an
+     identical file) — already fixed in code this session (checks
+     `attachment_vault` before touching Storage, no longer depends on
+     this policy).
+   - `js/sync-queue.js`'s offline image-retry path has the same
+     exposure and is **not** fixed — if an image upload succeeds
+     server-side but the client reads it as failed, the queued retry
+     hits the same missing-UPDATE-policy wall and is silently
+     swallowed (a photo could be stranded with no visible error).
+     Running P0 closes this at the policy level without needing a code
+     change. **Judgment call:** do you also want a code-level hardening
+     pass on `js/sync-queue.js`'s retry logic (e.g., treat a
+     permission-denied retry-of-an-existing-path as "already there,
+     succeeded" rather than a failure), or is the policy fix
+     sufficient? Full detail in the RLS audit section above.
 
-```sql
-select policyname, cmd, qual, with_check
-from pg_policies
-where schemaname = 'storage' and tablename = 'objects';
-```
-
-Skim the results for anything scoping to `bucket_id = 'session-images'`
-by folder prefix (`{auth.uid()}/...`) — that's the owner-scoping this
-bucket needs. If nothing matches, every authenticated user can
-currently read/write every other user's session photos and vaulted
-attachments; this would be a real, unrelated-to-Phase-B finding worth
-fixing immediately, independent of whether you run
-`PHASEB-migrations.sql` at all.
-
-**5. Review and run `PHASEB-migrations.sql`** (P1–P3 create tables;
+**5. Review and run `PHASEB-migrations.sql`** (P0 adds the missing
+storage policy; P1–P3 create tables;
 P4 backfills; P5 is read-only, meant for a clone, not production — run
 it there if you want the parity guarantee before trusting the live
 backfill; P6 is rollback, reference only). Re-runnable if interrupted.

@@ -597,37 +597,55 @@ BallisticDB.prototype._registerAttachmentHash = function (kind, blob, storagePat
 BallisticDB.prototype.vaultImportFile = function (kind, blob, filename) {
     var self = this;
     return sha256Hex(blob).then(function (hash) {
-        var path = self.userId + '/vault/' + hash;
-        return self.supabase.storage.from('session-images')
-            .upload(path, blob, { upsert: true, contentType: blob.type || 'application/octet-stream' })
-            .then(function (upRes) {
-                if (upRes.error) throw upRes.error;
-                var record = {
-                    id: generateUUID(),
-                    kind: kind,
-                    originalFilename: filename || null,
-                    contentHash: hash,
-                    byteSize: blob.size || null,
-                    storageBucket: 'session-images',
-                    storagePath: path,
-                    status: 'unresolved'
-                };
-                var row = _jsToRow(record, self.userId);
-                return self.supabase.from('attachment_vault').insert(row).select().single();
-            })
-            .then(function (res) {
-                if (res.error) {
-                    if (res.error.code === '23505') {
-                        return self.supabase.from('attachment_vault').select()
-                            .eq('user_id', self.userId).eq('content_hash', hash).single()
-                            .then(function (existing) {
-                                if (existing.error) throw existing.error;
-                                return _rowToJs(existing.data);
-                            });
-                    }
-                    throw res.error;
-                }
-                return _rowToJs(res.data);
+        // Check FIRST, upload only if genuinely new (owner-review RLS audit
+        // finding: the session-images bucket has INSERT/SELECT/DELETE
+        // policies but no UPDATE policy, so a plain upload(...,
+        // {upsert:true}) against a path that already exists — e.g.
+        // re-importing the exact same file, which this hash-keyed path
+        // makes identical bytes always land on — fails under RLS. Checking
+        // attachment_vault before ever touching Storage avoids depending
+        // on that policy at all for the common case, and also skips a
+        // wasted re-upload of identical bytes.)
+        return self.supabase.from('attachment_vault').select()
+            .eq('user_id', self.userId).eq('content_hash', hash).maybeSingle()
+            .then(function (existing) {
+                if (existing.error) throw existing.error;
+                if (existing.data) return _rowToJs(existing.data);
+
+                var path = self.userId + '/vault/' + hash;
+                return self.supabase.storage.from('session-images')
+                    .upload(path, blob, { upsert: true, contentType: blob.type || 'application/octet-stream' })
+                    .then(function (upRes) {
+                        if (upRes.error) throw upRes.error;
+                        var record = {
+                            id: generateUUID(),
+                            kind: kind,
+                            originalFilename: filename || null,
+                            contentHash: hash,
+                            byteSize: blob.size || null,
+                            storageBucket: 'session-images',
+                            storagePath: path,
+                            status: 'unresolved'
+                        };
+                        var row = _jsToRow(record, self.userId);
+                        return self.supabase.from('attachment_vault').insert(row).select().single();
+                    })
+                    .then(function (res) {
+                        if (res.error) {
+                            if (res.error.code === '23505') {
+                                // Lost a race with a concurrent identical
+                                // upload — fetch and return the row that won.
+                                return self.supabase.from('attachment_vault').select()
+                                    .eq('user_id', self.userId).eq('content_hash', hash).single()
+                                    .then(function (existing2) {
+                                        if (existing2.error) throw existing2.error;
+                                        return _rowToJs(existing2.data);
+                                    });
+                            }
+                            throw res.error;
+                        }
+                        return _rowToJs(res.data);
+                    });
             });
     });
 };

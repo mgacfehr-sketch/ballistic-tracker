@@ -20,6 +20,7 @@
 -- backfill; see OWNER-ACTIONS).
 --
 -- Sections:
+--   P0 — session-images bucket: add the missing UPDATE storage policy
 --   P1 — fact_events            (the minimal event envelope)
 --   P2 — attachment_vault       (vault-first import)
 --   P3 — workhorse_packages     (SCHEMA ONLY — Phase F builds the claim flow)
@@ -27,6 +28,44 @@
 --   P5 — Parity check queries   (run on a database CLONE, not production)
 --   P6 — Rollback
 -- ════════════════════════════════════════════════════════════
+
+
+-- ────────────────────────────────────────────────────────────
+-- P0 — session-images bucket: add the missing UPDATE storage policy.
+--
+-- Found running OWNER-ACTIONS item 4 (RLS audit, 2026-07-28): the
+-- session-images bucket has exactly 3 policies on storage.objects —
+-- "Users can upload own images" (INSERT), "Users can view own images"
+-- (SELECT), "Users can delete own images" (DELETE) — all correctly
+-- scoped by folder prefix (bucket_id = 'session-images' AND
+-- auth.uid()::text = (storage.foldername(name))[1]). There is NO
+-- UPDATE policy. Supabase Storage's upload(..., {upsert: true}) needs
+-- UPDATE permission when the target path already exists (INSERT alone
+-- only covers a genuinely new path) — without it, re-uploading to an
+-- existing path fails under RLS.
+--
+-- This bit js/db.js's own vaultImportFile (Phase B, this session) —
+-- fixed in the same commit as this SQL block by checking
+-- attachment_vault BEFORE ever calling Storage, so the common case
+-- (re-importing an identical file) no longer depends on this policy at
+-- all. It does NOT fix the pre-existing risk in js/sync-queue.js's
+-- offline image-retry path: if saveSessionImage/saveSteelPhoto's
+-- upload succeeds server-side but the client treats the response as a
+-- network failure (a real, not-hypothetical race on a flaky range
+-- connection) and queues + later retries, that retry targets the same
+-- already-uploaded path and would fail the same way — and per
+-- js/sync-queue.js's own comment, "image failure never blocks the
+-- flush," so today that failure is silently swallowed, potentially
+-- stranding a photo forever with no user-visible error. This migration
+-- block closes that gap at the policy level; whether js/sync-queue.js
+-- also deserves a code-level hardening pass is a separate question,
+-- flagged in PHASEB-REPORT.md, not decided here.
+-- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "Users can update own images" ON storage.objects;
+CREATE POLICY "Users can update own images"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'session-images' AND auth.uid()::text = (storage.foldername(name))[1])
+    WITH CHECK (bucket_id = 'session-images' AND auth.uid()::text = (storage.foldername(name))[1]);
 
 
 -- ────────────────────────────────────────────────────────────
