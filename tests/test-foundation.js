@@ -1,8 +1,11 @@
 /**
  * test-foundation.js — foundation-layer pure logic.
  * Run: node tests/test-foundation.js
- * Suites: ToolsCore · (WizardCore, HomeCore, RifleCards orderCards added
- * in their steps).
+ * Suites: ToolsCore · (WizardCore, HomeCore added in their steps).
+ * RifleCards.orderCards suite removed overnight run #2, item 4:
+ * js/rifle-cards.js was confirmed dead (zero references anywhere,
+ * not loaded by index.html, superseded by the v3/v4 Card system in
+ * rifle-app.js — see V4-REPORT.md's own prior finding) and deleted.
  */
 
 var passed = 0;
@@ -163,27 +166,6 @@ check('bump creates entry', c1.x, 1);
 check('bump immutable', c0.x, undefined);
 check('bump increments', HomeCore.bumpCount(c1, 'x').x, 2);
 check('bump caps at 999', HomeCore.bumpCount({ x: 999 }, 'x').x, 999);
-
-// ── RifleCards.orderCards ─────────────────────────────────────
-// (rifle-cards.js needs DOM globals only at render; orderCards is pure)
-global.document = { createElement: function () { return {}; }, getElementById: function () { return null; } };
-var RC = require('../js/rifle-cards.js').RifleCards;
-
-console.log('\nRifleCards.orderCards:');
-
-function fakeCard(id, slot) { return { id: id, slot: slot, isVisible: function () { return true; }, render: function () {} }; }
-
-var orderedCards = RC.orderCards([
-    fakeCard('prove1', 'prove'), fakeCard('ready1', 'ready'),
-    fakeCard('prog1', 'progress'), fakeCard('ammo1', 'ammo'), fakeCard('prog2', 'progress')
-]);
-check('seven-question slot order', orderedCards.map(function (c) { return c.id; }).join(','), 'ready1,ammo1,prog1,prog2,prove1');
-check('registration order within slot', orderedCards[2].id, 'prog1');
-
-var threw = false;
-try { RC.register({ id: 'bad', slot: 'nonsense', isVisible: function () {}, render: function () {} }); }
-catch (e) { threw = true; }
-check('unknown slot rejected by register', threw, true);
 
 // ── DopeCards.dopeRows ────────────────────────────────────────
 var calcMod = require('../js/calculations.js');
