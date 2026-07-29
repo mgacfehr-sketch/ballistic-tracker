@@ -228,14 +228,24 @@ RLS enabled, deliberately zero policies.
 **Existing tables Phase B's dual-write touches** (`zero_events`,
 `mv_measurements`, `tracking_verifications`, `truing_events`,
 `steel_strings`, `steel_shots`, `cleaning_logs`, `scope_adjustments`):
-RLS + four owner-only policies exist **in `REORG-migrations.sql`**,
-confirmed by reading the file. Whether that migration's RLS policies
-match what's actually live cannot be independently confirmed without
-database access — the exact same landing-gap risk that SIMPLE-
-migrations.sql turned out to have for `sessions`' snapshot columns
-(owner-review #2's concrete finding). **Owner action below** gives a
-read-only query to confirm these are actually live before trusting
-this audit.
+**CONFIRMED LIVE 2026-07-28** (OWNER-ACTIONS item 3) — `pg_policies`
+shows exactly 4 policies (SELECT/INSERT/UPDATE/DELETE) on all 8
+tables, 32 rows total, no gaps. **Correction to this report's first
+draft:** only 6 of the 8 tables' policies (`zero_events`,
+`mv_measurements`, `tracking_verifications`, `truing_events`,
+`steel_strings`, `steel_shots`) are actually defined anywhere in this
+repo's SQL, in `REORG-migrations.sql`'s R4 section — confirmed by
+re-reading it. `cleaning_logs` and `scope_adjustments` have **no**
+`CREATE POLICY`/`ENABLE ROW LEVEL SECURITY` in any of the twelve `*.sql`
+files (checked by grep); they're live and correct, but entirely
+undocumented in-repo, the same "predates schema-as-code" pattern as
+their columns (owner-review #2). Consistent with that: their live
+policy names use "Users can **view** own X" wording, while the other
+six use "Users can **read** own X" — a cosmetic difference in naming
+convention, not a coverage or behavior gap, but further evidence these
+two tables' RLS was set up separately, outside this repo's migration
+history. No action needed — this closes clean, just corrects an
+inference this report made before the query came back.
 
 **`session-images` Storage bucket:** no `CREATE POLICY` / bucket-setup
 SQL exists anywhere in the twelve pre-existing `*.sql` files (checked
@@ -290,8 +300,13 @@ written. If it's now nonzero (someone/something wrote to the dead
 that would mean re-auditing #3's "dead code" finding, not just adding
 a backfill block.
 
-**3. Confirm the existing event tables' RLS is actually live** (the
-`REORG-migrations.sql` landing-gap risk named above):
+**3. ~~Confirm the existing event tables' RLS is actually live~~ —
+DONE, 2026-07-28.** All 8 tables, 4 policies each (SELECT/INSERT/
+UPDATE/DELETE), no gaps. Also surfaced that `cleaning_logs`/
+`scope_adjustments`'s policies aren't defined anywhere in this repo's
+SQL (unlike the other six) — live and correct, just undocumented
+in-repo, same as their columns. See RLS audit section above. Query
+kept here for reference:
 
 ```sql
 select tablename, policyname, cmd
