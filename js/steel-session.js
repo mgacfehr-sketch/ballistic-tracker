@@ -783,11 +783,20 @@ var SteelSession = (function () {
                 photoRef: photoBlob ? (_db.userId + '/steel_' + stringId + '.jpg') : null,
                 notes: note
             }).then(function () {
-                if (photoBlob && typeof SyncQueue !== 'undefined' && SyncQueue) {
-                    return SyncQueue.writeImage(stringId, photoBlob, null, 'steel');
-                }
-                if (photoBlob) return _db.saveSteelPhoto(stringId, photoBlob);
-                return null;
+                // CLAUDE.md rule 8 / A16: the string row is already saved
+                // by this point -- an image failure (including local
+                // storage exhaustion, e.g. SyncQueue.writeImage's queued
+                // path hitting a full IndexedDB quota mid-photo) must
+                // never surface as "Save failed" for a save that actually
+                // succeeded. Isolated with its own catch, mirroring
+                // session-flow.js's own (already-correct) pattern for the
+                // paper-session annotated image.
+                var imageWrite = photoBlob && typeof SyncQueue !== 'undefined' && SyncQueue
+                    ? SyncQueue.writeImage(stringId, photoBlob, null, 'steel')
+                    : (photoBlob ? _db.saveSteelPhoto(stringId, photoBlob) : null);
+                return Promise.resolve(imageWrite).catch(function (imgErr) {
+                    console.warn('[SteelSession] photo save failed (string already saved):', imgErr);
+                });
             }).then(function () {
                 S.shots = [];
                 _savedScreen(stringId);

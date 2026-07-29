@@ -357,5 +357,89 @@ check('init() requests persistent storage (reduces silent eviction risk under di
     assert(/navigator\.storage\.persist\(\)\.catch\(/.test(reqBody), 'persist() must be requested best-effort (never throw/block on denial)');
 });
 
+console.log('\n════════════════════════════════════════');
+console.log('FAILURE-INJECTION ROUND 2 (overnight run #2, item 6)');
+console.log('════════════════════════════════════════\n');
+
+console.log('\n--- Storage quota exhaustion mid-photo ---\n');
+
+check('session-flow.js: the annotated-image write (SyncQueue.writeImage / saveSessionImage) is isolated in its OWN promise chain, separate from the session row save — a quota failure here can only ever reach a console.error, never a user-facing "save failed"', function () {
+    var body = slice('js/session-flow.js', 'Promise.all([\n            canvasToJpegBlob(storedCanvas, 0.80),', 30);
+    assert(/\.catch\(function \(err\) \{\s*console\.error\('\[Session\] Failed to store annotated image:'/.test(body),
+        'the image-write chain must terminate in its own console.error catch, never propagate to a save-failed alert');
+});
+
+check('steel-session.js: the casual-lane photo write is isolated with its own .catch BEFORE the outer save-failed catch runs — a quota failure on the photo can never make an already-saved string report "Save failed" (this session\'s fix; previously it was NOT isolated)', function () {
+    var body = slice('js/steel-session.js', "document.getElementById('st-casual-save').addEventListener", 45);
+    assert(/Promise\.resolve\(imageWrite\)\.catch\(function \(imgErr\) \{\s*console\.warn/.test(body),
+        'the photo write must be wrapped in its own Promise.resolve(...).catch(...) before the outer chain continues');
+    var imageWriteIdx = body.indexOf('Promise.resolve(imageWrite)');
+    var savedScreenIdx = body.indexOf('_savedScreen(stringId)');
+    var outerCatchIdx = body.lastIndexOf("alert('Save failed:");
+    assert(imageWriteIdx !== -1 && savedScreenIdx !== -1 && outerCatchIdx !== -1, 'expected all three anchors present');
+    assert(imageWriteIdx < savedScreenIdx && savedScreenIdx < outerCatchIdx,
+        'the isolated image catch must run, then _savedScreen, with the outer alert only reachable from the STRING save failing');
+});
+
+check('isQuotaError would correctly classify the exact error IndexedDB throws when a queued photo blob exceeds local storage', function () {
+    var e = new Error('The quota has been exceeded.');
+    e.name = 'QuotaExceededError';
+    assert(S.isQuotaError(e) === true, 'a real browser QuotaExceededError on a large blob put() must classify as quota, not a generic failure');
+});
+
+console.log('\n--- Service-worker update mid-capture ---\n');
+
+check('DOCUMENTS CURRENT BEHAVIOR (not fixed this round — would require new UI, out of scope for "no UI feature work"): index.html reloads UNCONDITIONALLY the instant SW_UPDATED arrives, with no check for an in-progress capture', function () {
+    var html = source('index.html');
+    var idx = html.indexOf("if (e.data && e.data.type === 'SW_UPDATED')");
+    assert(idx !== -1, 'the SW_UPDATED listener must exist');
+    var body = html.slice(idx, idx + 200);
+    assert(/window\.location\.reload\(\);/.test(body), 'reload must fire directly off the message, no gate');
+    // Confirm there is NO conditional between the message arriving and the
+    // reload call (e.g. checking a "capture in progress" flag) -- if a
+    // future change adds one, this assertion should be updated alongside
+    // it, not silently left describing stale behavior.
+    assert(!/if\s*\(.*captur/i.test(body), 'no capture-in-progress gate currently exists around the reload');
+});
+
+check('mitigation that DOES exist: the three fact cards (zero/steel/chrono) autosave via fact-draft.js on every change, so a forced reload mid-entry on THOSE screens is recoverable', function () {
+    var body = source('js/fact-draft.js');
+    ['zero', 'steel', 'chrono'].forEach(function (kind) {
+        assert(body.indexOf("kind: '" + kind + "'") !== -1, 'fact-draft.js must register the ' + kind + ' card kind');
+    });
+});
+
+check('KNOWN GAP, documented not fixed: the legacy canvas capture flow (session-flow.js tap-to-place markers) has no fact-draft.js autosave equivalent — a forced reload mid-marker-placement there would lose unsaved taps. Real-device/manual verification needed; see OVERNIGHT2-REPORT.md.', function () {
+    var body = source('js/session-flow.js');
+    assert(body.indexOf('FactDraft') === -1, 'confirms session-flow.js does not currently integrate with fact-draft.js\'s autosave — if this ever changes, this test should be updated to check the new coverage instead of asserting its absence');
+});
+
+console.log('\n--- IndexedDB upgrade interruption ---\n');
+
+check('sync-queue.js\'s _open() no longer hangs forever if blocked by another tab\'s open connection — onblocked is handled with a bounded timeout that eventually rejects observably', function () {
+    var body = slice('js/sync-queue.js', 'function _open() {', 40);
+    assert(body.indexOf('req.onblocked = function () {') !== -1, '_open() must register onblocked');
+    assert(/setTimeout\(function \(\) \{\s*if \(!settled\) \{ settled = true; reject\(new Error\('indexeddb_blocked'\)\); \}\s*\}, 4000\)/.test(body),
+        'onblocked must arm a bounded timeout that rejects observably, not hang forever');
+});
+
+check('sync-queue.js\'s _open() guards onsuccess/onerror against firing after the blocked-timeout already settled the promise (no double-resolve crash, no silently overwriting a rejection with a late success)', function () {
+    var body = slice('js/sync-queue.js', 'function _open() {', 45);
+    assert(/req\.onsuccess = function \(\) \{\s*if \(settled\) return;/.test(body), 'onsuccess must check settled first');
+    assert(/req\.onerror = function \(\) \{\s*if \(settled\) return;/.test(body), 'onerror must check settled first');
+});
+
+check('offline-cache.js\'s _openDB() has the SAME onblocked protection as sync-queue.js\'s _open() — both IndexedDB opens in this codebase, not just one', function () {
+    var body = slice('js/offline-cache.js', '_openDB: function () {', 40);
+    assert(body.indexOf('req.onblocked = function () {') !== -1, '_openDB() must register onblocked');
+    assert(/indexeddb_blocked/.test(body), '_openDB() must reject with the same observable error on a sustained block');
+});
+
+check('offline-cache.js\'s _openDB() also guards onsuccess/onerror with the settled flag', function () {
+    var body = slice('js/offline-cache.js', '_openDB: function () {', 60);
+    assert(/if \(settled\) return;.*\s*settled = true;\s*if \(blockedTimer\) clearTimeout\(blockedTimer\);\s*OfflineCache\._db = e\.target\.result;/.test(body),
+        'onsuccess must guard against a prior blocked-timeout rejection before assigning OfflineCache._db');
+});
+
 console.log('\nResults: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

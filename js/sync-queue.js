@@ -246,6 +246,22 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
     function _open() {
         return new Promise(function (resolve, reject) {
             var req = indexedDB.open(DB_NAME, DB_VERSION);
+            var settled = false;
+
+            // Failure-injection round 2: without this, a version upgrade
+            // blocked by another open tab/connection hangs this promise
+            // forever with no observable error -- every queued write and
+            // every flush would silently stall. Give the blocking
+            // connection a few seconds to clear before failing
+            // observably. Same pattern as offline-cache.js's _openDB().
+            var blockedTimer = null;
+            req.onblocked = function () {
+                console.warn('[SyncQueue] IndexedDB upgrade blocked by another open tab/connection');
+                blockedTimer = setTimeout(function () {
+                    if (!settled) { settled = true; reject(new Error('indexeddb_blocked')); }
+                }, 4000);
+            };
+
             req.onupgradeneeded = function (e) {
                 var idb = e.target.result;
                 if (!idb.objectStoreNames.contains('ops')) {
@@ -257,8 +273,18 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                     idb.createObjectStore('images', { keyPath: 'sessionId' });
                 }
             };
-            req.onsuccess = function () { resolve(req.result); };
-            req.onerror = function () { reject(req.error); };
+            req.onsuccess = function () {
+                if (settled) return;
+                settled = true;
+                if (blockedTimer) clearTimeout(blockedTimer);
+                resolve(req.result);
+            };
+            req.onerror = function () {
+                if (settled) return;
+                settled = true;
+                if (blockedTimer) clearTimeout(blockedTimer);
+                reject(req.error);
+            };
         });
     }
 

@@ -18,6 +18,25 @@ var OfflineCache = {
 
         return new Promise(function (resolve, reject) {
             var req = indexedDB.open(OfflineCache.DB_NAME, OfflineCache.DB_VERSION);
+            var settled = false;
+
+            // Failure-injection round 2: an upgrade can BLOCK forever
+            // (no onupgradeneeded/onsuccess/onerror ever fires) if
+            // another tab still holds an older-version connection open
+            // -- e.g. the app updated in one tab while a second tab from
+            // before the update is still sitting open. Without this,
+            // every caller awaiting _openDB() (offline reads included)
+            // would hang silently with no observable error. Give the
+            // blocking connection a few seconds to clear (the normal
+            // case -- the other tab closes or reloads), then fail
+            // observably rather than hang forever unexplained.
+            var blockedTimer = null;
+            req.onblocked = function () {
+                console.warn('[Offline] IndexedDB upgrade blocked by another open tab/connection');
+                blockedTimer = setTimeout(function () {
+                    if (!settled) { settled = true; reject(new Error('indexeddb_blocked')); }
+                }, 4000);
+            };
 
             req.onupgradeneeded = function (e) {
                 var db = e.target.result;
@@ -39,11 +58,17 @@ var OfflineCache = {
             };
 
             req.onsuccess = function (e) {
+                if (settled) return; // a blocked-timeout already rejected this open
+                settled = true;
+                if (blockedTimer) clearTimeout(blockedTimer);
                 OfflineCache._db = e.target.result;
                 resolve(OfflineCache._db);
             };
 
             req.onerror = function (e) {
+                if (settled) return;
+                settled = true;
+                if (blockedTimer) clearTimeout(blockedTimer);
                 console.warn('[Offline] Failed to open IDB:', e.target.error);
                 reject(e.target.error);
             };
