@@ -10,13 +10,17 @@ changes."*).
 call site in `js/db.js` (the sole Supabase access point per CLAUDE.md
 rule 2) — this session has no database credentials, and per the rules
 of engagement the assistant does not run SQL or authenticate as the
-account owner. **One exception:** Section 5's admin-RPC hardening
-question was resolved when the owner independently ran a read-only
-`pg_get_functiondef()` catalog query (assistant-provided, owner-run) in
-the Supabase SQL Editor and reported the result back — see that section
-for the confirmed finding. Row counts remain **TBD**; a read-only
-counting query is provided in the Appendix for the owner to run and
-report back the same way, at their convenience.
+account owner. **Two exceptions, both owner-run, read-only, results
+pasted back:** Section 5's admin-RPC hardening question
+(`pg_get_functiondef()`), and — 2026-07-28, closing owner-review queue
+item #2 — a full `information_schema.columns` dump across all seven
+undocumented base tables (`rifles`, `barrels`, `loads`, `sessions`,
+`zero_records`, `scope_adjustments`, `cleaning_logs`). Section 1 below
+is now the **confirmed live column list** for those seven tables, not
+an inference from `js/db.js`'s field usage — see each table's entry.
+Row counts remain **TBD**; a read-only counting query is provided in
+the Appendix for the owner to run and report back the same way, at
+their convenience.
 
 ---
 
@@ -30,25 +34,43 @@ migration file in this repo.** `rifles`, `barrels`, `loads`, `sessions`,
 (confirmed directly: REORG-migrations.sql's own comment on
 `ai_conversations`/`ai_usage_logs` says those "already exist on the
 live database... created before schema-as-code," and the same is true,
-undocumented even by comment, for the seven listed above). Their
-*complete* column set is not reconstructable from the repo alone — only
-inferred from `js/db.js`'s field usage and the additive columns below.
-This is not a defect to fix in Gate 0 (read-only analysis only), but it
-is the central fact anyone touching Phase B's fact-spine migration
-needs to know: **the backfill script cannot trust the repo's SQL files
-as a complete schema reference for these seven tables** — it needs an
-actual `information_schema` dump from the live database first.
+undocumented even by comment, for the seven listed above).
 
-**This is not hypothetical — it already happened once, mid-Gate-0.**
-SIMPLE-migrations.sql (five `sessions` snapshot columns) existed in the
-repo and was believed applied, but a live check found it had never
-actually landed on production, most likely run against the wrong
-Supabase project at some point. See the `sessions` entry in Section 1
-for the full finding and its Phase B backfill implication. A partial
-live schema check (five columns on `sessions`) is done; a full
-`information_schema` dump across all seven tables was attempted twice
-but the pasted results didn't come through — still open, see the owner-
-review queue.
+**RESOLVED 2026-07-28 — owner-review queue item #2 CLOSED.** A full
+`information_schema.columns` dump across all seven tables (owner-run,
+read-only) is now in hand; Section 1's column lists below are
+confirmed live schema, not inference. Two concrete findings from it:
+
+1. **The `trued_bc`/`trued_mv`/`trued_event_id`/`trued_at` placement
+   question (previously flagged "verify against live schema before
+   Phase B trusts this inventory blindly") is resolved: these four
+   columns exist on `loads` only — NOT on `rifles`.** REORG R5's own
+   comment ("these live ON THE LOAD") was correct; the caveat in this
+   document was the thing that was wrong. `PHASEB-migrations.sql`
+   never referenced these four columns (out of Phase B's dual-write
+   scope either way), so this finding doesn't change anything already
+   built — it just closes an open question.
+2. **`sessions` carries three columns referenced nowhere in the
+   application:** `annotated_image` (text), `overlay_position` (jsonb),
+   `notes` (text) — confirmed by grep across every `js/*.js` file, zero
+   read or write sites for any of the three. Not documented anywhere
+   before this dump (not in any `ALTER TABLE`, not in `js/db.js`'s
+   field usage) — they're part of the original undocumented
+   `CREATE TABLE`. `sessions.notes` is unrelated to the live, actively
+   used `sessions.sight_in_comments` field — not a duplicate-value risk
+   like `barrels`' round-count columns (§8 below), just three dead
+   columns. No action needed; noted here so a future reader doesn't
+   rediscover them from scratch, and so Phase C's eventual `sessions`
+   decomposition knows they're historical/orphaned, not a hidden
+   feature to preserve.
+
+**This is not hypothetical — the exact risk this closes already
+happened once, mid-Gate-0.** SIMPLE-migrations.sql (five `sessions`
+snapshot columns) existed in the repo and was believed applied, but a
+live check found it had never actually landed on production, most
+likely run against the wrong Supabase project at some point. See the
+`sessions` entry in Section 1 for the full finding and its Phase B
+backfill implication.
 
 **Second finding, already named by `docs/canon/PROVEN-Constitutional-Review.md`
 and not re-litigated here:** `sessions` is the aggregate root today, and
@@ -63,15 +85,17 @@ generalize.
 
 ## 1. Undocumented base tables (predate schema-as-code)
 
-Column lists below are assembled from every `ALTER TABLE` found in the
-repo's migration files, plus fields `js/db.js` reads/writes that never
-appear in any `ALTER TABLE` (meaning they were part of the original,
-undocumented `CREATE TABLE`). **This list is not guaranteed complete.**
+**Confirmed live 2026-07-28** via a full `information_schema.columns`
+dump (owner-run, read-only, owner-review queue item #2) — the column
+lists below are no longer inference from `js/db.js`'s field usage;
+they are the actual live schema for all seven tables. Kept organized
+by migration-of-origin where known, for history's sake, but every
+column named below is confirmed present.
 
 ### `rifles`
-Core columns are undocumented (inferred from `js/db.js`: at minimum
-`id`, `user_id`, `name`, `caliber`, `zero_range`, `scope_height`,
-`angle_unit`, timestamps). Additive columns on record:
+Confirmed live columns: `id`, `user_id`, `name`, `caliber`,
+`scope_height`, `zero_range`, `angle_unit`, `notes`, `created_at`,
+`updated_at`, plus additive columns:
 - `serial_number`, `action`, `barrel_spec`, `trigger_spec`, `chassis`,
   `muzzle_device` (MORNING M1 — Certificate build sheet)
 - `scope_click_value`, `scope_correction_factor`,
@@ -82,16 +106,17 @@ Core columns are undocumented (inferred from `js/db.js`: at minimum
   never dropped, so both mechanisms exist simultaneously)
 - `origin`, `certified_by`, `certified_at`, `transfer_id` (REORG R6 —
   Workhorse factory provenance stamp; `origin: 'owner'|'factory'`)
-- `trued_bc`, `trued_mv`, `trued_event_id`, `trued_at` — **note: these
-  four are documented in REORG R5's comment as living "ON THE LOAD," but
-  `js/db.js` and this list place them by the comment's own text; verify
-  against live schema which table actually carries them (rifles vs
-  loads) before Phase B trusts this inventory blindly** — see finding
-  in Section 0.
+
+**Resolved 2026-07-28:** `trued_bc`/`trued_mv`/`trued_event_id`/
+`trued_at` do **NOT** exist on `rifles` — confirmed absent from the
+live dump. REORG R5's comment ("these live ON THE LOAD") was correct;
+this document's previous caveat here was the thing that needed
+fixing, not the schema. See `loads` below.
 
 ### `barrels`
-Undocumented core (inferred: `id`, `user_id`, `rifle_id`, `twist_rate`,
-`twist_direction`, `install_date`, `is_active`, `notes`, timestamps).
+Confirmed live columns: `id`, `user_id`, `rifle_id`, `twist_rate`,
+`twist_direction`, `install_date`, `is_active`, `round_count`, `notes`,
+`created_at`, `total_rounds`, `updated_at`.
 **Known dual-column split:** both `round_count` and `total_rounds`
 exist; `js/db.js`'s `_normalizeBarrel`/`_barrelRowForWrite` synchronize
 them on every read/write because "the DB has both... We standardize on
@@ -100,12 +125,13 @@ application code rather than a single source column — a data-integrity
 smell distinct from a provenance gap, but adjacent to it.
 
 ### `loads`
-Undocumented core (inferred: `id`, `user_id`, `rifle_id`, `name`,
+Confirmed live columns: `id`, `user_id`, `rifle_id`, `name`,
 `bullet_name`, `bullet_weight`, `bullet_length`, `bullet_diameter`,
-`bullet_bc`, `drag_model`, `muzzle_velocity`, `notes`, timestamps).
-Additive: `lot_number` (WAVES M4), `recipe` jsonb (WAVES M5, handload
-detail), `trued_bc`/`trued_mv`/`trued_event_id`/`trued_at` (REORG R5 —
-see the rifles-vs-loads placement caveat above).
+`bullet_bc`, `drag_model`, `muzzle_velocity`, `notes`, `created_at`,
+`lot_number` (WAVES M4), `recipe` jsonb (WAVES M5, handload detail),
+`updated_at`, and — **confirmed 2026-07-28 to live here, not on
+`rifles`** — `trued_bc` (real), `trued_mv` (real), `trued_event_id`
+(uuid), `trued_at` (timestamptz) (REORG R5).
 
 **Provenance gap:** `loads.muzzle_velocity` (the box/advertised number)
 carries no column-level marker distinguishing it from a measured value.
@@ -118,11 +144,12 @@ different screen) would have to reimplement that same inference or risk
 presenting an estimate as a measurement.
 
 ### `sessions`
-The aggregate root. Undocumented core (inferred from extensive
-`js/db.js` usage: `id`, `user_id`, `rifle_id`, `load_id`, `date`,
-`distance_yards`, `rounds_fired`, `measured_velocity`, `results` jsonb,
-`weather` jsonb, `impacts` jsonb, `is_zero_session` boolean, image
-storage refs, timestamps). Additive columns on record:
+The aggregate root. Confirmed live core: `id`, `user_id`, `rifle_id`,
+`load_id`, `barrel_id`, `date`, `distance_yards`, `rounds_fired`,
+`measured_velocity`, `weather` jsonb, `image_filename`,
+`calibration_data` jsonb, `bullet_diameter`, `poa_point` jsonb,
+`impacts` jsonb, `results` jsonb, `sight_in_comments`,
+`is_zero_session`, `created_at`. Additive columns on record:
 - `updated_at` (REORG R0)
 - `suppressor_id` (REORG R1)
 - `lot_number` (REORG R2)
@@ -136,6 +163,18 @@ storage refs, timestamps). Additive columns on record:
   landing-gap finding immediately below**
 - `session_type`, `ladder` jsonb (WAVES M6 — ladder test sessions ride
   the same table via a type discriminator rather than a separate table)
+
+**New finding, 2026-07-28 (owner-review #2's dump):** `sessions` also
+carries `annotated_image` (text), `overlay_position` (jsonb), and
+`notes` (text) — none of the three referenced anywhere in `js/*.js`
+(confirmed by grep: zero read or write sites for any of them). Not
+documented by any `ALTER TABLE` either, so they're part of the
+original undocumented `CREATE TABLE`, not a later addition. `notes` is
+NOT the same field as the actively-used `sight_in_comments` — this
+isn't a duplicate-value risk like `barrels`' round-count split, just
+three orphaned columns nothing in the current codebase touches. No
+action needed; recorded so Phase C's eventual `sessions` decomposition
+knows they're historical, not a hidden feature to preserve or migrate.
 
 **RESOLVED FINDING 2026-07-28 — the SIMPLE migration had never actually
 landed on production, despite existing in the repo.** A targeted
@@ -181,9 +220,11 @@ for `measured_velocity`, `impacts`, or `results` — a session's shot data
 carries no marker for photo-measured vs. manually entered vs. imported.
 
 ### `zero_records` (legacy)
-Undocumented core (inferred from `js/db.js`'s `addZeroRecord`: `id`,
-`user_id`, `rifle_id`, `load_id`, `session_id`, `date`, `range_yards`,
-`weather`, `config`, `notes`).
+Confirmed live columns: `id`, `user_id`, `rifle_id`, `load_id`,
+`session_id`, `date`, `range_yards`, `weather`, `notes`, `created_at`,
+`config`, `updated_at`, `suppressor_id`. (`suppressor_id` and
+`updated_at` were never referenced by `js/db.js`'s `addZeroRecord` —
+unsurprising now that path is confirmed dead code, below.)
 
 **RESOLVED 2026-07-28 — dead code AND empty, confirmed two ways.**
 Originally flagged as a duplicate zero-truth path alongside the new
@@ -212,17 +253,24 @@ handling at all** — there is nothing in it to migrate, merge, or
 reconcile against `zero_events`.
 
 ### `scope_adjustments`
-Undocumented core (inferred: `id`, `user_id`, `rifle_id`, `date`, and
-adjustment detail fields). Additive: `updated_at` (REORG R0). Consumed
-by `calibration-status.js` only for its `date` field (to detect
-"adjusted after the last zero").
+Confirmed live columns: `id`, `user_id`, `rifle_id`, `session_id`,
+`date`, `elevation_change`, `windage_change`, `reason`, `notes`,
+`created_at`, `updated_at` (REORG R0). Consumed by
+`calibration-status.js` only for its `date` field (to detect "adjusted
+after the last zero"). `created_at` exists but was not used by
+`PHASEB-migrations.sql`'s P4 backfill block when it was first written
+(the dump confirming it postdates that commit) — updated in a
+follow-up commit for consistency with the other backfilled tables'
+`event_time`/payload shape.
 
 ### `cleaning_logs`
-Undocumented core (inferred: `id`, `user_id`, `rifle_id`, `date`, round
-count at cleaning, notes). Additive: `updated_at` (REORG R0). No
-provenance field for exact-vs-approximate date/round-count, despite
-Constitution §39/§74 explicitly requiring that distinction be
-preservable ("exact," "minimum," "estimated," "unknown").
+Confirmed live columns: `id`, `user_id`, `rifle_id`, `barrel_id`,
+`date`, `round_count_at_cleaning`, `notes`, `created_at`, `updated_at`
+(REORG R0). No provenance field for exact-vs-approximate date/round-
+count, despite Constitution §39/§74 explicitly requiring that
+distinction be preservable ("exact," "minimum," "estimated,"
+"unknown"). Same `created_at`-arrived-after-the-backfill-was-written
+note as `scope_adjustments` above.
 
 ---
 

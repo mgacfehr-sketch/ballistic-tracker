@@ -85,14 +85,31 @@ in `PHASEB-migrations.sql` P2) plus `js/db.js`'s
 `_registerAttachmentHash`, wired into `saveSessionImage` and
 `saveSteelPhoto`. See below.
 
-### Owner-review queue — still needs the owner's hands
+### Owner-review queue — closed after this report was first written
 
-**#2** (seven base tables predate schema-as-code — full
-`information_schema` dump still not received) is unchanged from
-`HANDOFF.md`'s state and could not be advanced further without live
-database access. See OWNER-ACTIONS below — it's the same query
-already provided twice, still needed, now joined by one more query
-Phase B's backfill needs (a fresh `zero_records` timing recheck).
+**#2 (seven base tables predate schema-as-code) — CLOSED 2026-07-28,
+same day, after the owner ran OWNER-ACTION 1's query.** The full
+`information_schema.columns` dump across all seven tables came back;
+`docs/canon/MIGRATION-INVENTORY.md` §1 is updated to record confirmed
+live schema instead of inference, with its canon-manifest hash updated
+in the same commit. Two concrete findings from it:
+1. The `trued_bc`/`trued_mv`/`trued_event_id`/`trued_at` placement
+   question (open since Gate 0) is resolved: those four columns live
+   on `loads` only, never existed on `rifles`. REORG R5's comment was
+   right; the inventory's caveat was wrong and is now removed.
+2. `sessions` carries three previously-undocumented, entirely unused
+   columns — `annotated_image`, `overlay_position`, `notes` (confirmed
+   via grep: zero read/write sites anywhere in `js/*.js`). No action
+   needed; recorded for Phase C's eventual `sessions` decomposition so
+   they aren't mistaken for a hidden feature.
+
+The dump also confirmed `cleaning_logs` and `scope_adjustments` both
+have a `created_at` column that `PHASEB-migrations.sql`'s P4 backfill
+hadn't used (it predated confirmation they existed) — updated in a
+follow-up commit so both tables' `event_time` fallback and payload
+shape now match the other six backfilled tables exactly, closing the
+minor inconsistency with the "backfilled and freshly-written rows are
+byte-for-byte the same shape" claim made below.
 
 ---
 
@@ -247,23 +264,12 @@ changed and are app-shell files per CLAUDE.md rule 9).
 Everything below needs your hands — SQL to run, a judgment call, or
 both. Suggested order:
 
-**1. Re-run the seven-table `information_schema` dump (owner-review
-#2, still open from Gate 0).** Same query as before, unchanged, still
-needed — Phase B's backfill (P4) currently trusts only the columns
-`js/db.js` itself proves exist by writing them successfully; a real
-dump might reveal more columns on `cleaning_logs`/`scope_adjustments`
-in particular (no `source`/provenance column was assumed for either —
-confirm that's actually true) worth adding to the payload before you
-run the backfill.
-
-```sql
-select table_name, string_agg(column_name || ':' || data_type, ', ' order by ordinal_position) as columns
-from information_schema.columns
-where table_schema = 'public'
-  and table_name in ('rifles','barrels','loads','sessions','zero_records','scope_adjustments','cleaning_logs')
-group by table_name
-order by table_name;
-```
+**1. ~~Re-run the seven-table `information_schema` dump~~ — DONE,
+2026-07-28.** You ran this the same day; results incorporated into
+`docs/canon/MIGRATION-INVENTORY.md` §1 and `PHASEB-migrations.sql`'s
+P4 backfill (owner-review #2 closed — see above). Kept here, struck
+through, so this list's numbering stays stable against anything
+already referencing it.
 
 **2. The zero_records timing recheck, right before you run the P4
 backfill block (not before).** Owner-review #3 confirmed `zero_records`

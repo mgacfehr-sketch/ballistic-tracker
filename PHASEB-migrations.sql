@@ -345,34 +345,35 @@ ON CONFLICT (source_table, source_row_id) DO NOTHING;
 -- Fixed provenance 'manual' (Amendment 1 A2 lifecycle fact; no source
 -- column exists on this table — see docs/canon/MIGRATION-INVENTORY.md
 -- §1's #10 finding, still an open gap for exact/approximate marking,
--- not solved here). Only columns js/db.js itself writes are selected —
--- this table predates schema-as-code (see MIGRATION-INVENTORY.md §0);
--- a fuller information_schema dump (owner-review #2, still open) may
--- reveal more columns worth adding to this payload later.
+-- not solved here). Columns confirmed via the owner-run
+-- information_schema dump 2026-07-28 (owner-review #2, CLOSED) —
+-- event_time/payload now include created_at, matching the other six
+-- backfilled tables' shape (this table's created_at wasn't confirmed
+-- to exist when this block was first written).
 INSERT INTO public.fact_events
     (user_id, rifle_id, event_type, event_time, provenance, source_table, source_row_id, payload)
 SELECT
-    user_id, rifle_id, 'cleaning', COALESCE(date, now()),
+    user_id, rifle_id, 'cleaning', COALESCE(date, created_at, now()),
     'manual', 'cleaning_logs', id,
     jsonb_build_object(
         'id', id, 'rifleId', rifle_id, 'barrelId', barrel_id, 'date', date,
-        'roundCountAtCleaning', round_count_at_cleaning, 'notes', notes
+        'roundCountAtCleaning', round_count_at_cleaning, 'notes', notes, 'createdAt', created_at
     )
 FROM public.cleaning_logs
 ON CONFLICT (source_table, source_row_id) DO NOTHING;
 
 -- scope_adjustments -> fact_events ('scope_adjustment')
 -- Fixed provenance 'manual' (Amendment 1 A2 lifecycle fact). Same
--- predates-schema-as-code caveat as cleaning_logs above.
+-- confirmed-schema / created_at note as cleaning_logs above.
 INSERT INTO public.fact_events
     (user_id, rifle_id, event_type, event_time, provenance, source_table, source_row_id, payload)
 SELECT
-    user_id, rifle_id, 'scope_adjustment', COALESCE(date, now()),
+    user_id, rifle_id, 'scope_adjustment', COALESCE(date, created_at, now()),
     'manual', 'scope_adjustments', id,
     jsonb_build_object(
         'id', id, 'rifleId', rifle_id, 'sessionId', session_id, 'date', date,
         'elevationChange', elevation_change, 'windageChange', windage_change,
-        'reason', reason, 'notes', notes
+        'reason', reason, 'notes', notes, 'createdAt', created_at
     )
 FROM public.scope_adjustments
 ON CONFLICT (source_table, source_row_id) DO NOTHING;
