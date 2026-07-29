@@ -8,6 +8,13 @@
  * Delivery prefers Web Share (Capacitor-safe); <a download> fallback.
  */
 
+(function () {
+    'use strict';
+    if (typeof module !== 'undefined' && module.exports && typeof deriveTroubleshootingHold === 'undefined') {
+        global.deriveTroubleshootingHold = require('./validation-status.js').deriveTroubleshootingHold;
+    }
+})();
+
 var DataExport = (function () {
     'use strict';
 
@@ -52,8 +59,66 @@ var DataExport = (function () {
         { key: 'scope-adjustments', label: 'Scope adjustments', fetch: function (db) { return _perRifle(db, 'getScopeAdjustmentsByRifle'); } },
         { key: 'suppressors', label: 'Suppressors', fetch: function (db) {
             return db.getSuppressors ? db.getSuppressors() : Promise.resolve([]);
+        } },
+        // Overnight run #2, item 3 — export parity for Amendment 1's
+        // Phase B fact spine and Phase C/D memory layer. Same
+        // fetch-or-empty-array shape as every type above, so a database
+        // the owner hasn't migrated yet degrades to an empty sheet/CSV
+        // rather than breaking "Export everything."
+        { key: 'fact-events', label: 'Fact events', fetch: function (db) {
+            return db.getAllFactEvents ? db.getAllFactEvents() : Promise.resolve([]);
+        } },
+        { key: 'attachment-vault', label: 'Attachment vault (metadata)', fetch: function (db) {
+            return db.getAllAttachmentVault ? db.getAllAttachmentVault() : Promise.resolve([]);
+        } },
+        { key: 'validation-statuses', label: 'Validation statuses', fetch: function (db) {
+            return _validationStatusRows(db);
         } }
     ];
+
+    /** One row per rifle: the SAME derivation validation-status.js's
+     *  deriveTroubleshootingHold already uses live (js/rifle-app.js's
+     *  resting screen, js/rifle-payoff.js's gate) — never a second,
+     *  divergent classification invented for export. Raw
+     *  troubleshooting_checks/config_epochs rows are already covered by
+     *  their own account-wide export types above; this sheet is the
+     *  DERIVED status a shooter would recognize from the app itself. */
+    function _validationStatusRows(db) {
+        if (!db.getAllRifles) return Promise.resolve([]);
+        return db.getAllRifles().then(function (rifles) {
+            var chain = Promise.resolve([]);
+            (rifles || []).forEach(function (r) {
+                chain = chain.then(function (acc) {
+                    return Promise.all([
+                        db.getTroubleshootingChecksByRifle ? db.getTroubleshootingChecksByRifle(r.id).catch(function () { return []; }) : Promise.resolve([]),
+                        db.getConfigEpochsByRifle ? db.getConfigEpochsByRifle(r.id).catch(function () { return []; }) : Promise.resolve([])
+                    ]).then(function (res) {
+                        var checks = res[0] || [], epochs = res[1] || [];
+                        var alarmRows = checks.filter(function (c) { return c && c.step === 'alarm'; })
+                            .sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+                        var alarmAt = alarmRows.length ? alarmRows[0].createdAt : null;
+                        var ladderChecks = checks.filter(function (c) { return c && c.step !== 'alarm'; })
+                            .map(function (c) { return { step: c.step, result: c.result, at: c.createdAt }; });
+                        var hold = (typeof deriveTroubleshootingHold === 'function')
+                            ? deriveTroubleshootingHold({ alarmAt: alarmAt, checks: ladderChecks })
+                            : { inHold: false, ladderStep: null };
+                        var lastEpoch = epochs.length ? epochs[epochs.length - 1] : null;
+                        acc.push({
+                            rifleId: r.id, rifleName: r.name || null,
+                            troubleshootingHold: hold.inHold, holdLadderStep: hold.ladderStep || null,
+                            lastAlarmAt: alarmAt, troubleshootingCheckCount: checks.length,
+                            lastConfigEpochKind: lastEpoch ? lastEpoch.kind : null,
+                            lastConfigEpochValue: lastEpoch ? lastEpoch.value : null,
+                            lastConfigEpochAt: lastEpoch ? lastEpoch.startedAt : null,
+                            configEpochCount: epochs.length
+                        });
+                        return acc;
+                    });
+                });
+            });
+            return chain;
+        });
+    }
 
     function _perRifle(db, method) {
         return db.getAllRifles().then(function (rifles) {
@@ -189,3 +254,12 @@ var DataExport = (function () {
 
     return { open: open, TYPES: TYPES };
 })();
+
+// Export for Node unit tests (overnight run #2, item 3's round-trip
+// test needs TYPES' fetch functions directly). Nothing at module scope
+// touches document/XLSX/navigator -- those only run inside open()/
+// _exportWorkbook(), never called by the Node suite -- same pattern as
+// js/suppressors.js's own widened export.
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DataExport;
+}

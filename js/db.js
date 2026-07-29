@@ -1998,6 +1998,59 @@ BallisticDB.prototype.getTroubleshootingChecksByRifle = function (rifleId) {
         });
 };
 
+// ── Export parity (overnight run #2, item 3) ───────────────────
+// Account-wide getters (no rifle_id filter) for the fact spine and
+// vault-first import metadata, so "Export everything" (js/data-export.js)
+// can include them alongside the pre-existing per-rifle exports. Same
+// convention as getAllRifles/getAllSessions/getAllVelocityStrings above.
+
+BallisticDB.prototype.getAllFactEvents = function () {
+    var self = this;
+    return self.supabase.from('fact_events').select()
+        .eq('user_id', self.userId)
+        .order('event_time', { ascending: true })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+// attachment_vault never stores file bytes (P2's own schema — hash,
+// path, size, kind, status only), so this IS the metadata already;
+// nothing to strip before export.
+BallisticDB.prototype.getAllAttachmentVault = function () {
+    var self = this;
+    return self.supabase.from('attachment_vault').select()
+        .eq('user_id', self.userId)
+        .order('created_at', { ascending: true })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.getAllTroubleshootingChecks = function () {
+    var self = this;
+    return self.supabase.from('troubleshooting_checks').select()
+        .eq('user_id', self.userId)
+        .order('created_at', { ascending: true })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
+BallisticDB.prototype.getAllConfigEpochs = function () {
+    var self = this;
+    return self.supabase.from('config_epochs').select()
+        .eq('user_id', self.userId)
+        .order('created_at', { ascending: true })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};
+
 // ═════════════════════════════════════════════════════════════
 // Amendment 1 Phase E — per-shot residual engine, SHADOW STAGE ONLY.
 // js/residual-engine.js computes; this ONLY logs the output. Nothing
