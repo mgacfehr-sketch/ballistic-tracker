@@ -199,45 +199,30 @@ var Categories = (function () {
                     sub: 'Grade your calls, learn your bias',
                     gate: function () { return featureOn('windCall'); },
                     launch: function () { if (window.AppNav) AppNav.go('wind'); }
-                },
-                {
-                    id: 'true-rifle',
-                    title: 'True this rifle',
-                    sub: 'Make solutions match reality',
-                    utility: true, // v2.4 §1.3/§1.4: truing's door lives here as a gold utility
-                    gate: function () { return typeof TruingJob !== 'undefined'; },
-                    launch: function (ctx) {
-                        if (window.ToolActions && ToolActions.truing) {
-                            ToolActions.truing(ctx.db, ctx.rifle ? ctx.rifle.id : null);
-                        }
-                    }
                 }
+                // UI Consolidation phase: the "True this rifle" utility tool
+                // and the whole standalone "truing" category (both of which
+                // only ever did one thing -- ToolActions.truing(), i.e. open
+                // TruingJob as a separate destination) were removed here.
+                // Categories.show() itself has zero live callers today (every
+                // path into it traces back to home.js's never-rendered
+                // HomeManager.show() or device-export.js's never-called
+                // open()), so this was already unreachable in production --
+                // removed anyway so a future caller that resurrects
+                // Categories.show() can't silently re-open "Categories ->
+                // Truing tool" as a forced primary door (the exact pattern
+                // the v3.0 kill-list's "no separate truing door" targeted).
+                // TruingJob is NOT dead: js/steel-session.js's own escape
+                // hatch (steel card -> "advanced" -> the full logger -> a
+                // truing continuation for strings with enough data) is the
+                // one sanctioned live path, kept deliberately -- see
+                // UICONSOLIDATION-REPORT.md's "detailed truing" note.
+                // 'truing' stays in HISTORY_CHIPS/showHistory below -- that
+                // is a live, independent feature (rifle-simple.js) that
+                // filters past truing_events, unrelated to this dead
+                // navigation door.
             ],
             strip: stripShoot
-        },
-
-        truing: {
-            key: 'truing',
-            icon: 'job-truing',
-            title: 'Truing',
-            desc: 'Make solutions match reality',
-            registryTools: ['truing'],
-            tools: [
-                {
-                    id: 'truing-start',
-                    title: 'True this rifle',
-                    sub: 'Quick or full — corrections your dope can bet on',
-                    gate: function () {
-                        return toolVisible('truing') && typeof TruingJob !== 'undefined';
-                    },
-                    launch: function (ctx) {
-                        if (window.ToolActions && ToolActions.truing) {
-                            ToolActions.truing(ctx.db, ctx.rifle ? ctx.rifle.id : null);
-                        }
-                    }
-                }
-            ],
-            strip: stripTruing
         },
 
         scopetrack: {
@@ -341,7 +326,7 @@ var Categories = (function () {
     // Home order per contract §1.2 (Rifles lives in the tab bar).
     // loaddev is tier-hidden in v1; truing/steel full loggers appear as
     // their modules land — hasActiveTools() hides empty jobs automatically.
-    var KEYS = ['range', 'steel', 'loaddev', 'ballistics', 'truing', 'scopetrack', 'records'];
+    var KEYS = ['range', 'steel', 'loaddev', 'ballistics', 'scopetrack', 'records'];
 
     /* ── visibility (Home hides toolless categories) ──────── */
 
@@ -1233,15 +1218,6 @@ var Categories = (function () {
                 }
                 el.innerHTML = stripRows(rows);
             });
-    }
-
-    /** TRUING: the three prerequisites, from the Calibration Status card. */
-    function stripTruing(el, ctx) {
-        if (typeof CalibrationStatusCard === 'undefined' || !CalibrationStatusCard) {
-            el.innerHTML = '';
-            return;
-        }
-        CalibrationStatusCard.render(el, ctx.db, ctx.rifle);
     }
 
     /** SCOPE TRACKING: correction factor + verified date. */

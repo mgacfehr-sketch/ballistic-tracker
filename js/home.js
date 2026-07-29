@@ -474,9 +474,13 @@ HomeManager.prototype._launch = function (type, rifle, ctx) {
                 MvEntry.open(this.db, rifle, { onDone: function (saved) { if (saved) self.show(); } });
             } else if (window.AppNav) AppNav.go('chrono');
             break;
-        case 'truing':
-            if (window.ToolActions && ToolActions.truing) ToolActions.truing(this.db, rifle.id);
-            break;
+        // UI Consolidation phase: the 'truing' case (ToolActions.truing --
+        // opens TruingJob as a separate destination) was removed here.
+        // This whole switch lives inside HomeManager, whose own .show()
+        // has zero live callers today (rifle-app.js's Card replaced it),
+        // so it was already unreachable -- removed anyway so it can't
+        // resurrect the "forced primary door" pattern if HomeManager ever
+        // becomes reachable again. See UICONSOLIDATION-REPORT.md.
         case 'steelSession':
             if (window.ToolActions && ToolActions.steelSession) ToolActions.steelSession(this.db, rifle.id);
             break;

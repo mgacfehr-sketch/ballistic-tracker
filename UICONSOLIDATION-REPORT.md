@@ -6,7 +6,9 @@ own instruction. Device testing verdict that triggered this phase:
 saving, add-rifle findable on only one of three surfaces, capture not
 locatable. Five laws enforced, branch `redesign`, one commit per law,
 pushed after every commit, `sw.js` `CACHE_VERSION` bumped on every
-app-shell-touching commit (155 → 159).
+app-shell-touching commit (155 → 159). One follow-up commit corrects
+and acts on a wrong conclusion in this report's first pass on law (5)
+— see the "detailed truing" note below.
 
 **No canon contradiction was found or needed.** Every decision below
 was resolvable inside this phase's own stated latitude (the surface
@@ -158,17 +160,28 @@ found to be intentional (documented), not a bug — see the note under
 | A Record | `rifle-record.js` | Edit/delete one logged fact (or hand off to Session Detail for paper sessions) |
 | Session Detail | `history.js` `_renderSessionDetail` | View one paper session's stats + annotated photo |
 
-**Detailed lane (opt-in, `lanes.js` — deliberately unchanged, not a
-duplicate of the Simple lane above; see note below):**
+**Deeper surfaces (not gated by a live "Detailed lane" switch — that
+switch is dead, see the corrected note below; each row's OWN
+reachability was checked individually, not inferred from lanes.js):**
 
-| Surface | File | Job |
-|---|---|---|
-| Steel/Field Session (casual+full) | `steel-session.js` | The full-control steel logging path — wind clock, per-shot MV, holds |
-| Truing job | `truing.js` | Full-featured, multi-input truing wizard |
-| Scope tracking check | `scope-check.js` | Tall-target verification — reached from FIVE contexts, one screen (not duplicative — see note) |
-| Ladder test | `ladder.js` | Multi-group velocity-window test, launched as a mode of the paper wizard |
-| Field/steel analytics | `field.js` | Effective-range + wind-call grading surfaces inside Categories |
-| DOPE cards | `dope-cards.js` | Printable range card — reached from Full Chart's Print/Share, not a competing screen |
+| Surface | File | Job | Live entry path |
+|---|---|---|---|
+| Steel/Field Session (casual+full) | `steel-session.js` | The full-control steel logging path — wind clock, per-shot MV, holds | Steel card → "advanced" escape hatch (`rifle-add.js`) |
+| Truing job | `truing.js` | Full-featured, multi-input truing wizard | `steel-session.js`'s own handoff only — the sanctioned exception, see note below |
+| Scope tracking check | `scope-check.js` | Tall-target verification | FIVE live contexts, one screen (not duplicative — see note) |
+| Ladder test | `ladder.js` | Multi-group velocity-window test | `session-flow.js`'s `LadderManager.open`, launched as a paper-wizard mode |
+| DOPE cards | `dope-cards.js` | Printable range card | Full Chart's Print/Share (`rifle-chart.js`) |
+
+**Flagged, not fixed this pass (out of the truing-specific scope this
+follow-up was asked for):** `field.js`'s `FieldCore` and the Categories
+"strip" summary rows that call it (`stripCheck`/`stripShoot`/
+`stripSteel`) trace back to the same dead `Categories.show()` this
+investigation already confirmed unreachable — meaning `field.js`'s
+effective-range/wind-call-grading computations may currently have
+*zero* live callers too, the same shape of finding as `truing.js` had
+before this fix. Not verified exhaustively or touched here; worth its
+own pass rather than guessing at it as a side effect of the truing
+fix.
 | The five job categories | `categories.js` | Detailed-lane home: Range/Steel/Load Dev/Ballistics/Truing/Scope/Records |
 
 **Tools reached from Paperwork or elsewhere, each with one job:**
@@ -188,23 +201,65 @@ duplicate of the Simple lane above; see note below):**
 | Wind Call | `wind-call.js` | Wind/Coriolis/spin-drift calculator — **beta, hard off for everyone** |
 | Come-up verification / BC truing | `dope-log.js` | Verified-hit BC back-calculation — **beta, hard off for everyone** |
 
-### Note — "detailed truing": investigated, not a duplicate
+### Note — "detailed truing": corrected finding, then folded
 
-`rifle-payoff.js`'s own comment says its inline "add more shots" flow
-"IS detailed truing now, no separate door" — which reads, out of
-context, like `truing.js`'s standalone `TruingJob` UI should have zero
-callers left. It doesn't: `ToolActions.truing` (its launcher) is called
-live from `categories.js` (twice), `home.js`, and — notably —
-`steel-session.js` itself, which hands off to it after logging a
-Detailed-lane session with enough data to true. Checked against
-`lanes.js`'s own doctrine before concluding anything: *"One setting:
-Detailed mode, OFF by default... The Detailed lane is everything
-v2.3/v2.4 built, UNCHANGED. Both lanes write the SAME tables/events."*
-Read correctly, `rifle-payoff.js`'s comment is scoped to the SIMPLE
-lane specifically — there is no separate door WITHIN the simple card
-flow — while the DETAILED lane (opt-in, off by default) legitimately
-keeps its own more full-featured Truing job as the deliberately
-preserved power-user path. Confirmed intentional, not fixed.
+**This section originally concluded "confirmed intentional, not
+fixed" — that conclusion was wrong, and the correction is worth
+recording, not quietly overwriting.** The first pass cited `lanes.js`'s
+own header comment ("Detailed lane is everything v2.3/v2.4 built,
+UNCHANGED") as if it were still-current doctrine. It isn't: the v3.0
+Contract Part 2 explicitly kills the Lanes concept as a *user-facing*
+choice, and `V3-REPORT.md` already documented this — *"the user-facing
+Simple/Detailed switcher is dead... Roy has no manual toggle
+anymore."* The comment was itself stale, the same failure class as
+item (4)'s photo-rotation bug (a comment describing behavior/intent
+the code no longer implements) — citing it instead of tracing live
+reachability was the actual mistake, not the underlying question.
+
+**Re-traced properly:** `truing.js`'s standalone `TruingJob` is a
+genuine separate destination (a multi-step wizard rendered into the
+same `#view-home` container the Card uses, not an inline reveal on the
+steel card). Tracing every one of its four `ToolActions.truing()` call
+sites to their own reachability:
+- `categories.js` (×2, the "true-rifle" utility tool and the
+  standalone "truing" job category) — the literal "Categories → Truing
+  tool" door `V4-REPORT.md`'s own OWNER REVIEW QUEUE item #2 had
+  already flagged as a likely violation and left unresolved
+  ("worth an explicit yes/no from the owner"). Traced fully dead:
+  every path into `Categories.show()` runs through `home.js`'s
+  `HomeManager.show()`, which itself has zero live callers, or through
+  `device-export.js`'s `open()`, which also has zero live callers.
+- `home.js`'s own `case 'truing':` coach-dispatch branch — same dead
+  `HomeManager` screen family.
+- `steel-session.js`'s handoff (after logging a Detailed-lane session
+  with enough data to true) — **the one genuinely live path.**
+
+**Owner ruling:** keep `steel-session.js` → `TruingJob` as the
+sanctioned deep escape hatch for multi-string/multi-distance work the
+inline flow can't do (steel-session.js's own escape-hatch status was
+already established in `V4-REPORT.md`'s owner review); delete the
+confirmed-dead doors so they can't resurrect the forced-primary-door
+pattern; add a test locking the single-entry-path guarantee; fix the
+stale `lanes.js` comment that caused the original wrong conclusion.
+
+**Done:** removed `categories.js`'s "true-rifle" tool and the whole
+standalone `truing` category (its `key`/`registryTools`/`tools`/`strip`
+— confirmed self-contained; the SEPARATE, still-live `HISTORY_CHIPS`
+array and `_uhTruing` history-rendering function that also use the
+string `'truing'` were left untouched, since they're an independent,
+reachable feature via `rifle-simple.js` → `showHistory`, not part of
+this dead navigation door); removed `home.js`'s `case 'truing':`
+branch; redirected `device-export.js`'s three dead
+`Categories.show('ballistics', ...)` fallbacks to `AppNav.go('home')`,
+consistent with every other "done"/error destination in this phase.
+Rewrote `lanes.js`'s header comment to state plainly that the Lanes
+UI switch (and `Copy.t()`/`Copy.roy()`, also checked and confirmed
+dead — same `HomeManager` family) are historical context, not current
+navigation, with an explicit note not to repeat this mistake.
+`tests/test-truing-single-entry.js` (new, 9 checks) asserts exactly
+one file calls `ToolActions.truing()` with real arguments
+(`steel-session.js`, twice), that the three removed doors stay
+removed, and that the untouched history-chip feature stays intact.
 
 ### Note — ScopeCheck: five callers, one screen, not five duplicates
 
@@ -241,8 +296,13 @@ within two taps; the capture button is unconditional and a fetch
 failure can no longer masquerade as "no rifles yet"; the rotated-photo
 bug's actual root cause (a comment describing behavior the code never
 implemented) is fixed and proven against a real EXIF-tagged fixture;
-and the full surface inventory is recorded above, with one investigated
-near-duplicate (detailed truing) confirmed intentional against this
-codebase's own dual-lane doctrine rather than guessed at. Full suite
-green throughout, protected-engine hashes and canon manifest untouched,
-`sw.js` `CACHE_VERSION` 155 → 159 across five commits.
+and the full surface inventory is recorded above. Law (5)'s "detailed
+truing" finding was WRONG in this report's first pass (cited a stale
+`lanes.js` comment instead of tracing live reachability) — caught on
+review, corrected, and acted on: the confirmed-dead "Categories →
+Truing tool" doors are deleted, the one genuinely live path
+(`steel-session.js`'s escape hatch) is kept and locked with a
+single-entry-path test, and the stale comment that caused the mistake
+is rewritten so it can't mislead the next audit. Full suite green
+throughout, protected-engine hashes and canon manifest untouched,
+`sw.js` `CACHE_VERSION` 155 → 160 across six commits.

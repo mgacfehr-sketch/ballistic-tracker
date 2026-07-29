@@ -1,21 +1,50 @@
 /**
- * lanes.js — TWO LANES, ONE ENGINE (Contract v2.5 Part 1).
+ * lanes.js — Contract v2.5 Part 1 named this "TWO LANES, ONE ENGINE":
+ * a user-facing Simple/Detailed UI switch. THAT PART IS DEAD — the
+ * v3.0 Contract Part 2 explicitly kills the Lanes concept as a
+ * user-facing choice (confirmed by V3-REPORT.md: "the user-facing
+ * Simple/Detailed switcher is dead... Roy has no manual toggle
+ * anymore"). The ONLY live UI for it (`HomeManager`'s "Your doors"
+ * overlay, `#more-tools-lane`) sits inside `home.js`'s `.show()`
+ * family, which itself has zero live callers today
+ * (`rifle-app.js`'s Card replaced it as the resting screen) — so
+ * `Lanes.setDetailed()` currently has exactly one call site in the
+ * whole codebase, and it's unreachable. Read this file's own doctrine
+ * below as HISTORICAL CONTEXT for why the flag and its wording map
+ * exist, not as a description of current navigation. (This comment
+ * was itself stale until the UI Consolidation phase caught it citing
+ * dead architecture as if it still gated live screens — don't repeat
+ * that; check reachability, not doctrine text, before trusting a
+ * comment like the one below.)
  *
- * One setting: Detailed mode, OFF by default. The Simple lane is the
- * front door — few inputs, Roy's words, one obvious thing to do. The
- * Detailed lane is everything v2.3/v2.4 built, unchanged. Both lanes
- * write the SAME tables and events; the confidence system underneath
- * never changes.
+ * CURRENT STATUS: `detailed_mode` survives purely as an internal,
+ * read-only behavior flag — never set by direct user choice today,
+ * only by the one-time inference described below. Live readers:
+ * `mv-entry.js` and `session-flow.js` check `Lanes.isDetailed()` to
+ * pick wording/defaults on the SAME screens everyone uses, not to
+ * route to a different screen. It does not gate which surfaces exist.
+ *
+ * ORIGINAL DOCTRINE (v2.5, for context): One setting: Detailed mode,
+ * OFF by default. The Simple lane is the front door — few inputs,
+ * Roy's words, one obvious thing to do. The Detailed lane is
+ * everything v2.3/v2.4 built, unchanged. Both lanes write the SAME
+ * tables and events; the confidence system underneath never changes.
  *
  * Persisted in user_settings key 'detailed_mode' (no schema):
  *   { v: 1, detailed: bool, source: 'user'|'inferred' }
  * One-time inference: an existing user who has logged FULL steel
  * strings has already chosen the detailed workflow — default them ON
- * (recorded as source 'inferred', flips freely afterward).
+ * (recorded as source 'inferred'). Still live: `Lanes.resolve()`'s own
+ * logic drives this automatically; there is no user-facing flip left.
  *
  * THE COPY MAP (Part 1.4): one place both vocabularies live so they
  * can never drift per-screen. Simple = Roy words ("bullet speed",
- * "drop chart"); Detailed keeps precise vocabulary.
+ * "drop chart"); Detailed keeps precise vocabulary. ALSO DEAD today —
+ * every `Copy.t()`/`Copy.roy()` call site is inside the same dead
+ * `HomeManager` screen family (`home.js`), zero live callers, exactly
+ * like the lane switch above. Kept (not deleted) because it's pure,
+ * Node-tested, and cheap to keep correct; not because anything reads
+ * it live.
  *
  *   Copy.t('mv')        → 'bullet speed' | 'muzzle velocity'
  *   Copy.t('mv', true)  → Title case of the same

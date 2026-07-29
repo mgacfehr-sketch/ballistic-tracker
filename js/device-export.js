@@ -29,7 +29,11 @@ var DeviceExport = (function () {
             db.getTruingEventsByRifle(rifleId).catch(function () { return []; })
         ]).then(function (res) {
             var rifle = res[0];
-            if (!rifle) { if (window.Categories) Categories.show('ballistics'); return; }
+            // UI Consolidation phase: this used to fall back to the now-
+            // effectively-dead Categories.show('ballistics') (Categories
+            // itself has zero live callers today). Falls back to the
+            // Card instead, matching "every flow ends at the Card."
+            if (!rifle) { if (window.AppNav) AppNav.go('home'); return; }
             var loads = res[1] || [];
             var load = null;
             loads.forEach(function (l) { if (!load && (l.truedMv || l.truedBc)) load = l; });
@@ -139,7 +143,10 @@ var DeviceExport = (function () {
     function _bindBack(rifle) {
         var back = document.getElementById('de-back');
         if (back) back.addEventListener('click', function () {
-            if (window.Categories) Categories.show('ballistics', rifle.id);
+            // UI Consolidation phase: was Categories.show('ballistics', ...)
+            // — Categories has zero live callers today; the Card is this
+            // phase's universal "done" destination.
+            if (window.AppNav) AppNav.go('home');
         });
     }
 
@@ -151,6 +158,6 @@ if (typeof window !== 'undefined') {
     window.ToolActions = window.ToolActions || {};
     window.ToolActions.deviceExport = function (db, rifleId) {
         if (rifleId) DeviceExport.open(db, rifleId);
-        else if (typeof Categories !== 'undefined') Categories.show('ballistics');
+        else if (window.AppNav) AppNav.go('home');
     };
 }
