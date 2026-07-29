@@ -585,35 +585,35 @@ BallisticDB.prototype._registerAttachmentHash = function (kind, blob, storagePat
 
 /**
  * Vault-first import: hash + upload the ORIGINAL import file to
- * {userId}/vault/{hash} in the session-images bucket (same bucket +
- * rules convention this codebase already uses for steel photos — no
- * new bucket), BEFORE any parsing/association happens. Identical bytes
- * re-uploaded by the same user return the existing vault row instead
- * of erroring (unique on user_id+content_hash) — a safe re-import
- * no-op at the vault layer, independent of js/chrono.js's own per-shot
- * dedup (owner-review #7).
+ * {userId}/{hash} in the DEDICATED import-vault bucket (owner ruling,
+ * OWNER-ACTIONS item 6: original evidence has a different lifecycle
+ * and policy surface than display images, so it gets its own bucket
+ * rather than reusing session-images), BEFORE any parsing/association
+ * happens. Identical bytes re-uploaded by the same user return the
+ * existing vault row instead of erroring (unique on
+ * user_id+content_hash) — a safe re-import no-op at the vault layer,
+ * independent of js/chrono.js's own per-shot dedup (owner-review #7).
  * @returns {Promise<Object>} the vault row (existing or newly created)
  */
 BallisticDB.prototype.vaultImportFile = function (kind, blob, filename) {
     var self = this;
     return sha256Hex(blob).then(function (hash) {
         // Check FIRST, upload only if genuinely new (owner-review RLS audit
-        // finding: the session-images bucket has INSERT/SELECT/DELETE
-        // policies but no UPDATE policy, so a plain upload(...,
-        // {upsert:true}) against a path that already exists — e.g.
-        // re-importing the exact same file, which this hash-keyed path
-        // makes identical bytes always land on — fails under RLS. Checking
-        // attachment_vault before ever touching Storage avoids depending
-        // on that policy at all for the common case, and also skips a
-        // wasted re-upload of identical bytes.)
+        // finding: bucket upload(...,{upsert:true}) against a path that
+        // already exists — e.g. re-importing the exact same file, which
+        // this hash-keyed path makes identical bytes always land on —
+        // needs an UPDATE storage policy, which this dedicated bucket DOES
+        // have from the start (PHASEB-migrations.sql P0b), but checking
+        // attachment_vault first still avoids a wasted re-upload of
+        // identical bytes either way.
         return self.supabase.from('attachment_vault').select()
             .eq('user_id', self.userId).eq('content_hash', hash).maybeSingle()
             .then(function (existing) {
                 if (existing.error) throw existing.error;
                 if (existing.data) return _rowToJs(existing.data);
 
-                var path = self.userId + '/vault/' + hash;
-                return self.supabase.storage.from('session-images')
+                var path = self.userId + '/' + hash;
+                return self.supabase.storage.from('import-vault')
                     .upload(path, blob, { upsert: true, contentType: blob.type || 'application/octet-stream' })
                     .then(function (upRes) {
                         if (upRes.error) throw upRes.error;
@@ -623,7 +623,7 @@ BallisticDB.prototype.vaultImportFile = function (kind, blob, filename) {
                             originalFilename: filename || null,
                             contentHash: hash,
                             byteSize: blob.size || null,
-                            storageBucket: 'session-images',
+                            storageBucket: 'import-vault',
                             storagePath: path,
                             status: 'unresolved'
                         };
@@ -664,6 +664,51 @@ BallisticDB.prototype.resolveVaultedImport = function (vaultId, associatedTable,
         .then(function (res) {
             if (res.error) throw res.error;
         });
+};
+
+/**
+ * Read-only existence check for one exact Storage path — does it
+ * already exist, regardless of what the last upload attempt's response
+ * said? Uses list()+search, which only needs the bucket's SELECT
+ * policy — this works even on a bucket that has no UPDATE policy yet
+ * (owner-review RLS audit finding), and is what makes
+ * js/sync-queue.js's retry hardening below possible without depending
+ * on that policy fix. Never throws — "can't confirm" and "confirmed
+ * absent" both resolve false; the caller must treat "false" as "not
+ * verified," not "definitely doesn't exist."
+ */
+BallisticDB.prototype._storageObjectExists = function (bucket, path) {
+    var self = this;
+    var slash = path.lastIndexOf('/');
+    var folder = slash === -1 ? '' : path.slice(0, slash);
+    var filename = slash === -1 ? path : path.slice(slash + 1);
+    return self.supabase.storage.from(bucket).list(folder, { search: filename, limit: 1 })
+        .then(function (res) {
+            if (res.error) return false;
+            return (res.data || []).some(function (entry) { return entry.name === filename; });
+        })
+        .catch(function () { return false; });
+};
+
+/** Did BOTH of a session's images actually land, regardless of what the
+ *  last upload attempt's response said? (Amendment 1 A16 hardening —
+ *  see js/sync-queue.js's flush() image-retry path.) */
+BallisticDB.prototype.sessionImageExists = function (sessionId) {
+    var self = this;
+    var fullPath = self.userId + '/' + sessionId + '.jpg';
+    var thumbPath = self.userId + '/' + sessionId + '_thumb.jpg';
+    return Promise.all([
+        self._storageObjectExists('session-images', fullPath),
+        self._storageObjectExists('session-images', thumbPath)
+    ]).then(function (results) { return results[0] && results[1]; });
+};
+
+/** Did this steel photo actually land? Same purpose as
+ *  sessionImageExists above, single-file case. */
+BallisticDB.prototype.steelPhotoExists = function (stringId) {
+    var self = this;
+    var path = self.userId + '/steel_' + stringId + '.jpg';
+    return self._storageObjectExists('session-images', path);
 };
 
 // ── Session Images (Supabase Storage) ──────────────────────────

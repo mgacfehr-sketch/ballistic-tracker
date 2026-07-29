@@ -24,7 +24,16 @@
  * (RLS, constraint, validation) rethrows to the caller — that is a
  * bug, not connectivity, and queueing it would fail forever. Rows
  * that fail server-side during flush retry up to 5 times, then park
- * as status 'error' — surfaced, never dropped.
+ * as status 'error' — surfaced, never dropped. Queued IMAGES get the
+ * same MAX_ATTEMPTS/status-'error' protection (added 2026-07-28, A16
+ * hardening) — but a retry failure is verified first: db.js's
+ * sessionImageExists/steelPhotoExists check whether the file actually
+ * landed on a prior attempt whose response the client never saw,
+ * before counting the retry as a real failure. Without that check, a
+ * permission-shaped error on a retry-of-an-already-uploaded path
+ * (e.g. the RLS gap PHASEB-REPORT.md documents) would silently retry
+ * forever with no visible error — a stranded photo, which the
+ * never-lose promise does not permit.
  *
  * Out of scope by design (single user, one active device): offline
  * deletes, multi-device merge, Background Sync API, rifle/load
@@ -273,6 +282,20 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
         });
     }
 
+    /** All queued images, including ones parked as status 'error' after
+     *  MAX_ATTEMPTS — used by summary() so a stuck image is no longer
+     *  invisible to the pending/errored counts the rest of the app
+     *  already surfaces (status banner, logout warning). */
+    function _getAllImages() {
+        if (!_idb) return Promise.resolve([]);
+        return new Promise(function (resolve, reject) {
+            var tx = _idb.transaction('images', 'readonly');
+            var req = tx.objectStore('images').getAll();
+            req.onsuccess = function () { resolve(req.result || []); };
+            req.onerror = function () { reject(req.error); };
+        });
+    }
+
     function _notify() {
         _getAllOps().then(function (ops) {
             var s = SyncQueueCore.queueSummary(ops, _db && _db.userId);
@@ -384,7 +407,8 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                     fullBlob: fullBlob,
                     thumbnailBlob: thumbnailBlob,
                     queuedAt: new Date().toISOString(),
-                    attempts: 0
+                    attempts: 0,
+                    status: 'pending'
                 });
             }).then(function () { _notify(); return { queued: true }; });
         }
@@ -456,8 +480,48 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
                                         store.delete(op.row.id);
                                     });
                                 }).catch(function (e) {
-                                    // image failure never blocks the flush
-                                    console.warn('[Sync] queued image upload failed:', e);
+                                    // Amendment 1 A16 hardening (owner
+                                    // ruling, 2026-07-28): an upload can
+                                    // fail on THIS attempt's response while
+                                    // having actually succeeded on a PRIOR
+                                    // attempt the client never got to see
+                                    // (e.g. the missing-UPDATE-policy race
+                                    // documented in PHASEB-REPORT.md's RLS
+                                    // audit — the retry re-targets a path
+                                    // that already exists). The old
+                                    // behavior here ("image failure never
+                                    // blocks the flush") just logged and
+                                    // silently kept retrying forever with
+                                    // no visible error — a stranded photo,
+                                    // which violates the never-lose
+                                    // promise. Verify before giving up:
+                                    var verify = img.kind === 'steel'
+                                        ? _db.steelPhotoExists(op.row.id)
+                                        : _db.sessionImageExists(op.row.id);
+                                    return verify.catch(function () { return false; }).then(function (exists) {
+                                        if (exists) {
+                                            // it actually landed — this was
+                                            // a false failure, not a real one
+                                            return _tx('images', 'readwrite', function (store) {
+                                                store.delete(op.row.id);
+                                            });
+                                        }
+                                        // genuinely still missing — count
+                                        // the attempt, park as 'error' after
+                                        // MAX_ATTEMPTS (mirrors ops' own
+                                        // rule), never silently dropped
+                                        var updated = {};
+                                        for (var k in img) { if (img.hasOwnProperty(k)) updated[k] = img[k]; }
+                                        updated.attempts = (img.attempts || 0) + 1;
+                                        updated.lastError = String(e && e.message || e);
+                                        updated.status = updated.attempts >= MAX_ATTEMPTS ? 'error' : 'pending';
+                                        return _tx('images', 'readwrite', function (store) {
+                                            store.put(updated);
+                                        }).then(function () {
+                                            console.warn('[Sync] queued image upload failed (attempt ' +
+                                                updated.attempts + '/' + MAX_ATTEMPTS + '):', e);
+                                        });
+                                    });
                                 });
                             });
                         })
@@ -563,10 +627,23 @@ var SyncQueue = (typeof indexedDB !== 'undefined') ? (function () {
     /** {pending, errored, quarantined} for the visible sync state (§3.2).
      *  quarantined = captured under a different account than the one
      *  currently signed in on this device (A16) — never counted toward
-     *  pending, since it will not flush until that account returns. */
+     *  pending, since it will not flush until that account returns.
+     *  Includes queued IMAGES too (owner-review sync-queue hardening,
+     *  2026-07-28) — before this, a stuck image was invisible to every
+     *  caller of summary() (status banner, logout warning): it lives in
+     *  a separate IndexedDB store this function didn't look at. Images
+     *  don't carry capturedUserId (queueSummary's quarantine concept
+     *  doesn't apply to them — a known, smaller, separate gap, not
+     *  fixed here), so they're counted with the simpler opsSummary. */
     function summary() {
-        return _getAllOps().then(function (ops) {
-            return SyncQueueCore.queueSummary(ops, _db && _db.userId);
+        return Promise.all([_getAllOps(), _getAllImages()]).then(function (results) {
+            var opsSum = SyncQueueCore.queueSummary(results[0], _db && _db.userId);
+            var imgSum = SyncQueueCore.opsSummary(results[1]);
+            return {
+                pending: opsSum.pending + imgSum.pending,
+                errored: opsSum.errored + imgSum.errored,
+                quarantined: opsSum.quarantined
+            };
         }).catch(function () { return { pending: 0, errored: 0, quarantined: 0 }; });
     }
 

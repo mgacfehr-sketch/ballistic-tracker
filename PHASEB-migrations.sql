@@ -20,13 +20,14 @@
 -- backfill; see OWNER-ACTIONS).
 --
 -- Sections:
---   P0 — session-images bucket: add the missing UPDATE storage policy
---   P1 — fact_events            (the minimal event envelope)
---   P2 — attachment_vault       (vault-first import)
---   P3 — workhorse_packages     (SCHEMA ONLY — Phase F builds the claim flow)
---   P4 — Backfill: legacy rows -> fact_events (idempotent)
---   P5 — Parity check queries   (run on a database CLONE, not production)
---   P6 — Rollback
+--   P0  — session-images bucket: add the missing UPDATE storage policy
+--   P0b — import-vault: a new, dedicated bucket for vaulted originals
+--   P1  — fact_events            (the minimal event envelope)
+--   P2  — attachment_vault       (vault-first import)
+--   P3  — workhorse_packages     (SCHEMA ONLY — Phase F builds the claim flow)
+--   P4  — Backfill: legacy rows -> fact_events (idempotent)
+--   P5  — Parity check queries   (run on a database CLONE, not production)
+--   P6  — Rollback
 -- ════════════════════════════════════════════════════════════
 
 
@@ -66,6 +67,68 @@ CREATE POLICY "Users can update own images"
     ON storage.objects FOR UPDATE
     USING (bucket_id = 'session-images' AND auth.uid()::text = (storage.foldername(name))[1])
     WITH CHECK (bucket_id = 'session-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+
+-- ────────────────────────────────────────────────────────────
+-- P0b — `import-vault`: a DEDICATED Storage bucket for vaulted original
+-- import files, per owner ruling on OWNER-ACTIONS item 6. Original
+-- evidence (a raw Garmin CSV/XLSX, preserved unmodified as proof of
+-- what was actually imported) has a different lifecycle and policy
+-- surface than display images (session/steel photos, shown in the UI,
+-- deleted when their parent record is deleted) — this session's first
+-- draft reused the session-images bucket under a vault/ prefix; the
+-- owner ruled that conflates the two and asked for separation instead.
+-- js/db.js's vaultImportFile is updated in the same commit to upload
+-- here instead. _registerAttachmentHash (session/steel image hash
+-- tracking, owner-review #10) is UNCHANGED — those files stay exactly
+-- where they already live, in session-images; only vaulted IMPORTS move.
+--
+-- All 4 policies (including UPDATE, learning from the P0 finding above
+-- so this bucket never has the same gap) from the start.
+-- ────────────────────────────────────────────────────────────
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('import-vault', 'import-vault', false)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Users can upload own import-vault files" ON storage.objects;
+CREATE POLICY "Users can upload own import-vault files"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'import-vault' AND auth.uid()::text = (storage.foldername(name))[1]);
+DROP POLICY IF EXISTS "Users can view own import-vault files" ON storage.objects;
+CREATE POLICY "Users can view own import-vault files"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'import-vault' AND auth.uid()::text = (storage.foldername(name))[1]);
+DROP POLICY IF EXISTS "Users can update own import-vault files" ON storage.objects;
+CREATE POLICY "Users can update own import-vault files"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'import-vault' AND auth.uid()::text = (storage.foldername(name))[1])
+    WITH CHECK (bucket_id = 'import-vault' AND auth.uid()::text = (storage.foldername(name))[1]);
+DROP POLICY IF EXISTS "Users can delete own import-vault files" ON storage.objects;
+CREATE POLICY "Users can delete own import-vault files"
+    ON storage.objects FOR DELETE
+    USING (bucket_id = 'import-vault' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ⚠ REQUIRED FOLLOW-UP, NOT DONE HERE: account deletion. FOUNDATION-,
+-- MORNING-, and SIMPLIFY-migrations.sql each define (CREATE OR REPLACE)
+-- a public.delete_my_account() function; whichever was run LAST is
+-- live, and this session cannot tell which that is without another
+-- owner-run query (the exact same "which migration actually landed"
+-- risk that owner-review #2's landing-gap finding already surfaced
+-- once for SIMPLE-migrations.sql — not guessing again here). Every
+-- version found in the repo deletes storage.objects rows for
+-- bucket_id = 'session-images' but NONE of them know about
+-- 'import-vault' yet, since it didn't exist until this block. Until
+-- fixed, deleting an account leaves that user's vaulted import files
+-- orphaned in storage (not a data-exposure risk — RLS still scopes
+-- them to the now-deleted auth.users id, so nothing else can read
+-- them — just an unreclaimed-storage leak). Run this first:
+--
+--   select pg_get_functiondef('public.delete_my_account'::regproc);
+--
+-- paste the result back, and the one line
+--   DELETE FROM storage.objects WHERE bucket_id = 'import-vault' AND name LIKE uid::text || '/%';
+-- (same shape as the existing session-images line) gets added to
+-- whichever version is actually live, in a follow-up commit.
 
 
 -- ────────────────────────────────────────────────────────────
@@ -142,11 +205,18 @@ CREATE INDEX IF NOT EXISTS idx_fact_events_type       ON public.fact_events(user
 -- "Original file + hash preserved before association; unresolved
 -- imports park safely."
 --
--- Reuses the EXISTING session-images Storage bucket under a `vault/`
--- path prefix, per this codebase's own established convention (steel
--- photos already share that bucket under a `steel_` prefix rather than
--- getting a dedicated bucket — see js/db.js's saveSteelPhoto). No new
--- bucket, no new bucket-level policy surface to audit.
+-- Two distinct storage locations tracked through this ONE table (owner
+-- ruling on OWNER-ACTIONS item 6 — see P0b above for the full reasoning):
+--   - `kind IN ('garmin_csv', 'garmin_xlsx')` rows: original import
+--     evidence, uploaded to the DEDICATED `import-vault` bucket (P0b).
+--   - `kind IN ('session_image', 'steel_image')` rows: hash-tracking
+--     only (owner-review #10) for images that already live in the
+--     EXISTING `session-images` bucket at their own conventional path —
+--     no upload happens for these, `storage_bucket`/`storage_path` just
+--     record where the (unmoved) file already is.
+-- storage_bucket is NOT NULL with no column default — both js/db.js
+-- call sites (_registerAttachmentHash, vaultImportFile) always set it
+-- explicitly, so a default would only ever mask a bug, not save typing.
 --
 -- content_hash is SHA-256 of the ORIGINAL uploaded bytes, computed
 -- client-side (Web Crypto `crypto.subtle.digest`, available in both the
@@ -164,8 +234,8 @@ CREATE TABLE IF NOT EXISTS public.attachment_vault (
     original_filename      text,
     content_hash           text NOT NULL,             -- sha256 hex of the original file bytes
     byte_size              integer,
-    storage_bucket         text NOT NULL DEFAULT 'session-images',
-    storage_path           text NOT NULL,             -- e.g. '{userId}/vault/{contentHash}.csv'
+    storage_bucket         text NOT NULL,             -- 'import-vault' (garmin_*) | 'session-images' (*_image) — always set explicitly by the caller, no default
+    storage_path           text NOT NULL,             -- e.g. '{userId}/{contentHash}' (import-vault) or the image's own existing path (session-images)
     status                 text NOT NULL DEFAULT 'unresolved', -- 'unresolved' | 'associated' | 'orphaned'
     associated_fact_event_id uuid REFERENCES public.fact_events(id) ON DELETE SET NULL,
     associated_table       text,                      -- e.g. 'velocity_strings', 'sessions' (association may predate fact_events dual-write, e.g. session images)
@@ -509,6 +579,18 @@ LIMIT 20;
 --   3. No backfill data needs to be "un-migrated" elsewhere — the
 --      backfill (P4) only ever writes fact_events rows; it never
 --      modifies a legacy table.
+--   4. If rolling back P0b too: any files already vaulted to
+--      import-vault should be exported/backed up first (this bucket
+--      holds original evidence — treat deleting it as a real data-loss
+--      action, not routine cleanup). Once safe:
+--      DELETE FROM storage.objects WHERE bucket_id = 'import-vault';
+--      DELETE FROM storage.buckets WHERE id = 'import-vault';
+--      (the 4 policies on storage.objects are harmless to leave in
+--      place — they only ever match rows with bucket_id = 'import-vault',
+--      which no longer exist once the bucket is gone.)
+--   5. P0's UPDATE policy on session-images is safe to leave in place
+--      even on a full rollback — it only grants what INSERT already
+--      implied (overwrite your own existing file), never widens access.
 --
 -- Partial rollback (keep the tables, undo only a bad backfill run):
 --   DELETE FROM public.fact_events WHERE source_table = '<one table>';

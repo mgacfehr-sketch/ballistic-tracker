@@ -145,7 +145,7 @@ check('write(): a network failure mid-write falls through to the SAME _enqueue p
 });
 
 check('flush(): signal loss mid-flush stops cleanly without corrupting queue order (FIFO preserved, remaining ops stay pending)', function () {
-    var body = slice('js/sync-queue.js', 'function flush() {', 55);
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
     assert(/isNetworkError\(err, _online\(\)\) \|\| SyncQueueCore\.isAuthError\(err\)\) \{[\s\S]{0,400}return null;/.test(body),
         'a network/auth error mid-flush must stop (return null) rather than mark the row errored or skip ahead');
 });
@@ -177,7 +177,7 @@ check('write(): an expired-session error while nominally online queues the row i
 });
 
 check('flush(): a run of 401s during flush never counts toward MAX_ATTEMPTS (the fix is re-auth, not giving up on the row)', function () {
-    var body = slice('js/sync-queue.js', 'function flush() {', 55);
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
     var authBranch = body.slice(body.indexOf('isAuthError'), body.indexOf('isAuthError') + 500);
     assert(authBranch.indexOf('return null') !== -1,
         'the auth-error branch must return null (stop, do not increment attempts) like the network branch');
@@ -208,7 +208,7 @@ check('queueSummary separates quarantined ops from ordinary pending ones — the
 });
 
 check('flush(): a quarantined op is skipped BEFORE any flushQueuedRow call — it can never be attributed to the wrong account', function () {
-    var body = slice('js/sync-queue.js', 'function flush() {', 55);
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
     var stepStart = body.indexOf('function step(i)');
     var stepBody = body.slice(stepStart, stepStart + 900);
     var quarantineIdx = stepBody.indexOf('isQuarantined');
@@ -255,21 +255,81 @@ check('writeImage(): if the parent row is itself still queued (offline), the ima
 });
 
 check('flush(): a queued image upload failure never blocks or fails the row flush it rides on (image failure is isolated)', function () {
-    var body = slice('js/sync-queue.js', 'function flush() {', 55);
-    assert(/image failure never blocks the flush/.test(body),
-        'the flush loop must isolate image-upload failures from row-flush success');
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
+    var pendingIdx = body.indexOf('_pendingImage(op.row.id)');
+    var stepAgainIdx = body.indexOf('return step(i + 1);', pendingIdx);
+    assert(pendingIdx !== -1 && stepAgainIdx !== -1,
+        'the image branch must be followed by an unconditional step(i + 1) — nothing in the image path may reject upward and stop the row loop');
 });
 
 check('flush(): a queued image is deleted from the local store ONLY after its upload actually resolves (interrupted/failed uploads keep the only copy)', function () {
-    var body = slice('js/sync-queue.js', 'function flush() {', 55);
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
     var uploadIdx = body.indexOf('var up = img.kind');
     var thenIdx = body.indexOf('.then(function () {', uploadIdx);
     var deleteIdx = body.indexOf("store.delete(op.row.id)", uploadIdx);
     var catchIdx = body.indexOf('.catch(function (e) {', uploadIdx);
     assert(uploadIdx !== -1 && thenIdx !== -1 && deleteIdx !== -1 && catchIdx !== -1,
-        'expected upload -> then(delete) -> catch(log, keep) shape not found');
+        'expected upload -> then(delete) -> catch(verify) shape not found');
     assert(thenIdx < deleteIdx && deleteIdx < catchIdx,
-        'the delete must sit inside the success .then(), before the failure .catch() — a failed upload must never delete the only local copy');
+        'the success-path delete must sit inside the success .then(), before the failure .catch() — a failed upload must never delete the only local copy on the strength of the .then() branch alone');
+});
+
+console.log('\n════════════════════════════════════════');
+console.log('Scenario 6b — the missing-UPDATE-policy race (owner-review');
+console.log('RLS audit, 2026-07-28): a retry can fail on THIS attempt\'s');
+console.log('response while the upload actually succeeded on a PRIOR one');
+console.log('════════════════════════════════════════\n');
+
+check('flush(): a failed image retry is VERIFIED (does the file actually exist?) before being treated as a real failure — not just logged and silently left to retry forever', function () {
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
+    var catchIdx = body.indexOf('.catch(function (e) {', body.indexOf('var up = img.kind'));
+    var catchBody = body.slice(catchIdx, catchIdx + 3800);
+    assert(/img\.kind === 'steel'\s*\?\s*_db\.steelPhotoExists\(op\.row\.id\)\s*:\s*_db\.sessionImageExists\(op\.row\.id\)/.test(catchBody),
+        'the catch must call db.js\'s sessionImageExists/steelPhotoExists — the one place that can tell "already there" from "still missing"');
+});
+
+check('flush(): if verification finds the file already exists, the queued copy is deleted (resolved as success) — not left to retry a permission wall forever', function () {
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
+    var catchIdx = body.indexOf('.catch(function (e) {', body.indexOf('var up = img.kind'));
+    var catchBody = body.slice(catchIdx, catchIdx + 3800);
+    var verifyThenIdx = catchBody.indexOf('.then(function (exists) {');
+    var ifExistsIdx = catchBody.indexOf('if (exists) {', verifyThenIdx);
+    var deleteIdx = catchBody.indexOf('store.delete(op.row.id)', ifExistsIdx);
+    assert(verifyThenIdx !== -1 && ifExistsIdx !== -1 && deleteIdx !== -1,
+        'expected an if(exists) branch that deletes the queued row');
+    assert(ifExistsIdx < deleteIdx && deleteIdx < catchBody.indexOf('var updated = {}'),
+        'the exists-branch delete must come before the genuinely-still-missing branch below it');
+});
+
+check('flush(): if verification confirms the file is genuinely still missing, the attempt is counted and the image parks as status \'error\' after MAX_ATTEMPTS — mirroring ops\' own rule, never silently dropped', function () {
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
+    var catchIdx = body.indexOf('.catch(function (e) {', body.indexOf('var up = img.kind'));
+    var catchBody = body.slice(catchIdx, catchIdx + 3800);
+    assert(/updated\.attempts = \(img\.attempts \|\| 0\) \+ 1;/.test(catchBody), 'a genuinely failed retry must increment attempts');
+    assert(/updated\.status = updated\.attempts >= MAX_ATTEMPTS \? 'error' : 'pending';/.test(catchBody),
+        'the image must park as status \'error\' at the same MAX_ATTEMPTS threshold ops already use');
+    assert(/store\.put\(updated\)/.test(catchBody), 'the updated attempt/status must be persisted back to IndexedDB, not just held in memory');
+});
+
+check('flush(): the verify() step itself never crashes the flush loop — its own failure resolves false ("not confirmed"), it does not throw', function () {
+    var body = slice('js/sync-queue.js', 'function flush() {', 140);
+    var catchIdx = body.indexOf('.catch(function (e) {', body.indexOf('var up = img.kind'));
+    var catchBody = body.slice(catchIdx, catchIdx + 1600);
+    assert(/verify\.catch\(function \(\) \{ return false; \}\)/.test(catchBody),
+        'the verify() promise must have its own .catch that resolves false, so a failed existence check degrades to "treat as still missing" rather than an unhandled rejection');
+});
+
+check('db.js: sessionImageExists/steelPhotoExists use list()+search (needs only the SELECT storage policy — already confirmed live), so verification works even before the missing UPDATE policy is fixed', function () {
+    var body = slice('js/db.js', 'BallisticDB.prototype._storageObjectExists = function (bucket, path) {', 15);
+    assert(/\.list\(folder, \{ search: filename, limit: 1 \}\)/.test(body),
+        'existence check must use list()+search, not an operation that itself needs UPDATE/write permission');
+});
+
+check('summary(): queued images are no longer invisible to the pending/errored counts the status banner and logout warning already surface', function () {
+    var body = slice('js/sync-queue.js', 'function summary() {', 15);
+    assert(body.indexOf('_getAllImages()') !== -1, 'summary() must read the images store, not just ops');
+    assert(/SyncQueueCore\.opsSummary\(results\[1\]\)/.test(body),
+        'summary() must fold image pending/errored counts into the same aggregate the rest of the app already reads');
 });
 
 console.log('\n════════════════════════════════════════');

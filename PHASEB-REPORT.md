@@ -132,22 +132,26 @@ the backfill script, so retries/re-flushes/re-runs never double-write.
 RLS enabled, four owner-only policies matching this codebase's
 existing convention exactly.
 
-**P2 — `attachment_vault`: vault-first import.** Reuses the *existing*
-`session-images` Storage bucket under a `vault/` prefix — matching
-this codebase's own established convention (steel photos already
-share that bucket under a `steel_` prefix) rather than standing up a
-new bucket with its own policy surface to audit. `(user_id,
-content_hash)` unique — re-uploading identical bytes is a safe no-op.
-**Wired into working code, not just schema:**
+**P2 — `attachment_vault`: vault-first import.** Original import
+evidence (`kind IN ('garmin_csv','garmin_xlsx')`) uploads to a
+**dedicated `import-vault` bucket** (P0b, owner ruling on item 6 —
+"original evidence has a different lifecycle and policy surface than
+display images"), separate from the display-image hash-tracking rows
+(`kind IN ('session_image','steel_image')`), which stay pointed at the
+*existing* `session-images` bucket at each image's own conventional
+path — no file movement, hash-tracking only. One table, two storage
+locations, `storage_bucket` set explicitly by each caller, no column
+default. `(user_id, content_hash)` unique — re-uploading identical
+bytes is a safe no-op. **Wired into working code, not just schema:**
 - `js/utils.js`: `sha256Hex(blob)` via Web Crypto (`crypto.subtle`) —
   works in both the browser and a Capacitor WebView, no new dependency.
 - `js/db.js`: `_registerAttachmentHash` (hashes an already-uploaded
   file at its existing conventional path — no duplicate storage write)
   wired into `saveSessionImage` and `saveSteelPhoto`, best-effort,
   never blocks the save (CLAUDE.md rule 8). `vaultImportFile` (hashes +
-  uploads an original import file to `{userId}/vault/{hash}` *before*
-  parsing) and `resolveVaultedImport` (marks it resolved once parsed
-  rows are saved).
+  uploads an original import file to `{userId}/{hash}` in `import-vault`
+  *before* parsing) and `resolveVaultedImport` (marks it resolved once
+  parsed rows are saved).
 - `js/chrono.js`: `vaultImportFile` fires in `_handleFile`, in
   parallel with parsing (never gates it); `resolveVaultedImport` fires
   in `_importSelected`'s success path. One imported file can become
@@ -288,12 +292,15 @@ consequences, found by tracing every caller:
    stranded forever with no user-visible error. **Left open, not fixed
    this session** — it's a real reliability gap but a materially
    separate, non-trivial change to the sync-queue retry logic, outside
-   what this owner-action turn asked for. See OWNER-ACTIONS item 4.
+   what this owner-action turn asked for. **RULED 2026-07-28: fix it
+   too — done in the same session, see OWNER-ACTIONS item 4.**
 
 `PHASEB-migrations.sql` P0 adds the missing UPDATE policy — closes the
 gap at the policy level for BOTH cases above (the vault fix no longer
 needs it, but adding it is still correct and closes the sync-queue.js
-risk too, without requiring a code change there).
+risk too, at the policy level; the code-level hardening below closes
+it a second, independent way, per the owner's ruling that canon's
+never-lose promise shouldn't rest on a single layer of defense).
 
 ### Test suite / hash locks / cache
 
@@ -371,37 +378,71 @@ tracing who's affected:
      `attachment_vault` before touching Storage, no longer depends on
      this policy).
    - `js/sync-queue.js`'s offline image-retry path has the same
-     exposure and is **not** fixed — if an image upload succeeds
-     server-side but the client reads it as failed, the queued retry
-     hits the same missing-UPDATE-policy wall and is silently
-     swallowed (a photo could be stranded with no visible error).
-     Running P0 closes this at the policy level without needing a code
-     change. **Judgment call:** do you also want a code-level hardening
-     pass on `js/sync-queue.js`'s retry logic (e.g., treat a
-     permission-denied retry-of-an-existing-path as "already there,
-     succeeded" rather than a failure), or is the policy fix
-     sufficient? Full detail in the RLS audit section above.
+     exposure — **RULED 2026-07-28: harden it, don't just rely on the
+     policy fix.** A permission error on a retry-of-an-existing-path
+     must resolve as "verify: does the object exist? if yes, mark
+     succeeded" — canon (A16, never voluntarily discard acknowledged
+     data) beats the old code comment ("image failure never blocks the
+     flush") that let this go silent. **DONE, same session:**
+     `js/db.js` gained `_storageObjectExists`/`sessionImageExists`/
+     `steelPhotoExists` (read-only, `list()`+search — needs only the
+     SELECT policy, so this works even before P0 is run). `flush()`'s
+     image-retry catch now verifies before counting a failure: exists
+     → delete the queued copy (resolved as success, false failure
+     caught); genuinely missing → increment `attempts`, park as
+     `status: 'error'` after `MAX_ATTEMPTS` (mirroring `ops`' own
+     rule) — never silently retried forever with no visible error.
+     `summary()` now also reads the `images` store so a stuck image is
+     no longer invisible to the status banner/logout warning either.
+     8 new checks in `tests/test-failure-injection.js` Scenario 6b
+     cover the verify-exists/verify-missing/verify-itself-never-throws
+     branches and the `summary()` merge, as pure source-presence proofs
+     (same technique the rest of that suite already uses) — matches
+     Amendment 1 Part B's "right-sized failure-injection suite," now
+     covering this race specifically as asked. All 34 checks green.
 
-**5. Review and run `PHASEB-migrations.sql`** (P0 adds the missing
-storage policy; P1–P3 create tables;
-P4 backfills; P5 is read-only, meant for a clone, not production — run
-it there if you want the parity guarantee before trusting the live
-backfill; P6 is rollback, reference only). Re-runnable if interrupted.
+**5. Review and run `PHASEB-migrations.sql`** (P0/P0b create/fix
+storage policies; P1–P3 create tables; P4 backfills; P5 is read-only,
+meant for a clone, not production — run it there if you want the
+parity guarantee before trusting the live backfill; P6 is rollback,
+reference only). Re-runnable if interrupted.
 
-**6. Judgment call — is `attachment_vault`'s `session-images`-bucket-
-reuse the right call, or do you want a dedicated bucket for vaulted
-import files?** This session chose to match the existing steel-photo
-convention (same bucket, path-prefix scoped) specifically to avoid
-opening a second bucket-policy surface to audit on top of finding #4
-above. If you'd rather isolate imports from photos entirely, that's a
-straightforward follow-up migration — flagging it as a choice made,
-not an oversight.
+**6. ~~Judgment call — dedicated bucket for `attachment_vault` imports?~~
+RULED 2026-07-28: yes, dedicated bucket.** "Original evidence has a
+different lifecycle and policy surface than display images." **DONE:**
+`PHASEB-migrations.sql` P0b creates a new `import-vault` bucket with
+all 4 policies (including UPDATE from the start, learning from finding
+#4) — `js/db.js`'s `vaultImportFile` now uploads there instead of
+`session-images`. `_registerAttachmentHash` (session/steel image hash
+tracking) is unchanged; those files stay exactly where they are. See
+the P0b comment block for full reasoning.
 
-**7. Judgment call — `dope_entries`: restore the migration, or leave
-it removed?** Owner-review #4 is closed on the "remove the dead call
-sites" side (done this session). If `dopeLog` is coming back at some
-point, say so and the migration can be restored instead; otherwise no
-further action needed.
+**7. ~~Judgment call — `dope_entries`: restore or leave removed?~~
+RULED 2026-07-28: leave it removed.** "Dope derives from the fact
+spine now." No further action — owner-review #4 stays closed exactly
+as this session left it (three dead call sites removed from
+`js/db.js`, `js/dope-log.js` untouched and still unreachable).
+
+**8. NEW — required follow-up for account deletion, surfaced by
+ruling 6.** `FOUNDATION-`, `MORNING-`, and `SIMPLIFY-migrations.sql`
+each `CREATE OR REPLACE` a `public.delete_my_account()` function; this
+session cannot tell which version is actually live without another
+owner-run query — the exact same "which migration actually landed"
+risk owner-review #2's SIMPLE-migrations.sql finding already surfaced
+once, not guessed at again here. Every version in the repo cleans up
+`storage.objects` for `bucket_id = 'session-images'` but none of them
+know about the new `import-vault` bucket yet. Not a data-exposure risk
+(RLS still scopes orphaned files to the deleted `auth.users` id) — just
+an unreclaimed-storage leak until fixed. Run this first:
+
+```sql
+select pg_get_functiondef('public.delete_my_account'::regproc);
+```
+
+Paste the result back and the one-line addition (matching the existing
+`session-images` cleanup line's shape) gets added to whichever version
+is actually live, in a follow-up commit. Full detail in
+`PHASEB-migrations.sql`'s P0b comment block.
 
 ---
 
