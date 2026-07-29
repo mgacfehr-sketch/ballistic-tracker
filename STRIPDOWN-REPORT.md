@@ -73,14 +73,25 @@ across files this phase never touched — to the main menu for free.
   editing confirmed (create via `db.addLoad`, edit via
   `db.updateLoad`, both traced in the QA gate test).
 
-### RANGE SESSION — the existing wizard, reused entirely unchanged
+### RANGE SESSION — the existing 7-step wizard, entry order refined per an explicit follow-up spec
 
 `SessionLaunch.start({})` → the same 7-step wizard that already
-existed (rifle+ammo picker with inline "+ New ammo" → photo capture →
-calibration → distance/MV/weather → point of aim → mark impacts →
-results). Nothing about the measurement engine, the photo pipeline, or
-the calibration flow was touched — the owner's own instruction said to
-reuse it, and it already did everything asked except one thing:
+existed (photo capture → calibration → distance/MV/weather → point of
+aim → mark impacts → results). Nothing about the measurement engine,
+the photo pipeline, or the calibration flow was touched.
+
+**Entry order refined in a follow-up** (owner's exact spec): step 1
+was originally one combined screen (every rifle listed with its ammo
+nested underneath). Split into two sequential screens —
+`SessionFlow.prototype._renderRiflePicker` ("Which rifle are you
+using?" — rifle list only, nothing else on screen; the dead Quick
+Start beta section and the Print/Share-target utility buttons were
+removed from this screen, the latter moved to the photo step) and
+`_renderAmmoPicker` ("Which ammo are you using?" — ONLY the tapped
+rifle's own ammo, fetched by that rifle's id specifically, plus
+"+ New ammo" inline: name, bullet, weight, advertised speed). No other
+question was found ahead of rifle/ammo selection needing to move —
+distance/MV/weather were already collected later, in the DATA step.
 
 - **Added:** optional Velocity high/low fields next to the existing
   average Velocity field in the DATA step (`index.html` +
@@ -177,7 +188,9 @@ MAIN MENU
 │   │           └── tap a session → photo, full stats, MV → back to RIFLE DETAIL
 │   └── + Add rifle → full create form → Save → new RIFLE DETAIL
 └── RANGE SESSION
-    └── which rifle? / which ammo? (+ New ammo inline)
+    └── Screen 1: "Which rifle are you using?" (rifle list only)
+        → tap a rifle → Screen 2: "Which ammo are you using?"
+          (that rifle's ammo only, + New ammo inline)
         → target photo (camera or gallery, displays straight)
         → calibrate (existing ArUco/manual flow)
         → distance, bullet diameter, rounds, velocity (avg + optional high/low), weather
