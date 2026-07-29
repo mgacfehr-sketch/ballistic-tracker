@@ -377,10 +377,14 @@
                             // scope the picker to just this rifle instead of
                             // falling through to _loadProfilePicker's flat
                             // all-rifles list (a real wrong-rifle risk on any
-                            // account with 2+ rifles). "+ New ammo" is already
-                            // offered per rifle group in that picker.
+                            // account with 2+ rifles). STRIP-DOWN PHASE: with
+                            // a known rifle, jump straight to the ammo screen
+                            // ("+ New ammo" is already offered there) —
+                            // there's no reason to show the rifle-picker
+                            // screen again when the caller already knows
+                            // which rifle this launch is for.
                             if (rifle) {
-                                sessionFlow._renderProfilePicker([{ rifle: rifle, loads: [] }]);
+                                sessionFlow._renderAmmoPicker(rifle.id);
                             } else {
                                 // rifle not even cached (rare) — fall back to
                                 // the flat picker rather than showing nothing;

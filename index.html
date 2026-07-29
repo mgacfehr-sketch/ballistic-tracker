@@ -119,15 +119,23 @@
                     <div id="progress-bar"></div>
                 </div>
 
-                <!-- Step 1: rifle & load -->
+                <!-- Step 1: rifle & ammo — STRIP-DOWN PHASE (owner order):
+                     two sequential screens rendered entirely by
+                     session-flow.js's _renderRiflePicker/_renderAmmoPicker
+                     into #profile-picker below. Screen 1 ("Which rifle are
+                     you using?") shows nothing but the rifle list; screen 2
+                     ("Which ammo are you using?") shows only that rifle's
+                     ammo + "+ New ammo". Print/Share target moved to the
+                     photo step (screen 2 of 7 below) so screen 1 is
+                     literally nothing but the question + list. -->
                 <section class="step active" id="step-profile" data-step="1">
                     <div class="step-header">
                         <button class="btn-step-back" aria-label="Back to Home" title="Back to Home">
                             <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 6 8.5 12 14.5 18"/></svg>
                         </button>
                         <div class="step-titles">
-                            <span class="step-kicker">Step 1 of 7</span>
-                            <span class="step-title">Rifle &amp; load</span>
+                            <span class="step-kicker">Range session</span>
+                            <span class="step-title" id="profile-step-title">Which rifle are you using?</span>
                         </div>
                     </div>
                     <div id="profile-picker"></div>
@@ -141,16 +149,6 @@
                          same pattern used throughout this phase). -->
                     <div class="action-row u-mt-10 hidden">
                         <button id="btn-quick-mode" class="action">Just measure this group</button>
-                    </div>
-                    <div class="action-row u-mt-10">
-                        <button id="btn-print-target" class="btn-utility">
-                            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="8" rx="1.5"/><rect x="7" y="14" width="10" height="7"/></svg>
-                            Print target
-                        </button>
-                        <button id="btn-share-target" class="btn-utility">
-                            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="5.5" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><line x1="8.3" y1="10.9" x2="15.7" y2="6.6"/><line x1="8.3" y1="13.1" x2="15.7" y2="17.4"/></svg>
-                            Share target
-                        </button>
                     </div>
                 </section>
 
@@ -173,6 +171,16 @@
                     </button>
                     <div class="action-row u-mt-10">
                         <button id="btn-gallery" class="action">Choose from gallery</button>
+                    </div>
+                    <div class="action-row u-mt-10">
+                        <button id="btn-print-target" class="btn-utility">
+                            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="8" rx="1.5"/><rect x="7" y="14" width="10" height="7"/></svg>
+                            Print target
+                        </button>
+                        <button id="btn-share-target" class="btn-utility">
+                            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="5.5" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><line x1="8.3" y1="10.9" x2="15.7" y2="6.6"/><line x1="8.3" y1="13.1" x2="15.7" y2="17.4"/></svg>
+                            Share target
+                        </button>
                     </div>
                 </section>
 

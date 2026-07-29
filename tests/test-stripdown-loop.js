@@ -160,23 +160,73 @@ check('ammo form submit persists via db.addLoad/db.updateLoad (round-trip editin
 
 console.log('\n--- range session: rifle, ammo, photo, group, MV ---\n');
 
-check('SessionLaunch.start({}) with no rifleId falls through to the flat rifle+ammo picker (asks which rifle, which ammo)', function () {
+check('SessionLaunch.start({}) with no rifleId falls through to the two-screen picker (screen 1: which rifle)', function () {
     var startBody = slice('js/app.js', 'window.SessionLaunch = {', 1500);
     assert(startBody.indexOf("switchView('session');") !== -1, 'start({}) must activate the session view');
     assert(startBody.indexOf('if (!opts.rifleId) return;') !== -1,
         'with no rifleId, start() must return early and leave the view\'s own picker in place, not force a specific rifle');
     // The profile picker itself is rendered by switchView('session')'s own
     // branch (not by SessionLaunch.start directly) whenever no step is in
-    // progress -- this is what "asks which rifle, which ammo" resolves to.
+    // progress -- this reaches _loadProfilePicker -> _renderRiflePicker
+    // (screen 1).
     var switchBody = slice('js/app.js', "if (viewName === 'session') {", 400);
     assert(switchBody.indexOf('_loadProfilePicker();') !== -1,
         "switchView('session') must render the profile picker when no session is in progress");
+    var loadBody = slice('js/session-flow.js', 'SessionFlow.prototype._loadProfilePicker = function () {', 700);
+    assert(loadBody.indexOf('this._renderRiflePicker();') !== -1,
+        '_loadProfilePicker must land on the rifle-only screen (screen 1), not the old combined picker');
 });
 
-check('the profile picker offers "+ New ammo" inline per rifle, using the same minimal NewAmmoForm', function () {
-    var body = slice('js/session-flow.js', 'SessionFlow.prototype._renderProfilePicker = function (groups) {', 5000);
-    assert(body.indexOf('NewAmmoForm.html(') !== -1 && body.indexOf('NewAmmoForm.bind(') !== -1,
-        'profile picker must offer inline "+ New ammo"');
+console.log('\n--- OWNER SPEC: Range Session entry is exactly two screens, rifle then ammo ---\n');
+
+check('Screen 1 ("Which rifle are you using?") shows ONLY the rifle list — no ammo, no other fields, no Quick Start/quick-mode content', function () {
+    var body = slice('js/session-flow.js', 'SessionFlow.prototype._renderRiflePicker = function () {', 2500);
+    assert(body.indexOf("_setProfileStepTitle('Which rifle are you using?')") !== -1,
+        'screen 1 must set the exact title "Which rifle are you using?"');
+    // The rendered choice rows must be keyed by rifle id only, never a
+    // load id -- proof this screen genuinely doesn't ask about ammo.
+    assert(/data-rifle-id=.*picker-rifle-btn|picker-rifle-btn.*data-rifle-id/.test(body) || body.indexOf("data-rifle-id=' + escapeAttr(r.id)") !== -1,
+        'rifle rows must be keyed by rifle id');
+    assert(body.indexOf('data-load-id') === -1, 'screen 1 must not reference any load/ammo id at all');
+    assert(body.indexOf('NewAmmoForm') === -1, 'screen 1 must not offer "+ New ammo" -- that belongs on screen 2 only');
+    assert(body.indexOf('quick-start') === -1 && body.indexOf('quickMode') === -1,
+        'screen 1 must not render Quick Start or Quick Mode content');
+});
+
+check('tapping a rifle on screen 1 moves to screen 2 (_renderAmmoPicker), nothing else', function () {
+    var body = slice('js/session-flow.js', 'SessionFlow.prototype._renderRiflePicker = function () {', 2500);
+    assert(/btns\[i\]\.addEventListener\('click', function \(\) \{\s*self\._renderAmmoPicker\(this\.getAttribute\('data-rifle-id'\)\);/.test(body),
+        'the rifle row click handler must call _renderAmmoPicker with that rifle\'s id, and nothing else in between');
+});
+
+check('Screen 2 ("Which ammo are you using?") shows ONLY the tapped rifle\'s own ammo, fetched by that rifle\'s id specifically', function () {
+    var body = slice('js/session-flow.js', 'SessionFlow.prototype._renderAmmoPicker = function (rifleId) {', 3000);
+    assert(body.indexOf("_setProfileStepTitle('Which ammo are you using?')") !== -1,
+        'screen 2 must set the exact title "Which ammo are you using?"');
+    assert(body.indexOf('this.db.getLoadsByRifle(rifleId)') !== -1,
+        'screen 2 must fetch loads scoped to the SAME rifleId the caller passed in -- never a flat, all-rifles/all-ammo list');
+    assert(body.indexOf('getAllRifles') === -1 && body.indexOf('getAllLoads') === -1,
+        'screen 2 must not re-query every rifle or every load -- it already knows which rifle');
+});
+
+check('Screen 2 offers "+ New ammo" (name, bullet, weight, advertised speed) scoped to this rifle, saving and continuing straight into the session', function () {
+    var body = slice('js/session-flow.js', 'SessionFlow.prototype._renderAmmoPicker = function (rifleId) {', 3000);
+    assert(body.indexOf('btn-new-ammo-inline') !== -1, 'no "+ New ammo" row on screen 2');
+    assert(body.indexOf('NewAmmoForm.html(') !== -1 && body.indexOf('NewAmmoForm.bind(idPrefix, self.db, rifleId') !== -1,
+        '"+ New ammo" must be scoped to THIS rifle (rifleId), not a generic/global form');
+    assert(body.indexOf('self._selectProfile(rifleId, load.id)') !== -1,
+        'saving new ammo must select it and continue straight into the session, not dead-end on screen 2');
+    var newAmmoBody = source('js/new-ammo.js');
+    ['-name', '-bullet', '-weight', '-velocity'].forEach(function (suffix) {
+        assert(newAmmoBody.indexOf("idPrefix + '" + suffix + "'") !== -1,
+            'NewAmmoForm is missing the "' + suffix.slice(1) + '" field (owner spec: name, bullet, weight, advertised speed)');
+    });
+});
+
+check('a rifle-scoped launch (SessionLaunch.start({rifleId}), when a caller already knows the rifle) jumps straight to screen 2 -- never re-asks screen 1', function () {
+    var body = slice('js/app.js', "if (!loads.length) {", 1200);
+    assert(body.indexOf('sessionFlow._renderAmmoPicker(rifle.id)') !== -1,
+        'a known rifle with no ammo yet must land directly on the ammo screen, not the rifle-picker screen');
 });
 
 check('photo capture uses the fixed EXIF-aware loadImageFromFile (item 4 of the prior UI Consolidation phase — photo must display straight)', function () {

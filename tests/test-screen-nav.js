@@ -313,10 +313,10 @@ check('js/new-ammo.js exports NewAmmoForm.html/bind', function () {
         throw new Error('NewAmmoForm does not export both html() and bind()');
     }
 });
-check('Paper session picker (session-flow.js) offers "+ New ammo" per rifle', function () {
+check('Range Session ammo screen (session-flow.js, STRIP-DOWN PHASE two-screen picker) offers "+ New ammo" for the selected rifle', function () {
     var source = readFile('js/session-flow.js');
-    var region = extractRegion(source, 'SessionFlow.prototype._renderProfilePicker = function', 6000);
-    if (region.indexOf('data-new-ammo-rifle') === -1) throw new Error('no "+ New ammo" row in the profile picker');
+    var region = extractRegion(source, 'SessionFlow.prototype._renderAmmoPicker = function', 6000);
+    if (region.indexOf('btn-new-ammo-inline') === -1) throw new Error('no "+ New ammo" row in the ammo picker screen');
     if (region.indexOf('NewAmmoForm') === -1) throw new Error('picker does not use NewAmmoForm');
     if (region.indexOf('_selectProfile(') === -1) throw new Error('saving new ammo does not continue into the session (_selectProfile)');
 });
@@ -384,7 +384,7 @@ console.log('\nSessionLaunch never falls through to the flat, unscoped all-rifle
 
 check('SessionLaunch.start (js/app.js) flags a pending scoped launch before switchView', function () {
     var source = readFile('js/app.js');
-    var region = extractRegion(source, 'window.SessionLaunch = {', 4300);
+    var region = extractRegion(source, 'window.SessionLaunch = {', 5000);
     if (region.indexOf('_scopedLaunchPending = true') === -1) {
         // AUDIT-FINDINGS.md F3: switchView('session') synchronously
         // triggers _loadProfilePicker()'s flat, all-rifles render. When
@@ -394,8 +394,8 @@ check('SessionLaunch.start (js/app.js) flags a pending scoped launch before swit
         // rifle-scoped picker rendered once the lookup resolves.
         throw new Error('SessionLaunch.start no longer sets _scopedLaunchPending before switchView(\'session\')');
     }
-    if (region.indexOf('_renderProfilePicker([{ rifle: rifle, loads: [] }])') === -1) {
-        throw new Error('the no-load case no longer scopes the picker to just the origin rifle');
+    if (region.indexOf('_renderAmmoPicker(rifle.id)') === -1) {
+        throw new Error('the no-load case no longer jumps straight to the ammo screen for the origin rifle (STRIP-DOWN PHASE two-screen picker)');
     }
     // The flag must be cleared at least 3 times: the two early-return
     // guards, plus once after the scoped Promise chain settles (success

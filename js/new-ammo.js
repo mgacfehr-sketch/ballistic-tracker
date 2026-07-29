@@ -3,13 +3,17 @@
  * form (device feedback: a rifle with no loads dead-ended every
  * session flow at "which load?" with no way to create one in place).
  *
- * Three fields only — name, bullet, weight — because that's what's
- * printed on a box of factory ammo. No BC, no drag model, no velocity:
+ * Four fields — name, bullet, weight, advertised speed — because
+ * that's what's printed on a box of factory ammo (STRIP-DOWN PHASE:
+ * the Range Session ammo screen's own spec named "advertised speed"
+ * explicitly; added here since this is the one shared inline-create
+ * form every live caller uses). Still no BC, no drag model, no lot:
  * this creates a real load row the session can attach to right now;
- * the full load form (rifle Paperwork) is still where BC/velocity/lot
- * get filled in properly. Callers that need a truing-capable load
- * (steel) handle the "still missing numbers" case themselves after
- * the fact — this module's only job is "never block on no load."
+ * the full load form (Rifles -> a rifle -> Ammo -> New/edit ammo) is
+ * still where BC/lot get filled in properly. Callers that need a
+ * truing-capable load (steel) handle the "still missing numbers" case
+ * themselves after the fact — this module's only job is "never block
+ * on no load."
  */
 
 var NewAmmoForm = (function () {
@@ -28,6 +32,8 @@ var NewAmmoForm = (function () {
             '<div class="field"><label for="' + idPrefix + '-weight">Weight <span class="field-unit">gr</span></label>' +
             '<input type="number" id="' + idPrefix + '-weight" min="10" max="1200" step="1" inputmode="numeric" placeholder="175"></div>' +
             '</div>' +
+            '<div class="field"><label for="' + idPrefix + '-velocity">Advertised speed <span class="field-unit">fps</span></label>' +
+            '<input type="number" id="' + idPrefix + '-velocity" min="0" max="5000" step="1" inputmode="numeric" placeholder="2650 (optional — from the box)"></div>' +
             '<button type="button" class="v3-gold" id="' + idPrefix + '-save">Save &amp; continue</button>' +
             '<p class="t-micro u-mt-10" id="' + idPrefix + '-error"></p>';
     }
@@ -41,10 +47,12 @@ var NewAmmoForm = (function () {
             var nameEl = document.getElementById(idPrefix + '-name');
             var bulletEl = document.getElementById(idPrefix + '-bullet');
             var weightEl = document.getElementById(idPrefix + '-weight');
+            var velocityEl = document.getElementById(idPrefix + '-velocity');
             var errEl = document.getElementById(idPrefix + '-error');
             var name = nameEl ? nameEl.value.trim() : '';
             var bulletName = bulletEl ? bulletEl.value.trim() : '';
             var weight = weightEl ? parseFloat(weightEl.value) : NaN;
+            var velocity = velocityEl ? parseFloat(velocityEl.value) : NaN;
 
             if (!name) {
                 if (errEl) errEl.textContent = 'Give it a name — the box label works.';
@@ -56,7 +64,8 @@ var NewAmmoForm = (function () {
                 rifleId: rifleId,
                 name: name,
                 bulletName: bulletName,
-                bulletWeight: isFinite(weight) && weight > 0 ? weight : 0
+                bulletWeight: isFinite(weight) && weight > 0 ? weight : 0,
+                muzzleVelocity: isFinite(velocity) && velocity > 0 ? velocity : 0
             }).then(function (load) {
                 onSaved(load);
             }).catch(function (err) {

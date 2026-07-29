@@ -68,6 +68,7 @@ SessionFlow.prototype.init = function () {
         progressBar: document.getElementById('progress-bar'),
         // Step 1: Profile
         profilePicker: document.getElementById('profile-picker'),
+        profileStepTitle: document.getElementById('profile-step-title'),
         btnQuickMode: document.getElementById('btn-quick-mode'),
         // Step 2: Load
         btnCamera: document.getElementById('btn-camera'),
@@ -340,6 +341,18 @@ SessionFlow.prototype._updateHint = function () {
 
 // ── Step 1: Profile Picker ────────────────────────────────────
 
+/**
+ * STRIP-DOWN PHASE (owner order, exact spec): Range Session's entry is
+ * now TWO sequential screens rendered into #profile-picker — screen 1
+ * "Which rifle are you using?" (rifle list only, nothing else), then
+ * screen 2 "Which ammo are you using?" (ONLY that rifle's ammo + "+ New
+ * ammo"). No other questions before those two. Replaces the prior
+ * single combined "every rifle with its ammo nested" picker.
+ */
+SessionFlow.prototype._setProfileStepTitle = function (text) {
+    if (this.els.profileStepTitle) this.els.profileStepTitle.textContent = text;
+};
+
 SessionFlow.prototype._loadProfilePicker = function () {
     var picker = this.els.profilePicker;
     if (!picker) return;
@@ -352,9 +365,18 @@ SessionFlow.prototype._loadProfilePicker = function () {
         picker.innerHTML = '<p class="t-micro">Database not available</p>';
         return;
     }
+    this._renderRiflePicker();
+};
 
+/** Screen 1: "Which rifle are you using?" — nothing else on screen. */
+SessionFlow.prototype._renderRiflePicker = function () {
+    var picker = this.els.profilePicker;
     var self = this;
+    this._setProfileStepTitle('Which rifle are you using?');
+    picker.innerHTML = '<p class="t-micro">Loading&hellip;</p>';
+
     this.db.getAllRifles().then(function (rifles) {
+        if (!picker.isConnected) return;
         if (rifles.length === 0) {
             // STRIP-DOWN PHASE: the "or tap 'Just measure this group'"
             // half of this copy referenced Quick Mode, now hidden (a
@@ -374,122 +396,100 @@ SessionFlow.prototype._loadProfilePicker = function () {
             return;
         }
 
-        // For each rifle, get its loads
-        var promises = rifles.map(function (r) {
-            return self.db.getLoadsByRifle(r.id).then(function (loads) {
-                return { rifle: r, loads: loads };
-            });
-        });
-
-        Promise.all(promises).then(function (groups) {
-            self._renderProfilePicker(groups);
-        });
-    });
-};
-
-SessionFlow.prototype._renderProfilePicker = function (groups) {
-    var picker = this.els.profilePicker;
-    var self = this;
-    var html = '';
-
-    // Quick Start buttons (beta feature)
-    if (typeof isBetaEnabled === 'function' && isBetaEnabled('quickStart') && groups.length > 0) {
-        html += '<div class="qcard-kicker">Quick start</div>';
-        html += '<div class="choice-stack u-mb-12">';
-        for (var q = 0; q < groups.length; q++) {
-            var qr = groups[q].rifle;
-            var qloads = groups[q].loads;
-            if (qloads.length === 0) continue;
-            // Use first load as default
-            var ql = qloads[0];
-            html += '<button class="choice-plate quick-start-btn" data-rifle-id="' + escapeAttr(qr.id) + '" data-load-id="' + escapeAttr(ql.id) + '">';
-            html += '<span>' + escapeHtml(qr.name);
-            html += '<span class="choice-desc">' + escapeHtml(qr.caliber) + ' &middot; ' + escapeHtml(ql.name) + '</span></span>';
-            html += Icon('chevron-right', 18);
-            html += '</button>';
-        }
-        html += '</div>';
-    }
-
-    for (var g = 0; g < groups.length; g++) {
-        var rifle = groups[g].rifle;
-        var loads = groups[g].loads;
-
-        loads.sort(function (a, b) {
+        rifles = rifles.slice().sort(function (a, b) {
             return (a.name || '').localeCompare(b.name || '');
         });
 
-        html += '<div class="qcard-kicker">' + escapeHtml(rifle.name) +
-            (rifle.caliber ? ' &middot; ' + escapeHtml(rifle.caliber) : '') + '</div>';
+        var html = '<div class="choice-stack">';
+        rifles.forEach(function (r) {
+            html += '<button class="choice-plate picker-rifle-btn" data-rifle-id="' + escapeAttr(r.id) + '">';
+            html += '<span>' + escapeHtml(r.name || 'Rifle') +
+                (r.caliber ? '<span class="choice-desc">' + escapeHtml(r.caliber) + '</span>' : '') + '</span>';
+            html += Icon('chevron-right', 18);
+            html += '</button>';
+        });
+        html += '</div>';
+        picker.innerHTML = html;
+
+        var btns = picker.querySelectorAll('.picker-rifle-btn');
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].addEventListener('click', function () {
+                self._renderAmmoPicker(this.getAttribute('data-rifle-id'));
+            });
+        }
+    });
+};
+
+/** Screen 2: "Which ammo are you using?" — ONLY this rifle's ammo,
+ *  plus "+ New ammo" (inline: name, bullet, weight, advertised speed —
+ *  saves to this rifle and continues straight into the session). */
+SessionFlow.prototype._renderAmmoPicker = function (rifleId) {
+    var picker = this.els.profilePicker;
+    var self = this;
+    picker.innerHTML = '<p class="t-micro">Loading&hellip;</p>';
+
+    Promise.all([
+        this.db.getRifle(rifleId),
+        this.db.getLoadsByRifle(rifleId)
+    ]).then(function (results) {
+        if (!picker.isConnected) return;
+        var rifle = results[0];
+        var loads = (results[1] || []).slice().sort(function (a, b) {
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        self._setProfileStepTitle('Which ammo are you using?');
+
+        var html = '<button type="button" class="backline" id="btn-ammo-picker-back">&lsaquo; ' +
+            escapeHtml(rifle ? (rifle.name || 'Rifle') : 'Rifle') + '</button>';
 
         if (loads.length === 0) {
             html += '<p class="t-micro">No ammo on file for this rifle yet.</p>';
         } else {
             html += '<div class="choice-stack">';
-            for (var l = 0; l < loads.length; l++) {
-                var ld = loads[l];
-                html += '<button class="choice-plate picker-load-btn" data-rifle-id="' + escapeAttr(rifle.id) + '" data-load-id="' + escapeAttr(ld.id) + '">';
+            loads.forEach(function (ld) {
+                html += '<button class="choice-plate picker-load-btn" data-load-id="' + escapeAttr(ld.id) + '">';
                 html += '<span>' + escapeHtml(ld.name);
                 html += '<span class="choice-desc">' + ld.bulletWeight + 'gr &middot; ' + ld.bulletDiameter + '&quot;</span></span>';
                 html += Icon('chevron-right', 18);
                 html += '</button>';
-            }
+            });
             html += '</div>';
         }
         // Device feedback: a load picker with no way to create a load
         // was a dead end. "+ New ammo" reveals a minimal inline form
         // right here — saving it selects this rifle with the new load
         // and continues into the session, nothing lost.
-        html += '<button type="button" class="action" data-new-ammo-rifle="' + escapeAttr(rifle.id) + '">' +
+        html += '<button type="button" class="action" id="btn-new-ammo-inline">' +
             Icon('plus', 18) + 'New ammo</button>';
-        html += '<div class="hidden" id="new-ammo-panel-' + escapeAttr(rifle.id) + '"></div>';
-    }
+        html += '<div class="hidden" id="new-ammo-panel-inline"></div>';
+        picker.innerHTML = html;
 
-    picker.innerHTML = html;
+        var backBtn = document.getElementById('btn-ammo-picker-back');
+        if (backBtn) backBtn.addEventListener('click', function () { self._renderRiflePicker(); });
 
-    if (typeof NewAmmoForm !== 'undefined') {
-        var newAmmoBtns = picker.querySelectorAll('[data-new-ammo-rifle]');
-        for (var na = 0; na < newAmmoBtns.length; na++) {
-            newAmmoBtns[na].addEventListener('click', function () {
-                var rId = this.getAttribute('data-new-ammo-rifle');
-                var panel = document.getElementById('new-ammo-panel-' + rId);
+        var newAmmoBtn = document.getElementById('btn-new-ammo-inline');
+        if (newAmmoBtn && typeof NewAmmoForm !== 'undefined') {
+            newAmmoBtn.addEventListener('click', function () {
+                var panel = document.getElementById('new-ammo-panel-inline');
                 if (!panel) return;
-                this.classList.add('hidden');
+                newAmmoBtn.classList.add('hidden');
                 panel.classList.remove('hidden');
-                var idPrefix = 'na-' + rId;
+                var idPrefix = 'na-' + rifleId;
                 panel.innerHTML = NewAmmoForm.html(idPrefix);
-                NewAmmoForm.bind(idPrefix, self.db, rId, function (load) {
-                    self._selectProfile(rId, load.id);
+                NewAmmoForm.bind(idPrefix, self.db, rifleId, function (load) {
+                    self._selectProfile(rifleId, load.id);
                 });
             });
         }
-    }
 
-    // Bind load buttons
-    var btns = picker.querySelectorAll('.picker-load-btn');
-    for (var i = 0; i < btns.length; i++) {
-        btns[i].addEventListener('click', function () {
-            var rId = this.getAttribute('data-rifle-id');
-            var lId = this.getAttribute('data-load-id');
-            self._selectProfile(rId, lId);
-        });
-    }
-
-    // Bind quick-start buttons
-    var qsBtns = picker.querySelectorAll('.quick-start-btn');
-    for (var qi = 0; qi < qsBtns.length; qi++) {
-        qsBtns[qi].addEventListener('click', function () {
-            var rId = this.getAttribute('data-rifle-id');
-            var lId = this.getAttribute('data-load-id');
-            self._selectProfile(rId, lId);
-            // Auto-fetch weather after profile select
-            setTimeout(function () {
-                if (self.els.btnFetchWeather && typeof self._fetchWeather === 'function') {
-                    self._fetchWeather();
-                }
-            }, 300);
-        });
-    }
+        var loadBtns = picker.querySelectorAll('.picker-load-btn');
+        for (var i = 0; i < loadBtns.length; i++) {
+            loadBtns[i].addEventListener('click', function () {
+                self._selectProfile(rifleId, this.getAttribute('data-load-id'));
+            });
+        }
+    });
 };
 
 SessionFlow.prototype._selectProfile = function (rifleId, loadId) {
