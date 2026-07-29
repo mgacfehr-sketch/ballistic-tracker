@@ -259,7 +259,7 @@ HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
     var container = this.profileManager.container;
     var dateStr = session.date ? new Date(session.date).toLocaleDateString() : 'Unknown date';
 
-    var html = this._toolbarHtml('btn-session-detail-back', 'History', escapeHtml(dateStr));
+    var html = this._toolbarHtml('btn-session-detail-back', 'Rifle', escapeHtml(dateStr));
     html += '<div class="screen">';
     html += this._sessionDetailBodyHtml(session);
     html += '</div>';
@@ -267,21 +267,20 @@ HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
 
     var self = this;
 
-    // UI Consolidation phase: session detail is reached DIRECTLY from
-    // the Card's feed (AppNav.openSession, via js/rifle-record.js) in
-    // live use today — showSessionList(rifleId) has no reachable caller
-    // of its own anymore, so a "back" that routed there first was a
-    // detour through a screen the shooter never actually opened, three
-    // taps from the Card instead of the required two. Goes straight
-    // home now, same as every other detail/record screen.
+    // STRIP-DOWN PHASE (owner order): session detail is now reached
+    // ONLY from a rifle's own page (profiles.js's _renderRifleDetail —
+    // "the saved session must be viewable from that rifle's page under
+    // Rifles"), so "back" returns to that rifle, not the main menu.
     document.getElementById('btn-session-detail-back').addEventListener('click', function () {
-        if (window.AppNav) AppNav.go('home'); else self.showSessionList(rifleId);
+        if (self.profileManager && rifleId) self.profileManager.showRifleDetail(rifleId);
+        else if (window.AppNav) AppNav.go('home');
     });
 
     document.getElementById('btn-delete-session').addEventListener('click', function () {
         if (confirm('Delete this session?')) {
             self.db.deleteSession(session.id).then(function () {
-                if (window.AppNav) AppNav.go('home'); else self.showSessionList(rifleId);
+                if (self.profileManager && rifleId) self.profileManager.showRifleDetail(rifleId);
+                else if (window.AppNav) AppNav.go('home');
             });
         }
     });

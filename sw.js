@@ -11,7 +11,7 @@
  *   Supabase API/Storage    → always network (never cached)
  */
 
-var CACHE_VERSION = 160;
+var CACHE_VERSION = 161;
 var CACHE_NAME = 'ballistic-v' + CACHE_VERSION;
 
 var APP_SHELL = [
@@ -88,6 +88,7 @@ var APP_SHELL = [
     './js/offline-cache.js',
     './js/sync-queue.js',
     './js/rifle-app.js',
+    './js/main-menu.js',
     './js/rifle-payoff.js',
     './js/rifle-add.js',
     './js/rifle-why.js',

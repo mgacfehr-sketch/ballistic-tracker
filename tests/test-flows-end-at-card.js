@@ -1,9 +1,17 @@
 /**
- * test-flows-end-at-card.js — UI Consolidation phase, law (2): "Every
- * flow ends at the Card. Saving anything (paper, steel, chrono,
- * cleaning, truing) returns to the Card with the feed updated." Plus
- * the companion law: from every reachable screen, a path of AT MOST
- * TWO taps reaches the Card.
+ * test-flows-end-at-card.js — written for the UI Consolidation phase's
+ * law (2): "Every flow ends at the Card... from every reachable
+ * screen, a path of AT MOST TWO taps reaches the Card."
+ *
+ * STRIP-DOWN PHASE UPDATE: the Card (js/rifle-app.js's RifleApp) is
+ * now HIDDEN — MainMenu is the resting screen ("home") instead. "The
+ * Card" below means "the resting screen" throughout; every check still
+ * verifies the same real thing (AppNav.go('home')/app.show(rifleId)
+ * reaches the app's current resting screen), it just isn't literally
+ * the Card anymore for the entries this phase touched. Not rewritten
+ * wholesale — most of these entries test flows/screens this phase left
+ * untouched (still HIDDEN but code-identical), so their own checks and
+ * hop counts still hold exactly as written.
  *
  * Same source-presence technique as tests/test-screen-nav.js (this
  * codebase ships no build tools/browser test runner — see that file's
@@ -125,10 +133,10 @@ var HOPS = [
         hops: 1, via: 'closes directly back onto the Card, which is already rendered underneath'
     },
     {
-        label: 'Paperwork (details drawer)',
-        file: 'js/profiles.js', anchor: "html += '<button type=\"button\" class=\"backline\" id=\"btn-detail-back\">&lsaquo; Home</button>';",
+        label: 'Rifle Detail (STRIP-DOWN PHASE: repurposed from Paperwork — edit/ammo/sessions only)',
+        file: 'js/profiles.js', anchor: "html += '<button type=\"button\" class=\"backline\" id=\"btn-detail-back\">&lsaquo; Rifles</button>';",
         check: function (body) { assert(body.length > 0, 'back button markup must exist'); },
-        hops: 1, via: 'its own "‹ Home" back button (fixed this phase from "‹ Rifles")'
+        hops: 2, via: 'its own "‹ Rifles" back button (1 hop) to the Rifles list, whose own back (1 hop) reaches the resting screen (Main Menu, post strip-down)'
     },
     {
         label: "Paperwork's Account overlay (Misc sessions / Suppressed shooting / Account)",

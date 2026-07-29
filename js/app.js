@@ -248,14 +248,22 @@
             profileManager.reportManager = new RifleReportManager(db, profileManager);
             profileManager.certificateManager = new CertificateManager(db, profileManager);
 
-            // v3.0: RifleApp is now THE resting screen (Part 1). HomeManager/
-            // Categories/Lanes stay instantiated for step 11's orderly
-            // retirement but no longer render — see V3-REPORT.md step 1.
+            // v3.0: RifleApp was THE resting screen (Part 1). STRIP-DOWN
+            // PHASE (owner order): MainMenu is now the resting screen
+            // instead — exactly two functions, Rifles and Range Session.
+            // RifleApp/HomeManager/Categories/Lanes all stay instantiated
+            // ("code stays, doors close") but none of them render on
+            // boot anymore.
             homeManager = new HomeManager(db);
             homeManager.init();
             rifleApp = new RifleApp(db);
             rifleApp.init();
-            rifleApp.show(); // the rifle is the default view — render immediately
+            if (typeof MainMenu !== 'undefined') {
+                MainMenu.init();
+                MainMenu.show(); // the main menu is the default view — render immediately
+            } else {
+                rifleApp.show(); // defensive fallback if main-menu.js failed to load
+            }
             if (typeof ToolRegistry !== 'undefined') {
                 var pLane = (typeof Lanes !== 'undefined') ? Lanes.init(db) : Promise.resolve();
                 Promise.all([ToolRegistry.init(db), pLane]).then(function () {
@@ -288,6 +296,11 @@
                 openRifle: function (rifleId) {
                     switchView('profiles');
                     profileManager.showRifleDetail(rifleId);
+                },
+                // STRIP-DOWN PHASE: the RIFLES entry point from MainMenu.
+                openRifleList: function () {
+                    switchView('profiles');
+                    profileManager.showRifleList();
                 },
                 openChronoReview: function (rifleId) {
                     switchView('chrono');
@@ -526,9 +539,16 @@
                 chronoManager.show();
             }
 
-            // v3.0: the rifle is the home view
-            if (viewName === 'home' && rifleApp) {
-                rifleApp.show();
+            // STRIP-DOWN PHASE: the main menu is the home view (was the
+            // Card/RifleApp — see initApp's own comment). Every existing
+            // AppNav.go('home') call across the whole codebase (the
+            // universal "done"/error/fallback redirect established in
+            // the UI Consolidation phase) now correctly lands here with
+            // zero changes needed at each call site.
+            if (viewName === 'home' && typeof MainMenu !== 'undefined') {
+                MainMenu.show();
+            } else if (viewName === 'home' && rifleApp) {
+                rifleApp.show(); // defensive fallback if main-menu.js failed to load
             }
 
             // Show admin when switching to admin tab

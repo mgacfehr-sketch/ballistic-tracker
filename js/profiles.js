@@ -28,22 +28,62 @@ ProfileManager.prototype.init = function () {
 };
 
 /**
- * showRifleList — RETIRED AS A PAGE (UI Consolidation phase). The
- * surface budget law: Card, switcher sheet, details drawer — nothing
- * else. Kept as a compatibility shim under its old name so the many
- * existing fallback callers (a not-found rifle in certificate.js/
- * history.js/rifle-report.js, a cancelled create-form, a failed detail
- * load) don't each need editing — every one of them now correctly
- * lands on the Card, the app's one resting screen, instead of a page
- * that no longer exists. Per-rifle status lines this page used to show
- * now live in the rifle switcher sheet (js/rifle-app.js's
- * _openRifleList). "Misc sessions" / "Suppressed shooting" / "Account"
- * moved to _showAccountOverlay, reached from Paperwork's "Settings &
- * sign-out" row.
+ * showRifleList — STRIP-DOWN PHASE (owner order). The RIFLES entry
+ * point, reached from MainMenu (AppNav.openRifleList). Deliberately
+ * minimal: name + caliber per rifle, "+ Add rifle" last, nothing else
+ * — no status chips, no search, no fleet summary (all HIDDEN this
+ * phase, see STRIPDOWN-REPORT.md). Kept under this name (not renamed)
+ * because the many existing fallback callers across certificate.js/
+ * history.js/rifle-report.js/profiles.js itself already call it
+ * expecting "somewhere safe to land" — it's a real, useful destination
+ * again, not a bounce to the main menu.
  */
 ProfileManager.prototype.showRifleList = function () {
     this.currentRifleId = null;
-    if (window.AppNav) AppNav.go('home');
+    var self = this;
+    this.db.getAllRifles().catch(function () { return []; }).then(function (rifles) {
+        rifles = rifles || [];
+        rifles.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+        self._renderRifleList(rifles);
+    });
+};
+
+ProfileManager.prototype._renderRifleList = function (rifles) {
+    var self = this;
+    var html = '<div class="screen">';
+    html += '<div class="pagehead"><button class="backline" id="btn-rifles-back">&lsaquo; Menu</button>' +
+        '<div class="pagetitle">Rifles</div></div>';
+
+    if (!rifles.length) {
+        html += '<div class="empty-teach">';
+        html += '<p>Add your first rifle to get started.</p>';
+        html += '<button type="button" class="btn-primary" id="btn-add-rifle">' + Icon('plus', 20) + 'Add rifle</button>';
+        html += '</div>';
+    } else {
+        var rows = '';
+        rifles.forEach(function (r) {
+            rows += UI.rowlink({
+                button: true, title: r.name || 'Rifle', sub: r.caliber || '',
+                data: { 'rifle-id': r.id }, chev: true
+            });
+        });
+        html += UI.card(rows);
+        html += '<div class="fab-zone"><button type="button" class="btn-primary" id="btn-add-rifle">' +
+            Icon('plus', 20) + 'Add rifle</button></div>';
+    }
+    html += '</div>';
+    this.container.innerHTML = html;
+
+    var backBtn = document.getElementById('btn-rifles-back');
+    if (backBtn) backBtn.addEventListener('click', function () { if (window.AppNav) AppNav.go('home'); });
+    var addBtn = document.getElementById('btn-add-rifle');
+    if (addBtn) addBtn.addEventListener('click', function () { self.showRifleForm(null); });
+    var rifleRows = this.container.querySelectorAll('[data-rifle-id]');
+    for (var i = 0; i < rifleRows.length; i++) {
+        rifleRows[i].addEventListener('click', function () {
+            self.showRifleDetail(this.getAttribute('data-rifle-id'));
+        });
+    }
 };
 
 /**
@@ -516,13 +556,15 @@ ProfileManager.prototype.showRifleDetail = function (rifleId) {
     Promise.all([
         this.db.getRifle(rifleId),
         this.db.getLoadsByRifle(rifleId),
-        this.db.getBarrelsByRifle(rifleId)
+        this.db.getBarrelsByRifle(rifleId),
+        this.db.getSessionsByRifle(rifleId).catch(function () { return []; })
     ]).then(function (results) {
         var rifle = results[0];
         var loads = results[1];
         var barrels = results[2];
+        var sessions = results[3];
         if (!rifle) { self.showRifleList(); return; }
-        self._renderRifleDetail(rifle, loads, barrels);
+        self._renderRifleDetail(rifle, loads, barrels, sessions);
     }).catch(function (err) {
         // Never dead-end silently — fall back to the list
         console.warn('[Profiles] rifle detail load failed:', err);
@@ -532,11 +574,19 @@ ProfileManager.prototype.showRifleDetail = function (rifleId) {
 };
 
 /**
- * THE RIFLE'S PAPERWORK (Contract v4.0 Part 2, surface 7): ONE plain
- * drawer, flat list, no sub-hierarchy. Status, the number, the chart,
- * and coaching all live on the Card now — this page is doors only.
+ * STRIP-DOWN PHASE (owner order): "tap to view/edit every field about
+ * that rifle... each rifle shows its ammo list... the saved session
+ * (photo, group size, MV) must be viewable from that rifle's page."
+ * Was THE RIFLE'S PAPERWORK (Contract v4.0, 9 rows — build sheet,
+ * ammo, barrel, trip planner, certificate/report, export, scope
+ * check, print target, account/settings). Every row besides Edit/Ammo
+ * is HIDDEN this phase (see STRIPDOWN-REPORT.md) — the underlying
+ * screens (showBarrelForm, _openTripPlanner, Categories.openReportCertificateFor,
+ * DataExport.open, ScopeCheck.start, _openTargetPrintChooser,
+ * _showAccountOverlay) all still exist, untouched, just not linked
+ * from here anymore.
  */
-ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
+ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels, sessions) {
     var self = this;
     // Feed the Home "Recent" strip (guarded — home.js may not be loaded)
     if (typeof Recents !== 'undefined') Recents.touchRifle(rifle);
@@ -546,101 +596,98 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
     }
     if (!activeBarrel && barrels.length) activeBarrel = barrels[0];
 
+    sessions = (sessions || []).slice().sort(function (a, b) {
+        return (b.date || '').localeCompare(a.date || '');
+    });
+
     var html = '<div class="screen">';
 
     html += '<div class="pagehead">';
-    html += '<button type="button" class="backline" id="btn-detail-back">&lsaquo; Home</button>';
+    html += '<button type="button" class="backline" id="btn-detail-back">&lsaquo; Rifles</button>';
     html += '<div class="pagetitle">' + escapeHtml(rifle.name) + '</div>';
     if (rifle.caliber) html += '<div class="pagesub mono">' + escapeHtml(rifle.caliber) + '</div>';
     html += '</div>';
 
-    var rows = '';
-    rows += UI.rowlink({
-        button: true, id: 'rd-build', title: 'Build sheet',
-        sub: 'Caliber, twist, scope height, zero range', chev: true
+    html += UI.card(UI.rowlink({
+        button: true, id: 'rd-edit', title: 'Edit rifle',
+        sub: 'Caliber, twist, scope height, zero range, and every build field', chev: true
+    }));
+
+    // ── Ammo ─────────────────────────────────────────────────
+    html += UI.sectionHead('Ammo');
+    var ammoRows = '';
+    (loads || []).forEach(function (ld) {
+        var bits = [];
+        if (ld.bulletWeight) bits.push(ld.bulletWeight + ' gr');
+        if (ld.muzzleVelocity) bits.push(Math.round(ld.muzzleVelocity) + ' fps');
+        ammoRows += UI.rowlink({
+            button: true, title: ld.name || 'Load', sub: bits.join(' · ') || '—',
+            subMono: true, chev: true, data: { 'ammo-row': ld.id }
+        });
     });
-    rows += UI.rowlink({
-        button: true, id: 'rd-ammo', title: 'Ammo list',
-        sub: (loads && loads.length) ? loads.length + ' on file' : 'None yet — add your first', chev: true
+    ammoRows += UI.rowlink({
+        button: true, titleHtml: '<span class="u-gold">＋ New ammo</span>',
+        sub: 'Name, bullet, weight, BC, advertised speed', data: { 'ammo-add': '1' }
     });
-    rows += UI.rowlink({
-        button: true, id: 'rd-barrel', title: 'Barrel & rounds',
-        sub: activeBarrel ? Number(activeBarrel.totalRounds || 0).toLocaleString() + ' rounds' : 'No barrel on file yet',
-        chev: true
-    });
-    rows += UI.rowlink({
-        button: true, id: 'rd-trip', title: 'Planning a trip?',
-        sub: 'Rounds left before this barrel needs cleaning', chev: true
-    });
-    rows += UI.rowlink({
-        button: true, id: 'rd-report', title: 'Certificate & report',
-        sub: 'For your records, or proof to share', chev: true
-    });
-    rows += UI.rowlink({
-        button: true, id: 'rd-export', title: 'Export everything',
-        sub: 'Built on this device — your data is yours', chev: true
-    });
-    rows += UI.rowlink({
-        button: true, id: 'rd-scope', title: 'Scope tracking',
-        sub: 'Verify your clicks are true', chev: true
-    });
-    rows += UI.rowlink({
-        button: true, id: 'rd-target', title: 'Print a target',
-        sub: 'The Proven target, letter or A4', chev: true
-    });
-    rows += UI.rowlink({
-        button: true, id: 'rd-settings', title: 'Settings & sign-out',
-        sub: 'Privacy, account', chev: true
-    });
-    html += UI.card(rows);
+    html += UI.card(ammoRows);
+
+    // ── Sessions (STRIP-DOWN PHASE: "viewable from that rifle's
+    // page") ────────────────────────────────────────────────
+    html += UI.sectionHead('Sessions');
+    if (!sessions.length) {
+        html += UI.card('<p class="t-body u-quiet" style="padding:var(--space-md)">No range sessions logged yet.</p>');
+    } else {
+        var sessRows = '';
+        sessions.forEach(function (s) {
+            var r = s.results || {};
+            var bits = [];
+            if (typeof r.groupSizeMOA === 'number') bits.push(r.groupSizeMOA.toFixed(2) + ' MOA');
+            if (s.measuredVelocity) bits.push(Math.round(s.measuredVelocity) + ' fps');
+            var when = s.date ? new Date(s.date).toLocaleDateString() : '';
+            sessRows += UI.rowlink({
+                button: true, title: when || 'Session', sub: bits.join(' · ') || '—',
+                subMono: true, chev: true, data: { 'session-row': s.id }
+            });
+        });
+        html += UI.card(sessRows);
+    }
 
     html += '</div>'; // .screen
 
     this.container.innerHTML = html;
-    this._bindRifleDetailEvents(rifle, activeBarrel);
+    this._bindRifleDetailEvents(rifle, sessions);
 };
 
-ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel) {
+ProfileManager.prototype._bindRifleDetailEvents = function (rifle, sessions) {
     var self = this;
 
     document.getElementById('btn-detail-back').addEventListener('click', function () {
         self.showRifleList();
     });
-    document.getElementById('rd-build').addEventListener('click', function () {
+    document.getElementById('rd-edit').addEventListener('click', function () {
         self.showRifleForm(rifle.id);
     });
-    document.getElementById('rd-ammo').addEventListener('click', function () {
-        self.showLoadsList(rifle.id);
-    });
-    document.getElementById('rd-barrel').addEventListener('click', function () {
-        if (activeBarrel && self.historyManager) {
-            self.historyManager.showCleaningLog(rifle.id, activeBarrel.id);
-        } else {
-            self.showBarrelForm(rifle.id, null);
-        }
-    });
-    document.getElementById('rd-trip').addEventListener('click', function () {
-        self._openTripPlanner(rifle, activeBarrel);
-    });
-    document.getElementById('rd-report').addEventListener('click', function () {
-        if (typeof Categories !== 'undefined' && Categories.openReportCertificateFor) {
-            Categories.openReportCertificateFor(rifle.id);
-        }
-    });
-    document.getElementById('rd-export').addEventListener('click', function () {
-        if (typeof DataExport !== 'undefined') DataExport.open(self.db);
-    });
-    document.getElementById('rd-scope').addEventListener('click', function () {
-        if (typeof ScopeCheck !== 'undefined') {
-            ScopeCheck.start(self.db, function () { self.showRifleDetail(rifle.id); });
-        }
-    });
-    document.getElementById('rd-target').addEventListener('click', function () {
-        self._openTargetPrintChooser();
-    });
-    document.getElementById('rd-settings').addEventListener('click', function () {
-        self._showAccountOverlay();
-    });
+
+    var ammoRows = this.container.querySelectorAll('[data-ammo-row]');
+    for (var i = 0; i < ammoRows.length; i++) {
+        ammoRows[i].addEventListener('click', function () {
+            self.showLoadDetail(rifle.id, this.getAttribute('data-ammo-row'));
+        });
+    }
+    var ammoAdd = this.container.querySelector('[data-ammo-add]');
+    if (ammoAdd) {
+        ammoAdd.addEventListener('click', function () {
+            self.showLoadForm(rifle.id, null);
+        });
+    }
+
+    var sessionRows = this.container.querySelectorAll('[data-session-row]');
+    for (var s = 0; s < sessionRows.length; s++) {
+        sessionRows[s].addEventListener('click', function () {
+            var id = this.getAttribute('data-session-row');
+            if (self.historyManager) self.historyManager.showSessionDetail(id, rifle.id);
+        });
+    }
 };
 
 /**

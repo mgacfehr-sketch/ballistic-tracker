@@ -288,7 +288,7 @@ check('UI Consolidation: the rifle switcher shows per-rifle status lines (the re
         throw new Error('the switcher status fill does not use the shared Readiness engine — every other readiness surface in this app must compute the verdict the same way');
     }
 });
-check('UI Consolidation: the Account overlay (Misc sessions/Suppressed shooting/Account) is closeable and reachable from Paperwork\'s Settings row', function () {
+check('UI Consolidation: the Account overlay (Misc sessions/Suppressed shooting/Account) code is intact — STRIP-DOWN PHASE update: no longer wired from any live screen (its Paperwork "Settings & sign-out" row was hidden this phase; see STRIPDOWN-REPORT.md), "code stays, doors close"', function () {
     var source = readFile('js/profiles.js');
     var region = extractRegion(source, 'ProfileManager.prototype._showAccountOverlay = function', 3000);
     if (region.indexOf("id='ao-close'") === -1 && region.indexOf('#ao-close') === -1) {
@@ -296,10 +296,12 @@ check('UI Consolidation: the Account overlay (Misc sessions/Suppressed shooting/
     }
     if (region.indexOf('ao-misc-sessions') === -1) throw new Error('Misc sessions did not move into the Account overlay');
     if (region.indexOf('ao-delete-account') === -1) throw new Error('Delete account did not move into the Account overlay');
-    var bindRegion = readFile('js/profiles.js');
-    var settingsRegion = extractRegion(bindRegion, "document.getElementById('rd-settings').addEventListener", 200);
-    if (settingsRegion.indexOf('_showAccountOverlay()') === -1) {
-        throw new Error('Paperwork\'s "Settings & sign-out" row no longer opens the Account overlay');
+    // STRIP-DOWN PHASE: confirm the door really is closed — no
+    // 'rd-settings' row exists anywhere in profiles.js anymore to
+    // accidentally still reach it.
+    var whole = readFile('js/profiles.js');
+    if (whole.indexOf("'rd-settings'") !== -1) {
+        throw new Error('an rd-settings reference still exists — the Account overlay door should be fully closed this phase');
     }
 });
 
