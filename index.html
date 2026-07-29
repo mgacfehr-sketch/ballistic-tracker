@@ -337,6 +337,18 @@
                         <button id="btn-save-image" class="action">Save image</button>
                         <button id="btn-share" class="action">Share</button>
                     </div>
+                    <!-- UI Consolidation phase: "every flow ends at the Card" —
+                         this was the paper-capture flow's dead end (device
+                         testing verdict): saving left the shooter stranded on
+                         the results step with only Crop/Save image/Share and
+                         a wizard "back" chevron that walks back INTO marking
+                         impacts again, never forward. Hidden until the save
+                         actually succeeds (session-flow.js reveals it), so it
+                         never appears as a false "you're done" before the
+                         write lands. -->
+                    <div class="action-row u-mt-10 hidden" id="btn-session-done-row">
+                        <button id="btn-session-done" class="action-primary">Done</button>
+                    </div>
                     <div class="action-row u-mt-10">
                         <button id="btn-new-from-results" class="action-ghost u-center">Start a new session</button>
                     </div>

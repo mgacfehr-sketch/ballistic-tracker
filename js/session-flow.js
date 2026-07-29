@@ -103,6 +103,8 @@ SessionFlow.prototype.init = function () {
         btnShare: document.getElementById('btn-share'),
         btnNewFromResults: document.getElementById('btn-new-from-results'),
         btnCropImage: document.getElementById('btn-crop-image'),
+        btnSessionDoneRow: document.getElementById('btn-session-done-row'),
+        btnSessionDone: document.getElementById('btn-session-done'),
         // Print/share blank target (on profile step)
         btnPrintTarget: document.getElementById('btn-print-target'),
         btnShareTarget: document.getElementById('btn-share-target'),
@@ -195,6 +197,10 @@ SessionFlow.prototype.reset = function () {
         this.els.btnSaveSession.disabled = false;
         this.els.btnSaveSession.innerHTML = Icon('check', 20) + ' Save session';
     }
+    // UI Consolidation phase: "Done" only ever means THIS save
+    // succeeded — must never carry over as a stale affordance into a
+    // fresh, not-yet-saved session.
+    this._hideEl(this.els.btnSessionDoneRow);
 
     // Clear preset selection
     var presetBtns = document.querySelectorAll('.preset-btn');
@@ -856,6 +862,11 @@ SessionFlow.prototype._bindUI = function () {
     this.els.btnNewFromResults.addEventListener('click', function () {
         self.reset();
     });
+    if (this.els.btnSessionDone) {
+        this.els.btnSessionDone.addEventListener('click', function () {
+            if (window.AppNav) AppNav.go('home');
+        });
+    }
     if (this.els.btnCropImage) {
         this.els.btnCropImage.addEventListener('click', function () {
             self._toggleCropMode();
@@ -1375,6 +1386,13 @@ SessionFlow.prototype._saveSession = function () {
         btn.innerHTML = Icon('check', 20) + (saved._pending
             ? ' Saved — will sync when you\'re back online'
             : ' Saved to history');
+        // UI Consolidation phase: "every flow ends at the Card" — before
+        // this, a saved paper session left the shooter stranded on the
+        // results step with no forward path (Crop/Save image/Share and a
+        // wizard "back" chevron that walks back INTO marking impacts
+        // again, never toward the rifle). Revealed only now, after the
+        // write actually lands, never before.
+        self._showEl(self.els.btnSessionDoneRow);
         if (typeof Recents !== 'undefined') Recents.touchSession(saved.id, self.selectedRifle);
         self._storeAnnotatedImage(saved.id);
         // A confirmed zero writes an append-only zero EVENT (§2.10) —

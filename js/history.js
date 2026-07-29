@@ -267,14 +267,21 @@ HistoryManager.prototype._renderSessionDetail = function (session, rifleId) {
 
     var self = this;
 
+    // UI Consolidation phase: session detail is reached DIRECTLY from
+    // the Card's feed (AppNav.openSession, via js/rifle-record.js) in
+    // live use today — showSessionList(rifleId) has no reachable caller
+    // of its own anymore, so a "back" that routed there first was a
+    // detour through a screen the shooter never actually opened, three
+    // taps from the Card instead of the required two. Goes straight
+    // home now, same as every other detail/record screen.
     document.getElementById('btn-session-detail-back').addEventListener('click', function () {
-        self.showSessionList(rifleId);
+        if (window.AppNav) AppNav.go('home'); else self.showSessionList(rifleId);
     });
 
     document.getElementById('btn-delete-session').addEventListener('click', function () {
         if (confirm('Delete this session?')) {
             self.db.deleteSession(session.id).then(function () {
-                self.showSessionList(rifleId);
+                if (window.AppNav) AppNav.go('home'); else self.showSessionList(rifleId);
             });
         }
     });
@@ -446,7 +453,11 @@ HistoryManager.prototype._renderCleaningForm = function (rifle, barrelId, totalR
             notes: document.getElementById('cl-notes').value.trim()
         };
         self.db.addCleaningLog(data).then(function () {
-            self.showCleaningLog(rifle.id, barrelId);
+            // UI Consolidation phase: "every flow ends at the Card" —
+            // saving a cleaning entry now returns straight to the Card
+            // (whose feed already includes cleaning logs) instead of
+            // back to the log list, matching every other save flow.
+            if (window.AppNav) AppNav.go('home'); else self.showCleaningLog(rifle.id, barrelId);
         });
     });
 };
