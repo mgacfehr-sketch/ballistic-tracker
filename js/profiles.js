@@ -696,6 +696,10 @@ ProfileManager.prototype._renderRifleDetail = function (rifle, loads, barrels) {
         chev: true
     });
     rows += UI.rowlink({
+        button: true, id: 'rd-trip', title: 'Planning a trip?',
+        sub: 'Rounds left before this barrel needs cleaning', chev: true
+    });
+    rows += UI.rowlink({
         button: true, id: 'rd-report', title: 'Certificate & report',
         sub: 'For your records, or proof to share', chev: true
     });
@@ -742,6 +746,9 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
             self.showBarrelForm(rifle.id, null);
         }
     });
+    document.getElementById('rd-trip').addEventListener('click', function () {
+        self._openTripPlanner(rifle, activeBarrel);
+    });
     document.getElementById('rd-report').addEventListener('click', function () {
         if (typeof Categories !== 'undefined' && Categories.openReportCertificateFor) {
             Categories.openReportCertificateFor(rifle.id);
@@ -760,6 +767,66 @@ ProfileManager.prototype._bindRifleDetailEvents = function (rifle, activeBarrel)
     });
     document.getElementById('rd-settings').addEventListener('click', function () {
         self.showRifleList();
+    });
+};
+
+/**
+ * Amendment 1 A14 — pre-trip round budgeting. "Runs only when the
+ * shooter asks or states a planned objective; advisory only; never a
+ * capture prerequisite" -- this is that explicit, request-only entry
+ * point (never surfaced automatically in next-action.js's coach ladder).
+ * Rounds since cleaning is computed from data the app already has
+ * (Constitution §6: never ask what the phone/app already knows); the
+ * cleaning interval and mission cost are THIS rifle's owner's own
+ * numbers, not a product-wide default (A7: "owner preferences... not
+ * product priors").
+ */
+ProfileManager.prototype._openTripPlanner = function (rifle, activeBarrel) {
+    var self = this;
+    var pLogs = activeBarrel
+        ? this.db.getCleaningLogsByBarrel(activeBarrel.id).catch(function () { return []; })
+        : Promise.resolve([]);
+    pLogs.then(function (logs) {
+        var latest = null;
+        (logs || []).forEach(function (l) { if (!latest || (l.date || '') > (latest.date || '')) latest = l; });
+        var roundsSinceCleaning = activeBarrel
+            ? Math.max(0, (activeBarrel.totalRounds || 0) - (latest ? (latest.roundCountAtCleaning || 0) : 0))
+            : 0;
+
+        var overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.innerHTML = '<div class="overlay-card">' +
+            '<div class="overlay-title">Planning a trip?</div>' +
+            '<p class="overlay-text">' + Number(roundsSinceCleaning).toLocaleString() +
+            ' rounds since ' + UI.esc(rifle.name || 'this rifle') + '\'s last cleaning.</p>' +
+            '<div class="field"><label for="tp-interval">Your usual cleaning interval (rounds)</label>' +
+            '<input type="number" inputmode="numeric" id="tp-interval" value="75"></div>' +
+            '<div class="field"><label for="tp-cost">Rounds this trip will likely cost</label>' +
+            '<input type="number" inputmode="numeric" id="tp-cost" value="18"></div>' +
+            '<p class="overlay-text" id="tp-verdict"></p>' +
+            '<button class="btn-primary u-full" id="tp-calc">Check my margin</button>' +
+            '<button class="btn u-full u-mt-10" id="tp-close">Close</button>' +
+            '</div>';
+        document.body.appendChild(overlay);
+        function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        overlay.querySelector('#tp-close').addEventListener('click', close);
+        overlay.querySelector('#tp-calc').addEventListener('click', function () {
+            var interval = parseInt(document.getElementById('tp-interval').value, 10);
+            var cost = parseInt(document.getElementById('tp-cost').value, 10);
+            var verdictEl = document.getElementById('tp-verdict');
+            if (typeof deriveRoundBudget !== 'function' || !isFinite(interval) || !isFinite(cost)) {
+                verdictEl.textContent = 'Enter both numbers to check.';
+                return;
+            }
+            var result = deriveRoundBudget({
+                roundsSinceCleaning: roundsSinceCleaning,
+                cleaningIntervalRounds: interval,
+                missionRoundCost: cost
+            });
+            verdictEl.textContent = result.verdict;
+            verdictEl.className = 'overlay-text ' + (result.word === 'ok' ? 'u-gold' : 'warn');
+        });
     });
 };
 

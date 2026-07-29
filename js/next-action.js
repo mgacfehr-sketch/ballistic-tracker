@@ -57,9 +57,32 @@ function _bestDistanceString(strings) {
     return best;
 }
 
+/** Amendment 1 Phase D coach copy per troubleshooting ladder step
+ *  (Validation Doctrine §7). */
+var TROUBLESHOOT_STEP_TITLE = {
+    zero: 'Re-check your zero',
+    mount: 'Check your scope mount and action fasteners',
+    velocity: 'Re-measure muzzle velocity',
+    builder: 'This may need your builder\'s attention'
+};
+
 /**
  * The ladder. → { id, title, detail, payoff, action:{type}, dismissible }
  * or the go-shoot floor. Dismissed rungs fall through to the next.
+ *
+ * Amendment 1 Phase D additions (both optional, backward-compatible --
+ * omitting either reproduces the exact pre-Phase-D ladder):
+ *   input.troubleshootingHold: { inHold, ladderStep } | null/undefined
+ *     -- js/validation-status.js's deriveTroubleshootingHold output.
+ *     While inHold, this becomes the ONLY non-floor rung: Commandment
+ *     32 ("never tune math around an unresolved hardware or zero
+ *     problem") means the truing-suggesting rungs (true-rifle, re-true,
+ *     confirm-true) must not appear at all until the hold clears.
+ *   input.configCompatNote: string | null -- js/config-memory.js's
+ *     checkCompatibility().note when the rifle's current suppressor/
+ *     barrel differs from what the last zero/truing was recorded under
+ *     (Constitution §12.2). Suppressed while in a troubleshooting hold
+ *     (the hold rung already owns the "something needs checking" slot).
  */
 function deriveNextAction(input) {
     var status = input.status || null;
@@ -68,8 +91,23 @@ function deriveNextAction(input) {
     var trued = status ? status.trued : null;
     var tracking = status ? status.tracking : null;
     var provenYd = (status && status.rollup && status.rollup.calibratedToYd) || 0;
+    var holdActive = !!(input.troubleshootingHold && input.troubleshootingHold.inHold);
 
     var ladder = [];
+
+    /* 0 — troubleshooting hold: highest priority, non-dismissible
+     * (Validation Doctrine §7 + Commandment 32). */
+    if (holdActive) {
+        var step = input.troubleshootingHold.ladderStep;
+        ladder.push({
+            id: 'troubleshoot-' + step,
+            title: TROUBLESHOOT_STEP_TITLE[step] || 'Work through the troubleshooting check',
+            detail: 'An earlier miss was bigger than a speed or drag problem explains — work this check before truing again.',
+            payoff: 'Clears the hold so truing can resume.',
+            action: { type: 'troubleshootingCheck', step: step },
+            dismissible: false
+        });
+    }
 
     /* 1 — no load/bullet or no MV at all */
     if (!input.hasLoad || !mv || mv.state === 'none') {
@@ -104,6 +142,21 @@ function deriveNextAction(input) {
             title: zTitle,
             detail: zDetail,
             payoff: 'Proven at 100.',
+            action: { type: 'rangeSession' },
+            dismissible: true
+        });
+    }
+
+    /* 2.5 — Phase C: the current suppressor/barrel doesn't match what
+     * the last zero/truing was recorded under (Constitution §12.2). The
+     * hold rung already owns "something needs checking" while active,
+     * so this stays silent then instead of stacking two warnings. */
+    if (input.configCompatNote && !holdActive) {
+        ladder.push({
+            id: 'config-changed',
+            title: 'Confirm zero for this configuration',
+            detail: input.configCompatNote,
+            payoff: 'Keeps PROVEN TO honest for the setup you\'re actually shooting.',
             action: { type: 'rangeSession' },
             dismissible: true
         });
@@ -197,6 +250,16 @@ function deriveNextAction(input) {
             payoff: 'Keeps the round count honest.',
             action: { type: 'cleaningLog' },
             dismissible: true
+        });
+    }
+
+    /* Commandment 32: never propose a ballistic correction while an
+     * unresolved troubleshooting hold is active -- strip the
+     * correction-suggesting rungs entirely (the hold rung above already
+     * occupies the "something needs attention" slot). */
+    if (holdActive) {
+        ladder = ladder.filter(function (r) {
+            return r.id !== 'true-rifle' && r.id !== 're-true' && r.id !== 'confirm-true' && r.id !== 'shoot-distance';
         });
     }
 

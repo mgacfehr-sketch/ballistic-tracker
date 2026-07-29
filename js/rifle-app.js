@@ -206,7 +206,7 @@ RifleApp.prototype._loadAndFillRifle = function (rifle) {
             if (!activeBarrel && barrels.length) activeBarrel = barrels[0];
 
             if (g) {
-                self._fillNumber(rifle, g, steel, activeBarrel, tracking);
+                self._fillNumber(rifle, g, steel, activeBarrel, tracking, zeroEvents);
                 self._fillChart(rifle, g);
             }
 
@@ -230,8 +230,9 @@ RifleApp.prototype._confWord = function (word) {
     return MAP[word] || (word || '').toLowerCase();
 };
 
-RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel, trackingVerifications) {
+RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel, trackingVerifications, zeroEvents) {
     var self = this;
+    var db = this.db;
     var status = g.status;
     var yd = status.rollup.calibratedToYd || 0;
 
@@ -287,7 +288,52 @@ RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel,
         });
     }
 
-    pShots.then(function () {
+    // Amendment 1 Phase D: the troubleshooting hold + Phase C's
+    // configuration-compatibility note both feed the SAME coach line
+    // next-action.js already owns -- no separate widget (Card UI
+    // convention: coach line is the voice of the status engine).
+    var pChecks = db.getTroubleshootingChecksByRifle
+        ? db.getTroubleshootingChecksByRifle(rifle.id).catch(function () { return []; }) : Promise.resolve([]);
+    var pSuppEpochs = db.getConfigEpochsByRifle
+        ? db.getConfigEpochsByRifle(rifle.id, 'suppressor').catch(function () { return []; }) : Promise.resolve([]);
+    var pLotEpochs = db.getConfigEpochsByRifle
+        ? db.getConfigEpochsByRifle(rifle.id, 'lot').catch(function () { return []; }) : Promise.resolve([]);
+    var pValidation = Promise.all([pChecks, pSuppEpochs, pLotEpochs]).then(function (vres) {
+        var checkRows = vres[0] || [];
+        var suppressorEpochs = (vres[1] || []).map(function (e) { return { value: e.value, startedAt: e.startedAt }; });
+        var lotEpochs = (vres[2] || []).map(function (e) { return { value: e.value, startedAt: e.startedAt }; });
+
+        var alarmRows = checkRows.filter(function (r) { return r && r.step === 'alarm'; })
+            .sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+        var alarmAt = alarmRows.length ? alarmRows[0].createdAt : null;
+        var checks = checkRows.filter(function (r) { return r && r.step !== 'alarm'; })
+            .map(function (r) { return { step: r.step, result: r.result, at: r.createdAt }; });
+        var hold = (typeof deriveTroubleshootingHold === 'function')
+            ? deriveTroubleshootingHold({ alarmAt: alarmAt, checks: checks })
+            : { inHold: false, ladderStep: null };
+
+        var configCompatNote = null;
+        if (typeof deriveCurrentState === 'function' && typeof checkCompatibility === 'function') {
+            var current = deriveCurrentState({ suppressorEpochs: suppressorEpochs, lotEpochs: lotEpochs });
+            var latestZero = null;
+            (zeroEvents || []).forEach(function (z) { if (!latestZero || (z.date || '') > (latestZero.date || '')) latestZero = z; });
+            if (latestZero) {
+                var compat = checkCompatibility({
+                    currentSuppressorId: current.suppressor ? current.suppressor.value : undefined,
+                    currentLotNumber: current.lot ? current.lot.value : undefined,
+                    currentBarrelId: activeBarrel ? activeBarrel.id : undefined,
+                    eventSuppressorId: latestZero.suppressorId,
+                    eventLotNumber: latestZero.lotNumber,
+                    eventBarrelId: latestZero.barrelId
+                });
+                if (!compat.compatible) configCompatNote = compat.note;
+            }
+        }
+        return { hold: hold, configCompatNote: configCompatNote };
+    }).catch(function () { return { hold: { inHold: false, ladderStep: null }, configCompatNote: null }; });
+
+    Promise.all([pShots, pValidation]).then(function (allRes) {
+        var validation = allRes[1];
         if (!self.container.isConnected || self._currentRifle() !== rifle) return;
         var na = deriveNextAction({
             now: new Date().toISOString(),
@@ -295,6 +341,8 @@ RifleApp.prototype._fillNumber = function (rifle, g, steelStrings, activeBarrel,
             hasLoad: hasLoad,
             mvTrueYd: mvTrueYd,
             distanceStrings: distanceStrings,
+            troubleshootingHold: validation.hold,
+            configCompatNote: validation.configCompatNote,
             roundsSinceCleaning: since,
             dismissals: {}
         });

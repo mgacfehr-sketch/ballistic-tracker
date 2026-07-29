@@ -1954,3 +1954,46 @@ BallisticDB.prototype.getRecurringTargets = function (rifleId) {
             return (res.data || []).map(_rowToJs);
         });
 };
+
+// ═════════════════════════════════════════════════════════════
+// Amendment 1 Phase D — troubleshooting ladder (Validation Doctrine §7).
+// One row IS the alarm trigger (step: 'alarm', result: 'alarm', written
+// by rifle-payoff.js's validation gate the moment a spot-check reads
+// 'alarm'); subsequent rows are the ladder steps themselves (zero,
+// mount, velocity, builder), each an append-only fact -- never edited,
+// never deleted, per the Validation Doctrine's own "recording each
+// check as a fact." js/validation-status.js's deriveTroubleshootingHold
+// derives current hold state from the latest 'alarm' row plus every
+// row after it.
+// ═════════════════════════════════════════════════════════════
+
+BallisticDB.prototype.addTroubleshootingCheck = function (data) {
+    var self = this;
+    var record = {
+        id: generateUUID(),
+        rifleId: data.rifleId,
+        step: data.step,       // 'alarm' | 'zero' | 'mount' | 'velocity' | 'builder'
+        result: data.result,   // 'alarm' | 'ok' | 'issue_found' | 'resolved'
+        notes: data.notes || null,
+        createdAt: new Date().toISOString()
+    };
+    var row = _jsToRow(record, self.userId);
+    return self.supabase.from('troubleshooting_checks').insert(row).select().single()
+        .then(function (res) {
+            if (res.error) throw res.error;
+            var saved = _rowToJs(res.data);
+            self._writeFactEvent('troubleshooting_check', 'troubleshooting_checks', saved, { provenance: 'manual' });
+            return saved;
+        });
+};
+
+BallisticDB.prototype.getTroubleshootingChecksByRifle = function (rifleId) {
+    var self = this;
+    return self.supabase.from('troubleshooting_checks').select()
+        .eq('user_id', self.userId).eq('rifle_id', rifleId)
+        .order('created_at', { ascending: true })
+        .then(function (res) {
+            if (res.error) throw res.error;
+            return (res.data || []).map(_rowToJs);
+        });
+};

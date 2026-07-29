@@ -170,5 +170,52 @@ check('everything dismissed → the floor',
         dismissals: { 'confirm-zero': NOW }
     }).id, 'go-shoot');
 
+console.log('\nAmendment 1 Phase D — troubleshooting hold override:');
+check('hold active → hold rung wins over everything, even add-load',
+    derive({ hasLoad: false, troubleshootingHold: { inHold: true, ladderStep: 'zero' } }).id,
+    'troubleshoot-zero');
+check('hold rung title matches the ladder step',
+    derive({ troubleshootingHold: { inHold: true, ladderStep: 'mount' } }).title,
+    'Check your scope mount and action fasteners');
+check('hold rung is never dismissible',
+    derive({ troubleshootingHold: { inHold: true, ladderStep: 'zero' } }).dismissible, false);
+check('hold rung deep-links to the troubleshooting check action',
+    JSON.stringify(derive({ troubleshootingHold: { inHold: true, ladderStep: 'velocity' } }).action),
+    JSON.stringify({ type: 'troubleshootingCheck', step: 'velocity' }));
+check('a flagged truing does NOT surface re-true while a hold is active (Commandment 32)',
+    derive({
+        status: greenStatus({ trued: { state: 'mv', toYd: 700, flagged: true } }),
+        troubleshootingHold: { inHold: true, ladderStep: 'zero' }
+    }).id, 'troubleshoot-zero');
+check('an untrued rifle with a ready string does NOT surface true-rifle during a hold',
+    derive({
+        status: untrued, distanceStrings: [{ distanceYd: 600, shotCount: 8 }],
+        troubleshootingHold: { inHold: true, ladderStep: 'zero' }
+    }).id, 'troubleshoot-zero');
+check('hold false/absent reproduces the exact pre-Phase-D ladder (no regression)',
+    derive({ troubleshootingHold: { inHold: false, ladderStep: null } }).id, 'go-shoot');
+check('omitting troubleshootingHold entirely is identical to hold:false',
+    derive({}).id, 'go-shoot');
+
+console.log('\nAmendment 1 Phase D — configuration-compatibility rung (Phase C tie-in):');
+check('a config-compat note surfaces its own rung when nothing else is wrong',
+    derive({ configCompatNote: 'Different muzzle configuration than this event.' }).id,
+    'config-changed');
+check('config-compat rung carries the note verbatim as detail',
+    derive({ configCompatNote: 'Different muzzle configuration than this event.' }).detail,
+    'Different muzzle configuration than this event.');
+check('zero-never still outranks a config-compat note',
+    derive({
+        status: greenStatus({ zero: { state: 'never' } }),
+        configCompatNote: 'Different muzzle configuration than this event.'
+    }).id, 'confirm-zero');
+check('config-compat rung is suppressed while a troubleshooting hold is active (one warning at a time)',
+    derive({
+        configCompatNote: 'Different muzzle configuration than this event.',
+        troubleshootingHold: { inHold: true, ladderStep: 'zero' }
+    }).id, 'troubleshoot-zero');
+check('no config-compat note -> no such rung (silence, not a placeholder)',
+    derive({}).id, 'go-shoot');
+
 console.log('\nResults: ' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -464,6 +464,13 @@ var RifleAdd = (function () {
      *  logging the hit at all. */
     function _finishSteelSave(app, rifle, S, units, ctx, btn) {
         var suppressorId = (ctx.suppressorEnabled && ctx.lastCan) ? ctx.lastCan : null;
+        // Amendment 1 Phase C: this is the actual v3/v4 simple-lane save
+        // path (the older session-flow.js/steel-session.js call this too,
+        // but this screen didn't) -- without it, a suppressor CHANGE made
+        // through the primary UI never became a config_epochs fact.
+        if (ctx.suppressorEnabled && typeof Suppressors !== 'undefined') {
+            Suppressors.rememberLastUsed(app.db, rifle.id, suppressorId).catch(function () {});
+        }
         var stringId = generateUUID();
         _write(app.db, 'addSteelString', {
             id: stringId, rifleId: rifle.id, loadId: ctx.load.id,
@@ -506,6 +513,9 @@ var RifleAdd = (function () {
      *  engine, built for N observations sharing one distance/dial). */
     function _finishSteelSaveMulti(app, rifle, S, units, ctx, btn) {
         var suppressorId = (ctx.suppressorEnabled && ctx.lastCan) ? ctx.lastCan : null;
+        if (ctx.suppressorEnabled && typeof Suppressors !== 'undefined') {
+            Suppressors.rememberLastUsed(app.db, rifle.id, suppressorId).catch(function () {});
+        }
         var stringId = generateUUID();
         _write(app.db, 'addSteelString', {
             id: stringId, rifleId: rifle.id, loadId: ctx.load.id,

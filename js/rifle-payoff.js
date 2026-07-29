@@ -22,12 +22,97 @@ var RiflePayoff = (function () {
     'use strict';
 
     /**
-     * obs = { rangeYds, dialed, hitInches, units, shotMV, mvMeasured,
-     *         zeroConfirmed, trackingVerified }
+     * Amendment 1 Phase D validation gate — runs BEFORE any truing
+     * attempt (Commandment 32: "never tune math around an unresolved
+     * hardware or zero problem"). Two independent reasons to block:
+     *   1. an unresolved troubleshooting hold from an earlier alarm
+     *      (Validation Doctrine §7 -- js/validation-status.js's
+     *      deriveTroubleshootingHold, fed by db.getTroubleshootingChecksByRifle);
+     *   2. THIS observation itself reads as an alarm (A10's fixed ~1 MOA
+     *      fallback -- js/validation-status.js's deriveSpotCheckOutcome).
+     *
+     * Scoped decision, disclosed in PHASECD-REPORT.md: A10's full
+     * baseline-relative classification (confirmed/drift/alarm) needs a
+     * per-rifle, per-distance, compatibility-filtered residual baseline
+     * (js/config-memory.js's checkCompatibility over prior compatible
+     * observations). Building and testing that data-gathering query is
+     * out of scope for this pass; this gate always passes `baseline:
+     * null`, which is the exact case A10 itself defines a rule for
+     * ("a fixed ~1 MOA fallback applies only when no baseline exists")
+     * -- so today's gate is the alarm/drift binary, never a false
+     * "confirmed." A drift-or-better observation proceeds through
+     * exactly the same solve as before Phase D existed -- no regression
+     * to the ordinary path.
+     *
+     * Never blocks on its OWN failure (a DB read error here must not
+     * prevent a shooter from seeing their payoff) -- fails open into the
+     * pre-Phase-D behavior.
      */
-    function run(app, rifle, load, obs) {
+    function _checkValidationGate(app, rifle, errMOA) {
+        var getChecks = (app.db && app.db.getTroubleshootingChecksByRifle)
+            ? app.db.getTroubleshootingChecksByRifle(rifle.id).catch(function () { return []; })
+            : Promise.resolve([]);
+        return getChecks.then(function (rows) {
+            rows = rows || [];
+            var alarmRows = rows.filter(function (r) { return r && r.step === 'alarm'; })
+                .sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+            var alarmAt = alarmRows.length ? alarmRows[0].createdAt : null;
+            var checks = rows.filter(function (r) { return r && r.step !== 'alarm'; })
+                .map(function (r) { return { step: r.step, result: r.result, at: r.createdAt }; });
+            var hold = deriveTroubleshootingHold({ alarmAt: alarmAt, checks: checks });
+            if (hold.inHold) return { blocked: true, reason: 'hold', hold: hold };
+
+            var outcome = deriveSpotCheckOutcome({ observedErrorMOA: errMOA, baseline: null });
+            if (outcome === 'alarm') {
+                if (app.db && app.db.addTroubleshootingCheck) {
+                    app.db.addTroubleshootingCheck({ rifleId: rifle.id, step: 'alarm', result: 'alarm' }).catch(function () {});
+                }
+                return {
+                    blocked: true, reason: 'alarm',
+                    hold: deriveTroubleshootingHold({ alarmAt: new Date().toISOString(), checks: [] })
+                };
+            }
+            return { blocked: false };
+        }).catch(function (err) {
+            console.warn('[RiflePayoff] validation gate failed, proceeding without it:', err);
+            return { blocked: false };
+        });
+    }
+
+    var TROUBLESHOOT_STEP_COPY = {
+        zero: 'Re-check your zero before anything else.',
+        mount: 'Check your scope mount and action fasteners.',
+        velocity: 'Chronograph this load again — has muzzle velocity changed?',
+        builder: 'This may need your builder\'s attention.'
+    };
+
+    /** The hold screen — same visual language as _couldNotUse (gold OK,
+     *  plain sentence, "still logged" reassurance), never the correction
+     *  UI. No Keep/Undo here -- there is nothing to keep; the gate never
+     *  reaches the solver at all. */
+    function _showHoldScreen(app, rifle, gate) {
         var container = app.container;
-        var profile = {
+        container.setAttribute('data-screen', 'v3-payoff-hold');
+        var step = gate.hold ? gate.hold.ladderStep : null;
+        var why = gate.reason === 'alarm'
+            ? 'That miss is bigger than a speed or drag problem can explain.'
+            : 'This rifle is mid-troubleshooting from an earlier miss like this.';
+        container.innerHTML = '<div class="screen">' +
+            '<div class="v3-payoff">' +
+            '<div class="say" style="margin-top:60px">' + UI.esc(why) + '</div>' +
+            '<div class="sub">' + UI.esc(TROUBLESHOOT_STEP_COPY[step] || 'Check the rifle before shooting more at distance.') + '</div>' +
+            '</div>' +
+            '<div class="sub" style="padding:0 var(--edge);margin-top:10px">Your string is still logged — this just isn\'t used to true the rifle until that check is done.</div>' +
+            '<button class="v3-gold" id="rp-hold-ok" style="margin-top:20px">OK</button>' +
+            '<div style="height:16px"></div></div>';
+        document.getElementById('rp-hold-ok').addEventListener('click', function () { app.show(rifle.id); });
+    }
+
+    /** Same profile shape every payoff path builds -- factored out so the
+     *  validation gate (below) and the actual solve agree on exactly
+     *  what "predicted" means. */
+    function _profileFor(rifle, load) {
+        return {
             muzzleVelocity: load.truedMv || load.muzzleVelocity,
             bc: load.truedBc || load.bulletBC,
             dragModel: load.dragModel || 'G7',
@@ -35,6 +120,44 @@ var RiflePayoff = (function () {
             zeroRange: rifle.zeroRange || 100,
             scopeHeight: rifle.scopeHeight || 1.5
         };
+    }
+    var PAYOFF_ENV = { tempF: null, pressureInHg: null, humidity: null, source: 'default' };
+
+    /**
+     * The RESIDUAL the validation gate must classify (A10) is the gap
+     * between what the observation implies was needed (observedComeUpMOA
+     * -- the same "hit HIGH -> it took LESS than you dialed" quantity
+     * simple-true.js itself computes) and what the CURRENT profile
+     * already predicts at that range. Comparing the raw observedComeUpMOA
+     * against the ~1 MOA fallback directly would be wrong -- that
+     * quantity is routinely several MOA at any real distance and would
+     * misclassify nearly everything as "alarm."
+     */
+    function _residualMOA(rifle, load, obs) {
+        var dialedMOA = simpleToMOA(obs.dialed || 0, obs.units || 'MOA', obs.rangeYds);
+        var hitMOA = inchesToMOA(obs.hitInches || 0, obs.rangeYds);
+        var observedComeUpMOA = dialedMOA - hitMOA;
+        var predictedMOA = 0;
+        try { predictedMOA = simpleComeUpAt(_profileFor(rifle, load), PAYOFF_ENV, obs.rangeYds) || 0; }
+        catch (e) { /* leave predictedMOA at 0 -- worst case, over-classifies toward alarm, never under */ }
+        return observedComeUpMOA - predictedMOA;
+    }
+
+    /**
+     * obs = { rangeYds, dialed, hitInches, units, shotMV, mvMeasured,
+     *         zeroConfirmed, trackingVerified }
+     */
+    function run(app, rifle, load, obs) {
+        var errMOA = _residualMOA(rifle, load, obs);
+        _checkValidationGate(app, rifle, errMOA).then(function (gate) {
+            if (gate.blocked) { _showHoldScreen(app, rifle, gate); return; }
+            _runCorrection(app, rifle, load, obs);
+        });
+    }
+
+    function _runCorrection(app, rifle, load, obs) {
+        var container = app.container;
+        var profile = _profileFor(rifle, load);
 
         var env = { tempF: null, pressureInHg: null, humidity: null, source: 'default' };
         var out = null;
@@ -194,7 +317,30 @@ var RiflePayoff = (function () {
         };
     }
 
+    /** Same residual concept as _residualMOA, averaged across every hit
+     *  in the string -- one classification per string, not per shot. */
+    function _residualMOAMulti(rifle, load, obs) {
+        var dialedMOA = simpleToMOA(obs.dialed || 0, obs.units || 'MOA', obs.rangeYds);
+        var hits = obs.hits || [];
+        var avgHitMOA = hits.length
+            ? hits.reduce(function (a, b) { return a + inchesToMOA(b || 0, obs.rangeYds); }, 0) / hits.length
+            : 0;
+        var observedComeUpMOA = dialedMOA - avgHitMOA;
+        var predictedMOA = 0;
+        try { predictedMOA = simpleComeUpAt(_profileFor(rifle, load), PAYOFF_ENV, obs.rangeYds) || 0; }
+        catch (e) { /* leave at 0 */ }
+        return observedComeUpMOA - predictedMOA;
+    }
+
     function runMulti(app, rifle, load, obs) {
+        var errMOA = _residualMOAMulti(rifle, load, obs);
+        _checkValidationGate(app, rifle, errMOA).then(function (gate) {
+            if (gate.blocked) { _showHoldScreen(app, rifle, gate); return; }
+            _runCorrectionMulti(app, rifle, load, obs);
+        });
+    }
+
+    function _runCorrectionMulti(app, rifle, load, obs) {
         var profile = {
             muzzleVelocity: load.truedMv || load.muzzleVelocity, bc: load.truedBc || load.bulletBC,
             dragModel: load.dragModel || 'G7', bulletWeight: load.bulletWeight || 140,
